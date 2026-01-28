@@ -26,6 +26,7 @@ use App\Models\Category;
 use App\Models\ThemeSetting;
 use App\Models\Testimonial;
 use App\Models\Blog;
+use App\Models\Referrer;
 use Exception;
 use Illuminate\Http\Request;
 use Carbon\Carbon;
@@ -120,8 +121,9 @@ class AppointmentController extends Controller
             // $combinedArray = array_merge($busineshours, $businesholiday);
             $combinedArray = $busineshours;
 
+            $referrers = Referrer::where('business_id', getActiveBusiness())->where('is_active', true)->orderBy('name')->pluck('name', 'id')->prepend(__('Select Referring Doctor'), '');
 
-            return view('appointment.create', compact('location', 'service', 'staff', 'customer', 'busineshours', 'busineshours', 'businesholiday', 'combinedArray'));
+            return view('appointment.create', compact('location', 'service', 'staff', 'customer', 'busineshours', 'busineshours', 'businesholiday', 'combinedArray', 'referrers'));
         } else {
             return redirect()->back()->with('error', __('Permission denied.'));
         }
@@ -208,6 +210,7 @@ class AppointmentController extends Controller
             $appointment->date = !empty($request->appointment_date) ? $request->appointment_date : '';
             $appointment->time = !empty($request->duration) ? $request->duration : '';
             $appointment->notes = !empty($request->notes) ? $request->notes : '';
+            $appointment->referrer_id = !empty($request->referrer_id) ? $request->referrer_id : null;
             $appointment->appointment_status = !empty($default_status) ? $default_status : 'Pending';
             $appointment->payment_type = !empty($request->payment_type) ? $request->payment_type : 'Manually';
             $appointment->business_id = getActiveBusiness();
@@ -309,8 +312,9 @@ class AppointmentController extends Controller
             $timeSlots = timeSlot($appointment->service_id, $appointment->date);
             // }
 
+            $referrers = Referrer::where('business_id', getActiveBusiness())->where('is_active', true)->orderBy('name')->pluck('name', 'id')->prepend(__('Select Referring Doctor'), '');
 
-            return view('appointment.edit', compact('location', 'service', 'staff', 'customer', 'busineshours', 'busineshours', 'appointment', 'timeSlots', 'combinedArray', 'businesholiday'));
+            return view('appointment.edit', compact('location', 'service', 'staff', 'customer', 'busineshours', 'busineshours', 'appointment', 'timeSlots', 'combinedArray', 'businesholiday', 'referrers'));
         } else {
             return redirect()->back()->with('error', __('Permission denied.'));
         }
@@ -350,6 +354,7 @@ class AppointmentController extends Controller
             $appointment->date = !empty($request->appointment_date) ? $request->appointment_date : '';
             $appointment->time = !empty($request->duration) ? $request->duration : '';
             $appointment->notes = !empty($request->notes) ? $request->notes : '';
+            $appointment->referrer_id = !empty($request->referrer_id) ? $request->referrer_id : null;
             $appointment->save();
 
             $AppointmentPayment = AppointmentPayment::where('appointment_id', $appointment->id)->first();
@@ -1199,7 +1204,7 @@ class AppointmentController extends Controller
      */
     public function printToken($id)
     {
-        $appointment = Appointment::with(['ServiceData', 'StaffData', 'LocationData', 'CustomerData'])->find($id);
+        $appointment = Appointment::with(['ServiceData', 'StaffData', 'LocationData', 'CustomerData', 'ReferrerData'])->find($id);
         
         if (!$appointment) {
             return redirect()->back()->with('error', __('Appointment not found!'));

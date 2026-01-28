@@ -20,6 +20,7 @@ class Appointment extends Model
         'date',
         'time',
         'notes',
+        'referrer_id',
         'payment_type',
         'appointment_status',
         'attachment',
@@ -67,6 +68,11 @@ class Appointment extends Model
     public function LocationData()
     {
         return $this->hasOne(Location::class, 'id', 'location_id');
+    }
+
+    public function ReferrerData()
+    {
+        return $this->belongsTo(Referrer::class, 'referrer_id', 'id');
     }
 
     public function StatusData()

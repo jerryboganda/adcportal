@@ -37,6 +37,7 @@ use App\Http\Controllers\BlogController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\TestimonialController;
 use App\Http\Controllers\SubscribeController;
+use App\Http\Controllers\ReferrerController;
 
 /*
 |--------------------------------------------------------------------------
@@ -227,6 +228,11 @@ Route::middleware(['auth', 'verified'])->group(function () {
     // Print Token
     Route::get('appointment/{id}/print-token', [AppointmentController::class, 'printToken'])->name('appointment.print-token');
     // End appointment
+
+    // Referring Doctors
+    Route::resource('referrer', ReferrerController::class);
+    Route::post('referrer/{referrer}/toggle-status', [ReferrerController::class, 'toggleStatus'])->name('referrer.toggle-status');
+    // End Referring Doctors
 
     // custom field
     Route::post('business/custom-field-setting/{id}', [CustomFieldController::class, 'CustomFieldSetting'])->name('custom-field.setting');

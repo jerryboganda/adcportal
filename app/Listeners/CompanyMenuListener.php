@@ -214,6 +214,19 @@ class CompanyMenuListener
             'group' => 'appointments'
         ]);
         $menu->add([
+            'title' => __('Referring Doctors'),
+            'icon' => 'stethoscope',
+            'name' => 'referrers',
+            'parent' => null,
+            'order' => 215,
+            'ignore_if' => [],
+            'depend_on' => [],
+            'route' => 'referrer.index',
+            'module' => $module,
+            'permission' => 'referrer manage',
+            'group' => 'appointments'
+        ]);
+        $menu->add([
             'title' => __('Contacts'),
             'icon' => 'phone',
             'name' => 'contacts',

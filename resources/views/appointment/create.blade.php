@@ -131,6 +131,22 @@
                 @enderror
             </div>
         </div>
+
+        <div class="col-md-12">
+            <div class="form-group">
+                {{ Form::label('referrer_id', __('Referred By'), ['class' => 'form-label']) }}
+                {{ Form::select('referrer_id', $referrers, null, ['class' => 'form-control']) }}
+                <div class="text-xs mt-1">{{ __('Manage referring doctors here. ') }}
+                    <a href="{{ route('referrer.index') }}" target="_blank"><b>{{ __('Manage Referrers') }}</b></a>
+                </div>
+                @error('referrer_id')
+                    <small class="invalid-referrer" role="alert">
+                        <strong class="text-danger">{{ $message }}</strong>
+                    </small>
+                @enderror
+            </div>
+        </div>
+
         {!! Form::hidden('appointment_status', 'Pending') !!}
         <div class="form-group col-md-6">
             <label for="appointment_date" class="col-form-label pt-0">{{ __('Appointment Date') }}</label>

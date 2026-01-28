@@ -25,7 +25,7 @@ class AppointmentDataTable extends DataTable
 
     public function dataTable(QueryBuilder $query): EloquentDataTable
     {
-        $rowColumn = ['id', 'customer_id', 'staff_id', 'service_id', 'location_id', 'appointment_status', 'date_duration'];
+        $rowColumn = ['id', 'customer_id', 'staff_id', 'service_id', 'location_id', 'referrer_id', 'appointment_status', 'date_duration'];
 
         $dataTable = (new EloquentDataTable($query))->addIndexColumn()
             ->addColumn('id', function (Appointment $Appointment) {
@@ -85,6 +85,14 @@ class AppointmentDataTable extends DataTable
                 });
             })
 
+            ->editColumn('referrer_id', function (Appointment $apointment) {
+                return '<span class="white-space">' . (!empty(optional($apointment->ReferrerData)) ? optional($apointment->ReferrerData)->name : "-") . '</span>';
+            })->filterColumn('referrer_id', function ($query, $keyword) {
+                $query->whereHas('ReferrerData', function ($q) use ($keyword) {
+                    $q->where('name', 'like', "%$keyword%");
+                });
+            })
+
             ->editColumn('appointment_status', function (Appointment $Appointment) {
                 $title = (!empty($Appointment->StatusData) ? $Appointment->StatusData->title : (module_is_active('WaitingList') && $Appointment->appointment_status == 'Waiting List' ? $Appointment->appointment_status : 'Pending'));
                 $color = (!empty($Appointment->StatusData->status_color) ? $Appointment->StatusData->status_color : '5bc0de');
@@ -121,7 +129,7 @@ class AppointmentDataTable extends DataTable
     public function query(Appointment $model, Request $request): QueryBuilder
     {
         // $business       = Business::find(($request->business) ?  $request->business : getActiveBusiness());
-        $Appointments = $model->with('CustomerData', 'ServiceData', 'StaffData', 'LocationData', 'StatusData')->where('created_by', $this->business->created_by)->where('business_id', $this->business->id);
+        $Appointments = $model->with('CustomerData', 'ServiceData', 'StaffData', 'LocationData', 'StatusData', 'ReferrerData')->where('created_by', $this->business->created_by)->where('business_id', $this->business->id);
 
         if ($request->date) {
             $date = date('d-m-Y', strtotime($request->date));
@@ -273,6 +281,7 @@ class AppointmentDataTable extends DataTable
             Column::make('staff_id')->title(__('Staff')),
             Column::make('service_id')->title(__('Service')),
             Column::make('location_id')->title(__('Location')),
+            Column::make('referrer_id')->title(__('Referred By')),
             Column::make('payment_type')->title(__('Payment')),
             Column::make('appointment_status')->title(__('Status'))->addClass('status_badge'),
         ];

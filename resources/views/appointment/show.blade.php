@@ -79,6 +79,12 @@
                         {{ !empty($appointment->StatusData) ? $appointment->StatusData->title : ((module_is_active('WaitingList') && $appointment->appointment_status == 'Waiting List') ? $appointment->appointment_status : 'Pending') }}
                     </dd>
                     </div>
+                    <div class="appointment-detail-item d-flex flex-wrap align-items-start gap-2">
+                    <dt class="text-md mb-0 h6">{{ __('Referred By:') }}</dt>
+                    <dd class="text-md mb-0">
+                        {{ !empty($appointment->ReferrerData) ? $appointment->ReferrerData->name : '-' }}
+                    </dd>
+                    </div>
                     @if (module_is_active('PromoCodes'))
                     <div class="appointment-detail-item d-flex flex-wrap align-items-start gap-2">
                         <dt class="text-md mb-0 h6">{{ __('Final Price:') }}</dt>
