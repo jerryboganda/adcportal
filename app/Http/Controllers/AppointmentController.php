@@ -1199,7 +1199,7 @@ class AppointmentController extends Controller
      */
     public function printToken($id)
     {
-        $appointment = Appointment::with(['service', 'staff', 'location', 'customer'])->find($id);
+        $appointment = Appointment::with(['ServiceData', 'StaffData', 'LocationData', 'CustomerData'])->find($id);
         
         if (!$appointment) {
             return redirect()->back()->with('error', __('Appointment not found!'));

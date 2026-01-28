@@ -141,8 +141,8 @@
         <!-- Header -->
         <div class="header">
             <h1>{{ $business->name ?? 'Amad Diagnostic Centre' }}</h1>
-            @if($appointment->location)
-                <p>{{ $appointment->location->name ?? '' }}</p>
+            @if($appointment->LocationData)
+                <p>{{ $appointment->LocationData->name ?? '' }}</p>
             @endif
         </div>
         
@@ -156,16 +156,16 @@
         <div class="details">
             <div class="detail-row">
                 <span class="label">Patient:</span>
-                <span class="value">{{ $appointment->name ?? ($appointment->customer->name ?? 'Walk-in') }}</span>
+                <span class="value">{{ $appointment->name ?? ($appointment->CustomerData->name ?? 'Walk-in') }}</span>
             </div>
             <div class="detail-row">
                 <span class="label">Service:</span>
-                <span class="value">{{ $appointment->service->name ?? 'N/A' }}</span>
+                <span class="value">{{ $appointment->ServiceData->name ?? 'N/A' }}</span>
             </div>
-            @if($appointment->staff)
+            @if($appointment->StaffData)
             <div class="detail-row">
                 <span class="label">Doctor/Staff:</span>
-                <span class="value">{{ $appointment->staff->name ?? 'N/A' }}</span>
+                <span class="value">{{ $appointment->StaffData->name ?? 'N/A' }}</span>
             </div>
             @endif
             <div class="detail-row">
