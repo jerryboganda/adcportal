@@ -149,12 +149,26 @@
     .fl11-content-body {
         flex-direction: column;
     }
+    
+    /* Time section - form first, summary second */
+    .fl11-content-body.fl11-time-section {
+        flex-direction: column !important;
+    }
+    
+    .fl11-form-section {
+        order: 1;
+        width: 100% !important;
+    }
+    
+    .fl11-form-section.fl11-full-width {
+        width: 100% !important;
+    }
 
     .fl11-summary-panel {
         min-width: 100%;
         max-width: 100%;
-        order: -1;
-        margin-bottom: 16px;
+        order: 2;
+        margin-top: 16px;
     }
 
     .fl11-services-grid {

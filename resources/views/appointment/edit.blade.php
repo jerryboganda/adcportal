@@ -87,13 +87,10 @@
 
         <div class="col-md-12">
             <div class="form-group">
-                {{ Form::label('referrer_id', __('Referred By'), ['class' => 'form-label']) }}
-                {{ Form::select('referrer_id', $referrers, $appointment->referrer_id, ['class' => 'form-control']) }}
-                <div class="text-xs mt-1">{{ __('Manage referring doctors here. ') }}
-                    <a href="{{ route('referrer.index') }}" target="_blank"><b>{{ __('Manage Referrers') }}</b></a>
-                </div>
-                @error('referrer_id')
-                    <small class="invalid-referrer" role="alert">
+                {{ Form::label('referred_by', __('Referred By'), ['class' => 'form-label']) }}
+                {{ Form::text('referred_by', $appointment->referred_by, ['class' => 'form-control', 'placeholder' => __('Enter Referring Doctor Name')]) }}
+                @error('referred_by')
+                    <small class="invalid-feedback" role="alert">
                         <strong class="text-danger">{{ $message }}</strong>
                     </small>
                 @enderror

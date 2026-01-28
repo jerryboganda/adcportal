@@ -368,6 +368,13 @@
                                                     id="contact" placeholder="Phone Number">
                                             </div>
                                         </div>
+                                        <div class="col-md-6 col-12">
+                                            <div class="form-group">
+                                                <label>{{ __('Referred By') }}</label>
+                                                <input type="text" class="form-control" name="referred_by"
+                                                    id="referred_by" placeholder="{{ __('Doctor Name (Optional)') }}">
+                                            </div>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
@@ -388,6 +395,13 @@
                                                 <label>{{ __('Paasword') }}</label>
                                                 <input type="password" class="form-control" name="password"
                                                     id="password" placeholder="Your Password">
+                                            </div>
+                                        </div>
+                                        <div class="col-md-6 col-12">
+                                            <div class="form-group">
+                                                <label>{{ __('Referred By') }}</label>
+                                                <input type="text" class="form-control" name="referred_by"
+                                                    id="referred_by" placeholder="{{ __('Doctor Name (Optional)') }}">
                                             </div>
                                         </div>
                                     </div>
@@ -417,6 +431,13 @@
                                                 <small class="text-muted">(+917878787878)</small>
                                                 <input type="text" class="form-control" name="contact"
                                                     id="contact" placeholder="Phone Number">
+                                            </div>
+                                        </div>
+                                        <div class="col-md-4 col-12">
+                                            <div class="form-group">
+                                                <label>{{ __('Referred By') }}</label>
+                                                <input type="text" class="form-control" name="referred_by"
+                                                    id="referred_by" placeholder="{{ __('Doctor Name (Optional)') }}">
                                             </div>
                                         </div>
                                     </div>

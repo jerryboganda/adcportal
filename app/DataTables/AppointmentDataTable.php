@@ -86,11 +86,13 @@ class AppointmentDataTable extends DataTable
             })
 
             ->editColumn('referrer_id', function (Appointment $apointment) {
-                return '<span class="white-space">' . (!empty(optional($apointment->ReferrerData)) ? optional($apointment->ReferrerData)->name : "-") . '</span>';
+                $name = $apointment->referred_by ?? (!empty(optional($apointment->ReferrerData)) ? optional($apointment->ReferrerData)->name : "-");
+                return '<span class="white-space">' . $name . '</span>';
             })->filterColumn('referrer_id', function ($query, $keyword) {
-                $query->whereHas('ReferrerData', function ($q) use ($keyword) {
-                    $q->where('name', 'like', "%$keyword%");
-                });
+                $query->where('referred_by', 'like', "%$keyword%")
+                      ->orWhereHas('ReferrerData', function ($q) use ($keyword) {
+                            $q->where('name', 'like', "%$keyword%");
+                      });
             })
 
             ->editColumn('appointment_status', function (Appointment $Appointment) {

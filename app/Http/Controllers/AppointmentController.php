@@ -211,6 +211,7 @@ class AppointmentController extends Controller
             $appointment->time = !empty($request->duration) ? $request->duration : '';
             $appointment->notes = !empty($request->notes) ? $request->notes : '';
             $appointment->referrer_id = !empty($request->referrer_id) ? $request->referrer_id : null;
+            $appointment->referred_by = !empty($request->referred_by) ? $request->referred_by : null;
             $appointment->appointment_status = !empty($default_status) ? $default_status : 'Pending';
             $appointment->payment_type = !empty($request->payment_type) ? $request->payment_type : 'Manually';
             $appointment->business_id = getActiveBusiness();
@@ -355,6 +356,7 @@ class AppointmentController extends Controller
             $appointment->time = !empty($request->duration) ? $request->duration : '';
             $appointment->notes = !empty($request->notes) ? $request->notes : '';
             $appointment->referrer_id = !empty($request->referrer_id) ? $request->referrer_id : null;
+            $appointment->referred_by = !empty($request->referred_by) ? $request->referred_by : null;
             $appointment->save();
 
             $AppointmentPayment = AppointmentPayment::where('appointment_id', $appointment->id)->first();
@@ -776,6 +778,7 @@ class AppointmentController extends Controller
                 $Appointment->date = !empty($request->appointment_date) ? $request->appointment_date : '';
                 $Appointment->time = !empty($request->duration) ? $request->duration : '';
                 $Appointment->notes = !empty($request->notes) ? $request->notes : '';
+                $Appointment->referred_by = !empty($request->referred_by) ? $request->referred_by : null;
                 $Appointment->payment_type = !empty($request->payment) ? $request->payment : 'Manually';
                 $Appointment->appointment_status = !empty($default_status) ? $default_status : 'Pending';
                 $Appointment->attachment = !empty($url) ? $url : null;

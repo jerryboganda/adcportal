@@ -21,6 +21,7 @@ class Appointment extends Model
         'time',
         'notes',
         'referrer_id',
+        'referred_by',
         'payment_type',
         'appointment_status',
         'attachment',

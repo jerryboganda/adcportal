@@ -176,10 +176,10 @@
                 <span class="label">Time:</span>
                 <span class="value">{{ $appointment->time ?? 'N/A' }}</span>
             </div>
-            @if($appointment->ReferrerData)
+            @if($appointment->referred_by || $appointment->ReferrerData)
             <div class="detail-row">
                 <span class="label">Referred By:</span>
-                <span class="value">{{ $appointment->ReferrerData->name }}</span>
+                <span class="value">{{ $appointment->referred_by ?? $appointment->ReferrerData->name }}</span>
             </div>
             @endif
         </div>

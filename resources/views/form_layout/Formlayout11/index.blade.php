@@ -635,6 +635,12 @@
                                     <input type="password" name="password" id="new_password" class="fl11-input" placeholder="{{ __('Create password') }}">
                                 </div>
                             </div>
+                            <div class="fl11-form-row">
+                                <div class="fl11-form-group fl11-full" style="width: 100%;">
+                                    <label>{{ __('Referred By') }}</label>
+                                    <input type="text" name="referred_by" class="fl11-input" placeholder="{{ __('Doctor Name (Optional)') }}">
+                                </div>
+                            </div>
                         </div>
 
                         <!-- Existing User Form -->
@@ -647,6 +653,12 @@
                                 <div class="fl11-form-group fl11-half">
                                     <label>{{ __('Password') }} <span class="fl11-required">*</span></label>
                                     <input type="password" name="password" id="existing_password" class="fl11-input" placeholder="{{ __('Enter password') }}">
+                                </div>
+                            </div>
+                            <div class="fl11-form-row">
+                                <div class="fl11-form-group fl11-full" style="width: 100%;">
+                                    <label>{{ __('Referred By') }}</label>
+                                    <input type="text" name="referred_by" class="fl11-input" placeholder="{{ __('Doctor Name (Optional)') }}">
                                 </div>
                             </div>
                         </div>
@@ -668,6 +680,10 @@
                             <div class="fl11-form-group">
                                 <label>{{ __('Phone') }} <span class="fl11-required">*</span></label>
                                 <input type="tel" name="contact" id="guest_contact" class="fl11-input" placeholder="{{ __('Enter phone number') }}">
+                            </div>
+                            <div class="fl11-form-group">
+                                <label>{{ __('Referred By') }}</label>
+                                <input type="text" name="referred_by" class="fl11-input" placeholder="{{ __('Doctor Name (Optional)') }}">
                             </div>
                         </div>
                     @endif
