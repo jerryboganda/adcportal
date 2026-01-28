@@ -56,6 +56,16 @@
 @endif
 
 @permission('appointment edit')
+    {{-- Print Token Button --}}
+    <div class="action-btn me-2">
+        <a href="{{ route('appointment.print-token', $Appointment->id) }}" 
+            target="_blank"
+            class="btn btn-sm bg-success d-inline align-items-center"
+            data-bs-toggle="tooltip" 
+            data-bs-original-title="{{ __('Print Token') }}">
+            <span class="text-white"><i class="ti ti-printer"></i></span>
+        </a>
+    </div>
     {{-- Reports Button --}}
     <div class="action-btn me-2">
         <a href="#" class="btn btn-sm bg-warning d-inline align-items-center"

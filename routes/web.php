@@ -223,6 +223,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('appointment/{id}/reports/upload', [AppointmentController::class, 'uploadReport'])->name('appointment.reports.upload');
     Route::delete('appointment/reports/{reportId}', [AppointmentController::class, 'deleteReport'])->name('appointment.reports.delete');
     Route::get('appointment/reports/{reportId}/download', [AppointmentController::class, 'downloadReport'])->name('appointment.reports.download');
+    
+    // Print Token
+    Route::get('appointment/{id}/print-token', [AppointmentController::class, 'printToken'])->name('appointment.print-token');
     // End appointment
 
     // custom field

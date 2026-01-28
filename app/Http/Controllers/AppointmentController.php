@@ -1194,4 +1194,44 @@ class AppointmentController extends Controller
         return redirect()->back()->with('error', __('File not found!'));
     }
 
+    /**
+     * Print Token - Generate and print thermal receipt for appointment
+     */
+    public function printToken($id)
+    {
+        $appointment = Appointment::with(['service', 'staff', 'location', 'customer'])->find($id);
+        
+        if (!$appointment) {
+            return redirect()->back()->with('error', __('Appointment not found!'));
+        }
+
+        // Get business info
+        $business = Business::find($appointment->business_id);
+        
+        // Assign token number if not already assigned
+        if (empty($appointment->token_number)) {
+            // Use database transaction with lock to prevent duplicate tokens
+            DB::transaction(function () use ($appointment) {
+                // Get today's date
+                $today = Carbon::today()->toDateString();
+                
+                // Get the max token number for today (using date field or created_at)
+                $maxToken = Appointment::where('business_id', $appointment->business_id)
+                    ->whereDate('date', $today)
+                    ->whereNotNull('token_number')
+                    ->lockForUpdate()
+                    ->max('token_number');
+                
+                // Assign next token number
+                $appointment->token_number = ($maxToken ?? 0) + 1;
+                $appointment->save();
+            });
+            
+            // Refresh to get the updated token
+            $appointment->refresh();
+        }
+
+        return view('appointment.print_token', compact('appointment', 'business'));
+    }
+
 }

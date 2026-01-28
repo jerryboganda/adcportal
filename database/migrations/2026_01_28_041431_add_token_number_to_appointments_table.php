@@ -11,8 +11,8 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::table('appointments', function (Blueprint \\\) {
-            \\\->integer('token_number')->nullable()->after('id');
+        Schema::table('appointments', function (Blueprint $table) {
+            $table->integer('token_number')->nullable()->after('id');
         });
     }
 
@@ -21,8 +21,8 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::table('appointments', function (Blueprint \\\) {
-            \\\->dropColumn('token_number');
+        Schema::table('appointments', function (Blueprint $table) {
+            $table->dropColumn('token_number');
         });
     }
 };
