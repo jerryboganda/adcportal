@@ -1,101 +1,31 @@
 services:
-  # MySQL Database
-  bookinggo-mysql:
-    image: mysql:8.0
-    container_name: bookinggo-mysql
-    restart: unless-stopped
-    environment:
-      MYSQL_DATABASE: ${DB_DATABASE:-bookinggo_saas}
-      MYSQL_ROOT_PASSWORD: ${DB_PASSWORD:-bookinggo_pass_2024}
-      MYSQL_USER: ${DB_USERNAME:-bookinggo_user}
-      MYSQL_PASSWORD: ${DB_PASSWORD:-bookinggo_pass_2024}
-      MYSQL_ROOT_HOST: '%'
-    ports:
-      - "3307:3306"
-    volumes:
-      - bookinggo-mysql-data:/var/lib/mysql
-      - ./docker/mysql/my.cnf:/etc/mysql/conf.d/my.cnf
-    command: --default-authentication-plugin=mysql_native_password --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
-    networks:
-      - bookinggo-network
-
-  # Redis
-  bookinggo-redis:
-    image: redis:7-alpine
-    container_name: bookinggo-redis
+  app:
+    image: php:8.3-apache
     restart: unless-stopped
     ports:
-      - "6380:6379"
+      - '8082:80'
     volumes:
-      - bookinggo-redis-data:/data
-    networks:
-      - bookinggo-network
-
-  # PHP-FPM Application
-  bookinggo-app:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    container_name: bookinggo-app
-    restart: unless-stopped
-    working_dir: /var/www
-    volumes:
-      - ./:/var/www
-      - ./docker/php/local.ini:/usr/local/etc/php/conf.d/local.ini
+      - .:/var/www/html
     environment:
-      - DB_HOST=bookinggo-mysql
+      - DB_CONNECTION=mysql
+      - DB_HOST=db
       - DB_PORT=3306
-      - DB_DATABASE=${DB_DATABASE:-bookinggo_saas}
-      - DB_USERNAME=${DB_USERNAME:-bookinggo_user}
-      - DB_PASSWORD=${DB_PASSWORD:-bookinggo_pass_2024}
-      - REDIS_HOST=bookinggo-redis
-      - REDIS_PORT=6379
+      - DB_DATABASE=bookinggodb
+      - DB_USERNAME=bookinggouser
+      - DB_PASSWORD=AUafJeHesfS32NzYn9y7
     depends_on:
-      - bookinggo-mysql
-      - bookinggo-redis
-    networks:
-      - bookinggo-network
-
-  # Nginx Web Server
-  bookinggo-nginx:
-    image: nginx:alpine
-    container_name: bookinggo-nginx
+      - db
+    entrypoint: ["/bin/sh", "-c", "apt-get update && apt-get install -y libpng-dev libzip-dev zip unzip && docker-php-ext-install pdo_mysql bcmath gd zip && grep -q 'DocumentRoot /var/www/html/public' /etc/apache2/sites-available/000-default.conf || sed -i 's!/var/www/html!/var/www/html/public!g' /etc/apache2/sites-available/000-default.conf && a2enmod rewrite && docker-php-entrypoint apache2-foreground"]            
+  db:
+    image: mariadb:10.11
     restart: unless-stopped
-    ports:
-      - "8085:80"
-      - "9443:443"
+    environment:
+      - MYSQL_DATABASE=laravel
+      - MYSQL_USER=laravel
+      - MYSQL_PASSWORD=laravel
+      - MYSQL_ROOT_PASSWORD=laravel_root_password
     volumes:
-      - ./:/var/www
-      - ./docker/nginx/conf.d:/etc/nginx/conf.d
-      - ./docker/nginx/ssl:/etc/nginx/ssl
-    depends_on:
-      - bookinggo-app
-    networks:
-      - bookinggo-network
-
-  # Vite Dev Server (for frontend development)
-  bookinggo-vite:
-    image: node:20-alpine
-    container_name: bookinggo-vite
-    restart: unless-stopped
-    working_dir: /var/www
-    ports:
-      - "5174:5173"
-    volumes:
-      - ./:/var/www
-      - /var/www/node_modules
-    command: sh -c "[ -d node_modules ] && npm run dev -- --host 0.0.0.0 || (npm install && npm run dev -- --host 0.0.0.0)"
-    depends_on:
-      - bookinggo-app
-    networks:
-      - bookinggo-network
-
-networks:
-  bookinggo-network:
-    driver: bridge
+      - db_data:/var/lib/mysql
 
 volumes:
-  bookinggo-mysql-data:
-    driver: local
-  bookinggo-redis-data:
-    driver: local
+  db_data:

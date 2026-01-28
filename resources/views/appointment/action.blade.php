@@ -56,6 +56,19 @@
 @endif
 
 @permission('appointment edit')
+    {{-- Reports Button --}}
+    <div class="action-btn me-2">
+        <a href="#" class="btn btn-sm bg-warning d-inline align-items-center"
+            data-url="{{ route('appointment.reports', $Appointment->id) }}" 
+            data-ajax-popup="true"
+            data-title="{{ __('Appointment Reports') }}" 
+            data-bs-toggle="tooltip" 
+            data-size="lg"
+            data-bs-original-title="{{ __('Reports') }}">
+            <span class="text-white"><i class="ti ti-file-text"></i></span>
+        </a>
+    </div>
+    {{-- Edit Button --}}
     <div class="action-btn me-2">
         <a href="#" class="btn btn-sm bg-info  d-inline align-items-center"
             data-url="{{ route('appointment.edit', $Appointment->id) }}" class="dropdown-item" data-ajax-popup="true"

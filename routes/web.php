@@ -49,7 +49,7 @@ use App\Http\Controllers\SubscribeController;
 |
 */
 // Route::get('appointments/{slug}/{appointment?}', [AppointmentController::class, 'appointmentForm'])->name('appointments.form');
-Route::any('appointments/{slug}/{appointment?}',[AppointmentController::class,'appointmentForm'])->name('appointments.form');
+Route::any('appointments/{slug}/{appointment?}', [AppointmentController::class, 'appointmentForm'])->name('appointments.form');
 Route::post('appointment-book', [AppointmentController::class, 'appointmentFormSubmit'])->name('appointment.form.submit');
 Route::get('appointments/{slug}/{id}', [AppointmentController::class, 'appointmentDone'])->name('appointments.done');
 Route::post('appointment-duration', [AppointmentController::class, 'appointmentDuration'])->name('appointment.duration');
@@ -59,7 +59,7 @@ Route::get('appointment/rtl', [AppointmentController::class, 'appointmentRtlSett
 Route::post('check-user-data', [AppointmentController::class, 'checkUser'])->name('check.user.data');
 
 Route::resource('contacts', ContactUsController::class);
-Route::get('/contacts/{id}/description', [ContactUsController::class,'description'])->name('contact.description');
+Route::get('/contacts/{id}/description', [ContactUsController::class, 'description'])->name('contact.description');
 Route::resource('subscribes', SubscribeController::class);
 
 // for checking online appointment for theme
@@ -108,10 +108,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
     //     );
 
     // } else {
-        Route::get('/dashboard', [HomeController::class, 'Dashboard'])->name('dashboard');
-        Route::get('/appointment-dashboard/{staff?}', [HomeController::class, 'AppointmentDashboard'])->name('appointment.dashboard');
-        Route::any('dashboard-index', [HomeController::class, 'Dashboard'])->name('dashboard.index');
-        Route::get('/home', [HomeController::class, 'Dashboard'])->name('home');
+    Route::get('/dashboard', [HomeController::class, 'Dashboard'])->name('dashboard');
+    Route::get('/appointment-dashboard/{staff?}', [HomeController::class, 'AppointmentDashboard'])->name('appointment.dashboard');
+    Route::any('dashboard-index', [HomeController::class, 'Dashboard'])->name('dashboard.index');
+    Route::get('/home', [HomeController::class, 'Dashboard'])->name('home');
     // }
     Route::any('dashboard-index', [HomeController::class, 'Dashboard'])->name('dashboard.index');
     // settings
@@ -183,9 +183,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('disable-language', [LanguageController::class, 'disableLang'])->name('disablelanguage');
     Route::any('store-language', [LanguageController::class, 'store'])->name('store.language');
     Route::delete('/lang/{id}', [LanguageController::class, 'destroy'])->name('lang.destroy');
-    Route::get('export/lang/json',[LanguageController::class,'exportLangJson'])->name('export.lang.json');
-    Route::get('import/lang/json/upload',[LanguageController::class,'importLangJsonUpload'])->name('import.lang.json.upload');
-    Route::post('import/lang/json',[LanguageController::class,'importLangJson'])->name('import.lang.json');
+    Route::get('export/lang/json', [LanguageController::class, 'exportLangJson'])->name('export.lang.json');
+    Route::get('import/lang/json/upload', [LanguageController::class, 'importLangJsonUpload'])->name('import.lang.json.upload');
+    Route::post('import/lang/json', [LanguageController::class, 'importLangJson'])->name('import.lang.json');
     // End Language
 
     // location
@@ -217,6 +217,12 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('appointment-status-update/{id}', [AppointmentController::class, 'appointmentStatusUpdate'])->name('appointment.status.update');
 
     Route::post('appointment-attachment-destroy/{id}', [AppointmentController::class, 'appointmentAttachmentDelete'])->name('appointment.attachment.destroy');
+
+    // Appointment Reports
+    Route::get('appointment/{id}/reports', [AppointmentController::class, 'showReports'])->name('appointment.reports');
+    Route::post('appointment/{id}/reports/upload', [AppointmentController::class, 'uploadReport'])->name('appointment.reports.upload');
+    Route::delete('appointment/reports/{reportId}', [AppointmentController::class, 'deleteReport'])->name('appointment.reports.delete');
+    Route::get('appointment/reports/{reportId}/download', [AppointmentController::class, 'downloadReport'])->name('appointment.reports.download');
     // End appointment
 
     // custom field
@@ -295,9 +301,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('plan-enable', [PlanController::class, 'planEnable'])->name('plan.enable');
 
 
-    Route::post('company/settings-save', [CompanySettingsController::class, 'store'])->name('company.settings.save');
-    Route::post('super-admin/settings-save', [SuperAdminSettingsController::class, 'store'])->name('super.admin.settings.save');
-    Route::post('storage-settings-save', [SuperAdminSettingsController::class, 'storageStore'])->name('storage.setting.store');
+    // Route::post('company/settings-save', [CompanySettingsController::class, 'store'])->name('company.settings.save');
+    // Route::post('super-admin/settings-save', [SuperAdminSettingsController::class, 'store'])->name('super.admin.settings.save');
+    // Route::post('storage-settings-save', [SuperAdminSettingsController::class, 'storageStore'])->name('storage.setting.store');
 
     Route::post('super-admin/custom-js-save', [SuperAdminSettingsController::class, 'customJsStore'])->name('super.admin.custom.js.save');
     Route::post('super-admin/custom-css-save', [SuperAdminSettingsController::class, 'customCssStore'])->name('super.admin.custom.css.save');
@@ -339,7 +345,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
 });
 
-Route::middleware(['web'])->group(function (){
+Route::middleware(['web'])->group(function () {
     Route::get('find-appointment/{businessSlug}', [HomeController::class, 'findAppointment'])->name('find.appointment');
     Route::post('track-appointment/{businessSlug}', [HomeController::class, 'trackAppointment'])->name('track.appointment');
 });
@@ -352,22 +358,22 @@ Route::get('cookie/consent', [SuperAdminSettingsController::class, 'CookieConsen
 
 // DIAGNOSTIC ROUTES - Remove in production
 Route::middleware(['auth'])->group(function () {
-    Route::get('settings-diagnostic', function() {
+    Route::get('settings-diagnostic', function () {
         return view('diagnostic.settings-debug');
     })->name('settings.diagnostic');
-    
+
     // AGGRESSIVE DEBUG PAGE
-    Route::get('aggressive-debug', function() {
+    Route::get('aggressive-debug', function () {
         return view('diagnostic.aggressive-debug');
     })->name('aggressive.debug');
-    
+
     // NUCLEAR DEBUG PAGE - Bypasses all JavaScript
-    Route::get('nuclear-debug', function() {
+    Route::get('nuclear-debug', function () {
         return view('diagnostic.nuclear-debug');
     })->name('nuclear.debug');
-    
+
     // SESSION TEST ROUTES
-    Route::get('test-session-set', function() {
+    Route::get('test-session-set', function () {
         session()->flash('success', 'TEST MESSAGE FROM SESSION!');
         session()->flash('test_value', 'Session is working!');
         \Log::info('Session flash set in test-session-set');
@@ -375,8 +381,8 @@ Route::middleware(['auth'])->group(function () {
         \Log::info('Session success value: ' . session()->get('success'));
         return redirect('/test-session-get');
     });
-    
-    Route::get('test-session-get', function() {
+
+    Route::get('test-session-get', function () {
         $success = session()->get('success');
         $test = session()->get('test_value');
         \Log::info('Session flash retrieved in test-session-get');
@@ -385,18 +391,18 @@ Route::middleware(['auth'])->group(function () {
         \Log::info('Test value: ' . $test);
         return "Success: " . ($success ?: 'NOT SET') . "<br>Test: " . ($test ?: 'NOT SET');
     });
-    
+
     // Check emergency log
-    Route::get('check-emergency-log', function() {
+    Route::get('check-emergency-log', function () {
         $logPath = storage_path('logs/emergency_debug.log');
         if (file_exists($logPath)) {
             return file_get_contents($logPath);
         }
         return 'No emergency log found';
     });
-    
+
     // Check Laravel log
-    Route::get('check-laravel-log', function() {
+    Route::get('check-laravel-log', function () {
         $logPath = storage_path('logs/laravel.log');
         if (file_exists($logPath)) {
             $lines = file($logPath);
@@ -404,20 +410,20 @@ Route::middleware(['auth'])->group(function () {
         }
         return 'No Laravel log found';
     });
-    
+
     // Test direct database write
-    Route::get('test-db-write', function() {
+    Route::get('test-db-write', function () {
         try {
             $testKey = 'debug_test_' . time();
             $testValue = 'test_value_' . rand(1000, 9999);
-            
+
             \App\Models\Setting::updateOrInsert(
                 ['key' => $testKey, 'business' => 0, 'created_by' => \Auth::user()->id],
                 ['value' => $testValue, 'updated_at' => now()]
             );
-            
+
             $verify = \App\Models\Setting::where('key', $testKey)->first();
-            
+
             if ($verify) {
                 return "✓ SUCCESS!\nKey: {$testKey}\nValue: {$verify->value}\nBusiness: {$verify->business}\nCreated By: {$verify->created_by}";
             } else {
@@ -427,67 +433,67 @@ Route::middleware(['auth'])->group(function () {
             return "✗ ERROR: " . $e->getMessage();
         }
     });
-    
+
     // Check current settings
-    Route::get('check-settings', function() {
+    Route::get('check-settings', function () {
         $userId = \Auth::user()->id;
-        
+
         // Direct DB query
         $dbSettings = \App\Models\Setting::where('created_by', $userId)->where('business', 0)->get();
-        
+
         // Via helper
         $helperSettings = getAdminAllSetting();
-        
+
         $output = "<h2>DATABASE (Direct Query):</h2><pre>";
         foreach ($dbSettings->take(15) as $setting) {
             $output .= "{$setting->key} = " . substr($setting->value, 0, 100) . "\n";
         }
         $output .= "</pre>";
-        
+
         $output .= "<h2>HELPER (getAdminAllSetting):</h2><pre>";
         foreach (array_slice($helperSettings, 0, 15, true) as $key => $value) {
             $output .= "{$key} = " . substr($value, 0, 100) . "\n";
         }
         $output .= "</pre>";
-        
+
         $output .= "<h2>COMPARISON:</h2>";
         $titleInDb = \App\Models\Setting::where('key', 'title_text')->where('business', 0)->first();
         $titleFromHelper = getAdminAllSetting('title_text');
         $output .= "<p><strong>title_text in DB:</strong> " . ($titleInDb ? $titleInDb->value : 'NOT FOUND') . "</p>";
         $output .= "<p><strong>title_text from helper:</strong> " . ($titleFromHelper ?: 'NOT FOUND') . "</p>";
-        
+
         $appInDb = \App\Models\Setting::where('key', 'app_name')->where('business', 0)->first();
         $appFromHelper = getAdminAllSetting('app_name');
         $output .= "<p><strong>app_name in DB:</strong> " . ($appInDb ? $appInDb->value : 'NOT FOUND') . "</p>";
         $output .= "<p><strong>app_name from helper:</strong> " . ($appFromHelper ?: 'NOT FOUND') . "</p>";
-        
+
         return $output;
     });
-    
+
     // FIX DUPLICATE SETTINGS - CRITICAL
-    Route::get('fix-duplicate-settings-now', function() {
+    Route::get('fix-duplicate-settings-now', function () {
         if (!\Auth::user() || \Auth::user()->type !== 'super admin') {
             return redirect('/')->with('error', 'Super admin only');
         }
-        
+
         $userId = \Auth::user()->id;
         $fixed = 0;
         $deleted = 0;
-        
+
         // Get all settings for this user with business=0
         $allSettings = \App\Models\Setting::where('created_by', $userId)
             ->where('business', 0)
             ->orderBy('updated_at', 'desc')
             ->get();
-        
+
         // Group by key
         $grouped = $allSettings->groupBy('key');
-        
+
         foreach ($grouped as $key => $settingsGroup) {
             if ($settingsGroup->count() > 1) {
                 // Keep the most recently updated one (first in group due to orderBy)
                 $keep = $settingsGroup->first();
-                
+
                 // Delete the rest
                 foreach ($settingsGroup->skip(1) as $duplicate) {
                     $duplicate->delete();
@@ -496,47 +502,46 @@ Route::middleware(['auth'])->group(function () {
                 $fixed++;
             }
         }
-        
         // Clear cache
         \Cache::forget('admin_settings');
         AdminSettingCacheForget();
-        
+
         return "<h1 style='color: green; text-align: center; margin-top: 100px;'>✓ DUPLICATES FIXED!</h1>
                 <p style='text-align: center; font-size: 20px;'>Fixed $fixed settings, deleted $deleted duplicates!</p>
                 <p style='text-align: center;'><a href='/check-settings' style='padding: 10px 20px; background: #007bff; color: white; text-decoration: none; border-radius: 5px;'>Check Settings Now</a></p>
                 <p style='text-align: center;'><a href='/settings'>Go to Settings</a></p>";
     });
-    
+
     // Direct fix route - just visit this URL
-    Route::get('fix-settings-now', function() {
+    Route::get('fix-settings-now', function () {
         if (!\Auth::user() || \Auth::user()->type !== 'super admin') {
             return redirect('/')->with('error', 'Super admin only');
         }
-        
+
         $userId = \Auth::user()->id;
-        
+
         // Fix all settings with wrong business ID
         $updated = \App\Models\Setting::where('created_by', $userId)
             ->where('business', '!=', 0)
             ->update(['business' => 0]);
-        
+
         // Clear cache
         \Cache::forget('admin_settings');
         \Cache::flush();
-        
+
         return "<h1 style='color: green; text-align: center; margin-top: 100px;'>✓ SUCCESS!</h1>
                 <p style='text-align: center; font-size: 20px;'>Fixed $updated settings!</p>
                 <p style='text-align: center;'><a href='/settings' style='padding: 10px 20px; background: #007bff; color: white; text-decoration: none; border-radius: 5px;'>Go to Settings</a></p>
                 <p style='text-align: center;'><a href='/settings-diagnostic'>View Diagnostic Page</a></p>";
     })->name('settings.fix.now');
-    
-    Route::post('settings-diagnostic-action', function(\Illuminate\Http\Request $request) {
+
+    Route::post('settings-diagnostic-action', function (\Illuminate\Http\Request $request) {
         if (!\Auth::user() || \Auth::user()->type !== 'super admin') {
             return redirect()->back()->with('error', 'Super admin only');
         }
-        
+
         $action = $request->input('action');
-        
+
         if ($action === 'clear_cache') {
             \Cache::flush();
             \Artisan::call('cache:clear');
@@ -544,7 +549,7 @@ Route::middleware(['auth'])->group(function () {
             \Artisan::call('view:clear');
             return redirect()->back()->with('success', 'All caches cleared!');
         }
-        
+
         if ($action === 'fix_business_ids') {
             $updated = \App\Models\Setting::where('created_by', \Auth::user()->id)
                 ->where('business', '!=', 0)
@@ -552,71 +557,71 @@ Route::middleware(['auth'])->group(function () {
             \Cache::forget('admin_settings');
             return redirect()->back()->with('success', "Updated $updated settings to business=0");
         }
-        
+
         if ($action === 'migrate_settings') {
             $fromUser = $request->input('from_user');
             $toUser = $request->input('to_user');
-            
+
             \DB::beginTransaction();
             try {
                 // Delete any existing settings for to_user to avoid conflicts
                 \App\Models\Setting::where('created_by', $toUser)
                     ->where('business', 0)
                     ->delete();
-                
+
                 // Update all settings from from_user to to_user
                 $updated = \App\Models\Setting::where('created_by', $fromUser)
                     ->where('business', 0)
                     ->update(['created_by' => $toUser]);
-                
+
                 \DB::commit();
                 \Cache::forget('admin_settings');
-                
+
                 return redirect()->back()->with('success', "Migrated $updated settings from user $fromUser to user $toUser");
             } catch (\Exception $e) {
                 \DB::rollBack();
                 return redirect()->back()->with('error', 'Migration failed: ' . $e->getMessage());
             }
         }
-        
+
         return redirect()->back()->with('error', 'Invalid action');
     })->name('settings.diagnostic.action');
-    
+
     // Logo-specific diagnostics
-    Route::get('/logo-debug', function() {
+    Route::get('/logo-debug', function () {
         if (!\Auth::user() || \Auth::user()->type !== 'super admin') {
             return redirect('/')->with('error', 'Super admin only');
         }
         return view('diagnostic.logo-debug');
     })->name('logo.debug');
-    
-    Route::post('/clear-logo-cache-now', function() {
+
+    Route::post('/clear-logo-cache-now', function () {
         if (!\Auth::user() || \Auth::user()->type !== 'super admin') {
             return redirect('/')->with('error', 'Super admin only');
         }
-        
+
         \Cache::forget('admin_settings');
         AdminSettingCacheForget();
         comapnySettingCacheForget();
-        
+
         return redirect('/logo-debug')->with('success', 'Cache cleared!');
     })->name('logo.cache.clear');
-    
-    Route::post('/fix-logo-duplicates-now', function() {
+
+    Route::post('/fix-logo-duplicates-now', function () {
         if (!\Auth::user() || \Auth::user()->type !== 'super admin') {
             return redirect('/')->with('error', 'Super admin only');
         }
-        
+
         $logoKeys = ['logo_dark', 'logo_light', 'favicon'];
         $deleted = 0;
-        
+
         foreach ($logoKeys as $key) {
             $settings = \App\Models\Setting::where('key', $key)
                 ->where('business', 0)
                 ->where('created_by', \Auth::user()->id)
                 ->orderBy('updated_at', 'desc')
                 ->get();
-            
+
             if ($settings->count() > 1) {
                 // Keep the first (most recent), delete the rest
                 $keep = $settings->first();
@@ -626,27 +631,27 @@ Route::middleware(['auth'])->group(function () {
                 }
             }
         }
-        
+
         \Cache::forget('admin_settings');
         AdminSettingCacheForget();
-        
+
         return redirect('/logo-debug')->with('success', "Deleted $deleted duplicate logo settings!");
     })->name('logo.duplicates.fix');
-    
-    Route::post('/reset-logo-settings', function() {
+
+    Route::post('/reset-logo-settings', function () {
         if (!\Auth::user() || \Auth::user()->type !== 'super admin') {
             return redirect('/')->with('error', 'Super admin only');
         }
-        
+
         $logoKeys = ['logo_dark', 'logo_light', 'favicon'];
         $deleted = \App\Models\Setting::whereIn('key', $logoKeys)
             ->where('business', 0)
             ->where('created_by', \Auth::user()->id)
             ->delete();
-        
+
         \Cache::forget('admin_settings');
         AdminSettingCacheForget();
-        
+
         return redirect('/logo-debug')->with('success', "Reset complete! Deleted $deleted logo settings.");
     })->name('logo.settings.reset');
 });
@@ -661,22 +666,22 @@ Route::get('/config-cache', function () {
     return redirect()->back()->with('success', 'Cache Clear Successfully');
 })->name('config.cache');
 
-Route::get('composer/json',function(){
+Route::get('composer/json', function () {
     $path = base_path('packages/workdo');
     $modules = \Illuminate\Support\Facades\File::directories($path);
 
-    $moduleNames = array_map(function($dir) {
+    $moduleNames = array_map(function ($dir) {
         return basename($dir);
     }, $modules);
 
     $require = '';
     $repo = '';
-    foreach($moduleNames as $module){
+    foreach ($moduleNames as $module) {
         $packageName = preg_replace('/([a-z])([A-Z])/', '$1-$2', $module);
-        $require .= '"workdo/'.strtolower($packageName).'": "dev-testing",';
+        $require .= '"workdo/' . strtolower($packageName) . '": "dev-testing",';
         $repo .= '{
             "type": "path",
-            "url": "packages/workdo/'.$module.'"
+            "url": "packages/workdo/' . $module . '"
         },';
     }
     return $require . '<br><br><br>' . rtrim($repo, ',');

@@ -1,0 +1,92 @@
+id	key	value	business	created_by	created_at	updated_at
+1	currency	PKR	2	3	2025-12-26 13:04:02	2025-12-26 13:04:02
+2	currency_symbol	PKR	2	3	2025-12-26 13:04:02	2025-12-26 13:04:02
+3	title_text	Amad Diagnostic Centre	2	3	NULL	NULL
+4	footer_text	Copyright © 2025 All rights reserved. Powered by PolytronX - Business Digitalized	2	3	NULL	NULL
+5	color	theme-3	2	3	NULL	NULL
+6	color_flag	false	2	3	NULL	NULL
+7	site_rtl	off	2	3	NULL	NULL
+8	site_transparent	off	2	3	NULL	NULL
+9	cust_darklayout	off	2	3	NULL	NULL
+10	defult_timezone	Asia/Karachi	2	3	NULL	NULL
+11	defult_language	en	2	3	NULL	NULL
+12	site_date_format	d-m-Y	2	3	NULL	NULL
+13	site_time_format	g:i A	2	3	NULL	NULL
+14	appointment_prefix	#ADC00000	2	3	NULL	NULL
+15	week_start_day	1	2	3	NULL	NULL
+16	booking_mode	1,2	2	3	NULL	NULL
+17	default_status	Pending	2	3	NULL	NULL
+18	bank_transfer_payment_is_on	on	2	3	NULL	NULL
+19	bank_number	Amad Diagnostic Centre\nAllied Bank Limited\nIBAN # PK77ABPL098493893295	2	3	NULL	NULL
+20	maximum_slot	150	2	3	NULL	NULL
+21	custom_field_enable	on	2	3	NULL	NULL
+22	title_text	Amad Diagnostic Centre - Gujranwala	0	1	2025-12-27 14:55:05	2025-12-27 14:59:04
+23	footer_text	Copyright © 2025 All rights reserved. Powered by PolytronX - Business Digitalized	0	1	2025-12-27 14:55:05	2025-12-27 14:59:04
+24	color	theme-3	0	1	2025-12-27 14:55:05	2025-12-27 14:59:04
+25	color_flag	false	0	1	2025-12-27 01:23:53	2025-12-27 14:59:04
+26	landing_page	off	0	1	2025-12-27 14:55:05	2025-12-27 14:59:04
+27	site_rtl	off	0	1	2025-12-27 14:55:05	2025-12-27 14:59:04
+28	signup	on	0	1	2025-12-27 14:55:05	2025-12-27 14:59:04
+29	email_verification	on	0	1	2025-12-27 14:55:05	2025-12-27 14:59:04
+30	site_transparent	on	0	1	2025-12-27 14:55:05	2025-12-27 14:59:04
+31	cust_darklayout	off	0	1	2025-12-27 14:55:05	2025-12-27 14:59:04
+32	storage_setting	local	0	1	2025-12-27 14:55:05	2025-12-27 15:00:15
+33	local_storage_validation	gif,jpeg,jpg,pdf,png,svg	0	1	2025-12-27 14:55:05	2025-12-27 15:00:15
+34	local_storage_max_upload_size	2025	0	1	2025-12-27 14:55:05	2025-12-27 15:00:15
+35	s3_key	NULL	0	1	2025-12-27 01:30:40	2025-12-27 15:00:15
+36	s3_secret	NULL	0	1	2025-12-27 01:30:40	2025-12-27 15:00:15
+37	s3_region	NULL	0	1	2025-12-27 01:30:40	2025-12-27 15:00:15
+38	s3_bucket	NULL	0	1	2025-12-27 01:30:40	2025-12-27 15:00:16
+39	s3_url	NULL	0	1	2025-12-27 01:30:40	2025-12-27 15:00:16
+40	s3_endpoint	NULL	0	1	2025-12-27 01:30:40	2025-12-27 15:00:16
+41	s3_max_upload_size	2024	0	1	2025-12-27 01:30:40	2025-12-27 15:00:16
+42	wasabi_key	NULL	0	1	2025-12-27 01:30:40	2025-12-27 15:00:16
+43	wasabi_secret	NULL	0	1	2025-12-27 01:30:40	2025-12-27 15:00:16
+44	wasabi_region	NULL	0	1	2025-12-27 01:30:40	2025-12-27 15:00:16
+45	wasabi_bucket	NULL	0	1	2025-12-27 01:30:40	2025-12-27 15:00:16
+46	wasabi_url	NULL	0	1	2025-12-27 01:30:40	2025-12-27 15:00:16
+47	wasabi_root	NULL	0	1	2025-12-27 01:30:40	2025-12-27 15:00:16
+48	wasabi_max_upload_size	2024	0	1	2025-12-27 01:30:40	2025-12-27 15:00:16
+49	s3_storage_validation	NULL	0	1	2025-12-27 01:30:40	2025-12-27 15:00:16
+50	wasabi_storage_validation	NULL	0	1	2025-12-27 01:30:40	2025-12-27 15:00:16
+51	meta_title	Amad Diagnostic Centre - Gujranwala	0	1	2025-12-27 14:55:05	2025-12-27 14:58:47
+52	meta_keywords	Amad Diagnostic Centre - Gujranwala	0	1	2025-12-27 14:55:05	2025-12-27 14:58:47
+53	meta_description	Amad Diagnostic Centre - Gujranwala	0	1	2025-12-27 14:55:05	2025-12-27 14:58:47
+54	meta_image	uploads/meta/adc-logo (1)_1766817131.png	0	1	2025-12-27 01:32:11	2025-12-27 01:32:11
+55	defult_timezone	Asia/Karachi	0	1	2025-12-27 14:55:05	2025-12-27 14:58:01
+56	defult_language	en	0	1	2025-12-27 14:55:05	2025-12-27 14:58:01
+57	site_date_format	d-m-Y	0	1	2025-12-27 01:34:18	2025-12-27 14:58:01
+58	site_time_format	g:i A	0	1	2025-12-27 01:34:18	2025-12-27 14:58:01
+59	favicon	uploads/logo/favicon_1766817451.png	0	1	2025-12-27 01:37:32	2025-12-27 14:59:04
+60	logo_dark	uploads/logo/logo_dark_1766817467.png	0	1	2025-12-27 01:37:48	2025-12-27 14:59:04
+61	logo_light	uploads/logo/logo_light_1766817489.png	0	1	2025-12-27 01:38:09	2025-12-27 14:59:04
+62	plan_package	on	0	1	2025-12-27 14:55:05	2025-12-27 14:55:05
+63	currency_format	1	10	3	NULL	NULL
+64	defult_currancy	PKR	10	3	NULL	NULL
+65	defult_currancy_symbol	₨	10	3	NULL	NULL
+66	defult_language	en	10	3	NULL	NULL
+67	defult_timezone	Asia/Karachi	10	3	NULL	NULL
+68	site_currency_symbol_position	pre	10	3	NULL	NULL
+69	site_date_format	d-m-Y	10	3	NULL	NULL
+70	site_time_format	g:i A	10	3	NULL	NULL
+71	title_text	Amad Diagnostic Centre - Gujranwala	10	3	NULL	NULL
+72	footer_text	Copyright © 2025 All rights reserved. Powered by PolytronX - Business Digitalized	10	3	NULL	NULL
+73	site_rtl	off	10	3	NULL	NULL
+74	cust_darklayout	off	10	3	NULL	NULL
+75	site_transparent	off	10	3	NULL	NULL
+76	color	theme-1	10	3	NULL	NULL
+77	currency_format	1	0	1	2025-12-27 14:55:05	2025-12-27 14:55:05
+78	defult_currancy	PKR	0	1	2025-12-27 14:55:05	2025-12-27 14:55:05
+79	defult_currancy_symbol	₨	0	1	2025-12-27 14:55:05	2025-12-27 14:55:05
+80	enable_cookie	off	0	1	2025-12-27 14:55:05	2025-12-27 14:55:05
+81	necessary_cookies	on	0	1	2025-12-27 14:55:05	2025-12-27 14:55:05
+82	cookie_logging	on	0	1	2025-12-27 14:55:05	2025-12-27 14:55:05
+83	cookie_title	We use cookies!	0	1	2025-12-27 14:55:05	2025-12-27 14:55:05
+84	cookie_description	Hi, this website uses essential cookies to ensure its proper operation and tracking cookies to understand how you interact with it	0	1	2025-12-27 14:55:05	2025-12-27 14:55:05
+85	strictly_cookie_title	Strictly necessary cookies	0	1	2025-12-27 14:55:05	2025-12-27 14:55:05
+86	strictly_cookie_description	These cookies are essential for the proper functioning of my website. Without these cookies, the website would not work properly	0	1	2025-12-27 14:55:05	2025-12-27 14:55:05
+87	more_information_description	For any queries in relation to our policy on cookies and your choices, please contact us	0	1	2025-12-27 14:55:05	2025-12-27 14:55:05
+88	contactus_url	#	0	1	2025-12-27 14:55:05	2025-12-27 14:55:05
+89	custome_package	on	0	1	2025-12-27 14:55:05	2025-12-27 14:55:05
+90	bank_transfer_payment_is_on	on	0	1	NULL	NULL
+91	bank_number	Amad Diagnostic Centre - Gujranwala\nAllied Bank Limited\nIBAN#PK76ABPL3642479343	0	1	NULL	NULL

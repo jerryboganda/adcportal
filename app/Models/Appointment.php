@@ -94,6 +94,11 @@ class Appointment extends Model
         return $this->belongsTo(Business::class, 'business_id', 'id');
     }
 
+    public function reports()
+    {
+        return $this->hasMany(AppointmentReport::class, 'appointment_id', 'id');
+    }
+
     public static function ColorCode()
     {
         $Color = [];

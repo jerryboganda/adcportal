@@ -8,7 +8,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use App\Models\User;
 use App\Models\Location;
-use App\Models\category;
+use App\Models\Category;
 use App\Models\Service;
 use App\Models\Setting;
 use App\Models\File;
@@ -318,7 +318,7 @@ class BusinessController extends Controller
             $domainPointing = '';
 
             $locations = Location::where('business_id', $id)->where('created_by', creatorId())->get();
-            $categories = category::where('business_id', $id)->where('created_by', creatorId())->get();
+            $categories = Category::where('business_id', $id)->where('created_by', creatorId())->get();
             $services = Service::where('business_id', $id)->where('created_by', creatorId())->get();
             $staffes = Staff::where('business_id', $id)->where('created_by', creatorId())->get();
             $businessholidays = BusinessHoliday::where('business_id', $id)->where('created_by', creatorId())->get();

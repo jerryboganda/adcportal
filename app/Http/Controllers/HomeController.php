@@ -296,7 +296,7 @@ class HomeController extends Controller
 
 
             if (isset($checkEmail) && $checkEmail !== NULL) {
-                $appointmentDetails = Appointment::find($request->appointment_number);
+                $appointmentDetails = Appointment::with('reports')->find($request->appointment_number);
                 $business = Business::where('slug', $slug)->first();
                 $allTrackingStatus = CustomStatus::where('business_id', $business->id)->orderby('id', 'asc')->get();
 

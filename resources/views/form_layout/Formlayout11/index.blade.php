@@ -107,6 +107,8 @@
         display: block;
         margin: 0 auto;
     }
+
+    .fl11-services-grid { display: grid !important; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)) !important; gap: 15px !important; }
 </style>
 @endpush
 
@@ -340,23 +342,38 @@
                                     <line x1="12" y1="32" x2="18" y2="32" stroke="{{ $colorCode }}" stroke-width="2.5" opacity="0.7"/>
                                     <line x1="46" y1="32" x2="52" y2="32" stroke="{{ $colorCode }}" stroke-width="2.5" opacity="0.7"/>
                                 </svg>
-                            @elseif(stripos($category->name, 'MRI') !== false)
-                                <!-- MRI Machine - Rectangular Cylinder Design -->
+                            @elseif(stripos($category->name, 'OPG') !== false)
+                                <!-- OPG Dental Panoramic Icon -->
                                 <svg viewBox="0 0 64 64" fill="none" class="fl11-category-svg">
-                                    <!-- Main MRI body (rectangular cylinder) -->
-                                    <rect x="10" y="20" width="44" height="24" rx="4" stroke="{{ $colorCode }}" stroke-width="3"/>
-                                    <rect x="13" y="23" width="38" height="18" rx="2" stroke="{{ $colorCode }}" stroke-width="2" opacity="0.5"/>
-                                    <!-- Tunnel opening (rectangular bore) -->
-                                    <rect x="20" y="26" width="24" height="12" rx="2" stroke="{{ $colorCode }}" stroke-width="2.5"/>
-                                    <line x1="26" y1="26" x2="26" y2="38" stroke="{{ $colorCode }}" stroke-width="1.5" opacity="0.4"/>
-                                    <line x1="38" y1="26" x2="38" y2="38" stroke="{{ $colorCode }}" stroke-width="1.5" opacity="0.4"/>
-                                    <!-- Patient table extending out -->
-                                    <rect x="28" y="35" width="8" height="18" stroke="{{ $colorCode }}" stroke-width="2" rx="1"/>
-                                    <!-- Magnetic field wave indicators (distinctive MRI feature) -->
-                                    <path d="M8 28 Q6 32 8 36" stroke="{{ $colorCode }}" stroke-width="2" opacity="0.7"/>
-                                    <path d="M56 28 Q58 32 56 36" stroke="{{ $colorCode }}" stroke-width="2" opacity="0.7"/>
-                                    <path d="M6 26 Q4 32 6 38" stroke="{{ $colorCode }}" stroke-width="1.5" opacity="0.5"/>
-                                    <path d="M58 26 Q60 32 58 38" stroke="{{ $colorCode }}" stroke-width="1.5" opacity="0.5"/>
+                                    <!-- Jaw arc -->
+                                    <path d="M12 20 Q32 8 52 20" stroke="{{ $colorCode }}" stroke-width="3" fill="none"/>
+                                    <path d="M12 44 Q32 56 52 44" stroke="{{ $colorCode }}" stroke-width="3" fill="none"/>
+                                    <!-- Teeth representation -->
+                                    <rect x="20" y="22" width="6" height="10" rx="2" stroke="{{ $colorCode }}" stroke-width="2"/>
+                                    <rect x="29" y="20" width="6" height="12" rx="2" stroke="{{ $colorCode }}" stroke-width="2"/>
+                                    <rect x="38" y="22" width="6" height="10" rx="2" stroke="{{ $colorCode }}" stroke-width="2"/>
+                                </svg>
+                            @elseif(stripos($category->name, 'Mammography') !== false)
+                                <!-- Mammography Icon -->
+                                <svg viewBox="0 0 64 64" fill="none" class="fl11-category-svg">
+                                    <!-- Breast shape -->
+                                    <circle cx="32" cy="32" r="18" stroke="{{ $colorCode }}" stroke-width="3"/>
+                                    <circle cx="32" cy="32" r="8" stroke="{{ $colorCode }}" stroke-width="2" opacity="0.6"/>
+                                    <!-- Compression plates -->
+                                    <line x1="10" y1="20" x2="54" y2="20" stroke="{{ $colorCode }}" stroke-width="2.5"/>
+                                    <line x1="10" y1="44" x2="54" y2="44" stroke="{{ $colorCode }}" stroke-width="2.5"/>
+                                </svg>
+                            @elseif(stripos($category->name, 'HSG') !== false)
+                                <!-- HSG Uterus/Fallopian Tubes Icon -->
+                                <svg viewBox="0 0 64 64" fill="none" class="fl11-category-svg">
+                                    <!-- Uterus shape -->
+                                    <path d="M24 40 L32 54 L40 40" stroke="{{ $colorCode }}" stroke-width="3" fill="none"/>
+                                    <!-- Fallopian tubes -->
+                                    <path d="M10 20 Q18 30 24 40" stroke="{{ $colorCode }}" stroke-width="2.5" fill="none"/>
+                                    <path d="M54 20 Q46 30 40 40" stroke="{{ $colorCode }}" stroke-width="2.5" fill="none"/>
+                                    <!-- Ovaries -->
+                                    <circle cx="10" cy="20" r="6" stroke="{{ $colorCode }}" stroke-width="2"/>
+                                    <circle cx="54" cy="20" r="6" stroke="{{ $colorCode }}" stroke-width="2"/>
                                 </svg>
                             @else
                                 <!-- Default Medical Icon -->
