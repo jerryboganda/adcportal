@@ -108,7 +108,9 @@
         margin: 0 auto;
     }
 
-    .fl11-services-grid { display: grid !important; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)) !important; gap: 15px !important; }
+    .fl11-services-grid { 
+        /* Removed to allow main-style.css and responsive.css to handle this */
+    }
 </style>
 @endpush
 
@@ -117,8 +119,14 @@
     <!-- Left Sidebar -->
     <div class="fl11-sidebar">
         <div class="fl11-sidebar-header">
-            <h2>{{ __('Book Appointment:') }}</h2>
-            <h3>{{ __('Service Selection') }}</h3>
+            <h2 class="fl11-bilingual">
+                <span>{{ __('Book Appointment:') }}</span>
+                <span class="fl11-ur" style="font-size: 14px; opacity: 0.9;">اپائنٹمنٹ بک کریں</span>
+            </h2>
+            <h3 id="fl11-step-title" class="fl11-bilingual">
+                <span>{{ __('Service Selection') }}</span>
+                <span class="fl11-ur" style="font-size: 14px; color: #00e5cc;">سروس کا انتخاب</span>
+            </h3>
         </div>
         
         <div class="fl11-steps">
@@ -126,37 +134,55 @@
                 <div class="fl11-step-indicator">
                     <div class="fl11-step-dot"></div>
                 </div>
-                <span class="fl11-step-label">{{ __('Service') }}</span>
+                <div class="fl11-bilingual">
+                    <span class="fl11-step-label">{{ __('Service') }}</span>
+                    <span class="fl11-ur" style="font-size: 10px; opacity: 0.8;">سروس</span>
+                </div>
             </div>
             <div class="fl11-step" data-step="2">
                 <div class="fl11-step-indicator">
                     <div class="fl11-step-dot"></div>
                 </div>
-                <span class="fl11-step-label">{{ __('Pick a Time') }}</span>
+                <div class="fl11-bilingual">
+                    <span class="fl11-step-label">{{ __('Pick a Time') }}</span>
+                    <span class="fl11-ur" style="font-size: 10px; opacity: 0.8;">وقت کا انتخاب</span>
+                </div>
             </div>
             <div class="fl11-step" data-step="3">
                 <div class="fl11-step-indicator">
                     <div class="fl11-step-dot"></div>
                 </div>
-                <span class="fl11-step-label">{{ __('Additional Details') }}</span>
+                <div class="fl11-bilingual">
+                    <span class="fl11-step-label">{{ __('Additional Details') }}</span>
+                    <span class="fl11-ur" style="font-size: 10px; opacity: 0.8;">مزید معلومات</span>
+                </div>
             </div>
             <div class="fl11-step" data-step="4">
                 <div class="fl11-step-indicator">
                     <div class="fl11-step-dot"></div>
                 </div>
-                <span class="fl11-step-label">{{ __('Share Your Details') }}</span>
+                <div class="fl11-bilingual">
+                    <span class="fl11-step-label">{{ __('Share Your Details') }}</span>
+                    <span class="fl11-ur" style="font-size: 10px; opacity: 0.8;">آپ کی تفصیلات</span>
+                </div>
             </div>
             <div class="fl11-step" data-step="5">
                 <div class="fl11-step-indicator">
                     <div class="fl11-step-dot"></div>
                 </div>
-                <span class="fl11-step-label">{{ __('Payment') }}</span>
+                <div class="fl11-bilingual">
+                    <span class="fl11-step-label">{{ __('Payment') }}</span>
+                    <span class="fl11-ur" style="font-size: 10px; opacity: 0.8;">ادائیگی</span>
+                </div>
             </div>
             <div class="fl11-step" data-step="6">
                 <div class="fl11-step-indicator">
                     <div class="fl11-step-dot"></div>
                 </div>
-                <span class="fl11-step-label">{{ __('Done') }}</span>
+                <div class="fl11-bilingual">
+                    <span class="fl11-step-label">{{ __('Done') }}</span>
+                    <span class="fl11-ur" style="font-size: 10px; opacity: 0.8;">مکمل</span>
+                </div>
             </div>
         </div>
     </div>
@@ -170,26 +196,32 @@
         <!-- STEP 1: Service Selection -->
         <div class="fl11-step-content fl11-step-1 active" id="fl11Step1">
             <div class="fl11-content-header">
-                <h1>{{ __('Please Select Services:') }}</h1>
+                <h1 class="fl11-bilingual">
+                    <span>{{ __('Please Select Services:') }}</span>
+                    <span class="fl11-ur" style="color: #64748b; font-size: 16px;">براہ کرم سروس کا انتخاب کریں</span>
+                </h1>
             </div>
 
             <div class="fl11-content-body">
                 <div class="fl11-form-section">
                     <div class="fl11-form-group">
-                        <label>{{ __('Choose a category') }} <span class="fl11-required">*</span></label>
+                        <label class="fl11-bilingual">
+                            <span>{{ __('Choose a category') }} <span class="fl11-required">*</span></span>
+                            <span class="fl11-ur" style="font-size: 13px; opacity: 0.8; margin-top: 2px;">درجہ بندی کا انتخاب کریں</span>
+                        </label>
                         <div class="fl11-select-wrapper">
                             <select name="category" id="categorySelect" class="fl11-select" required>
                                 <option value="">{{ __('Select category first') }}</option>
                                 @foreach ($categories as $category)
                                     <option value="{{ $category->id }}">
                                         @if(stripos($category->name, 'X-ray') !== false || stripos($category->name, 'Xray') !== false)
-                                            🩻 {{ $category->name }}
+                                            🩻 {{ $category->name }} (ایکس رے)
                                         @elseif(stripos($category->name, 'Ultrasound') !== false)
-                                            🔊 {{ $category->name }}
+                                            🔊 {{ $category->name }} (الٹراساؤنڈ)
                                         @elseif(stripos($category->name, 'CT Scan') !== false || stripos($category->name, 'CT-Scan') !== false)
-                                            💿 {{ $category->name }}
+                                            💿 {{ $category->name }} (سی ٹی اسکین)
                                         @elseif(stripos($category->name, 'MRI') !== false)
-                                            🧲 {{ $category->name }}
+                                            🧲 {{ $category->name }} (ایم آئی آئی)
                                         @else
                                             🏥 {{ $category->name }}
                                         @endif
@@ -203,7 +235,10 @@
                     </div>
 
                     <div class="fl11-form-group">
-                        <label>{{ __('Choose a service') }} <span class="fl11-required">*</span></label>
+                        <label class="fl11-bilingual">
+                            <span>{{ __('Choose a service') }} <span class="fl11-required">*</span></span>
+                            <span class="fl11-ur" style="font-size: 13px; opacity: 0.8; margin-top: 2px;">سروس کا انتخاب کریں</span>
+                        </label>
                         <div class="fl11-select-wrapper">
                             <select name="service" id="serviceSelect" class="fl11-select" required>
                                 <option value="">{{ __('Select service') }}</option>
@@ -218,7 +253,10 @@
                     </div>
 
                     <div class="fl11-form-group">
-                        <label>{{ __('Choose a location') }}</label>
+                        <label class="fl11-bilingual">
+                            <span>{{ __('Choose a location') }}</span>
+                            <span class="fl11-ur" style="font-size: 13px; opacity: 0.8; margin-top: 2px;">جگہ کا انتخاب کریں</span>
+                        </label>
                         <div class="fl11-select-wrapper">
                             <select name="location" id="locationSelect" class="fl11-select">
                                 <option value="">{{ __('Select location') }}</option>
@@ -233,7 +271,10 @@
                     </div>
 
                     <div class="fl11-form-group">
-                        <label>{{ __('Staff') }}</label>
+                        <label class="fl11-bilingual">
+                            <span>{{ __('Staff') }}</span>
+                            <span class="fl11-ur" style="font-size: 13px; opacity: 0.8; margin-top: 2px;">عملہ</span>
+                        </label>
                         <div class="fl11-select-wrapper">
                             <select name="staff" id="staffSelect" class="fl11-select">
                                 <option value="">{{ __('Select staff') }}</option>
@@ -248,7 +289,10 @@
                 <!-- Summary Panel -->
                 <div class="fl11-summary-panel">
                     <div class="fl11-summary-header">
-                        <h4>{{ __('Summary') }}</h4>
+                        <h4 class="fl11-bilingual">
+                            <span>{{ __('Summary') }}</span>
+                            <span class="fl11-ur" style="font-size: 14px; color: #00e5cc;">خلاصہ</span>
+                        </h4>
                         <svg class="fl11-summary-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                             <rect x="3" y="3" width="18" height="18" rx="2"></rect>
                             <line x1="9" y1="9" x2="15" y2="9"></line>
@@ -258,15 +302,24 @@
                     </div>
                     <div class="fl11-summary-content">
                         <div class="fl11-summary-row">
-                            <span class="fl11-summary-label">{{ __('Selected Category:') }}</span>
+                            <div class="fl11-bilingual">
+                                <span class="fl11-summary-label">{{ __('Selected Category:') }}</span>
+                                <span class="fl11-ur" style="font-size: 11px; opacity: 0.7;">منتخب درجہ بندی</span>
+                            </div>
                             <span class="fl11-summary-value" id="summaryCategory">{{ __('None yet') }}</span>
                         </div>
                         <div class="fl11-summary-row">
-                            <span class="fl11-summary-label">{{ __('Selected Service:') }}</span>
+                            <div class="fl11-bilingual">
+                                <span class="fl11-summary-label">{{ __('Selected Service:') }}</span>
+                                <span class="fl11-ur" style="font-size: 11px; opacity: 0.7;">منتخب سروس</span>
+                            </div>
                             <span class="fl11-summary-value" id="summaryService">{{ __('None yet') }}</span>
                         </div>
                         <div class="fl11-summary-row">
-                            <span class="fl11-summary-label">{{ __('Cost estimate:') }}</span>
+                            <div class="fl11-bilingual">
+                                <span class="fl11-summary-label">{{ __('Cost estimate:') }}</span>
+                                <span class="fl11-ur" style="font-size: 11px; opacity: 0.7;">تخمینہ لاگت</span>
+                            </div>
                             <span class="fl11-summary-value fl11-cost" id="summaryCost">{{ $currency_symbol ?? '$' }}0</span>
                             <span class="fl11-summary-sub" id="summaryCostNote">{{ __('None yet') }}</span>
                         </div>
@@ -293,6 +346,10 @@
                     @php
                         $color = $colors[$index % 4];
                         $colorCode = $colorCodes[$color];
+                        $isUrdu = stripos($category->name, 'X-ray') !== false || stripos($category->name, 'Xray') !== false ? 'ایکس رے' : 
+                                 (stripos($category->name, 'Ultrasound') !== false ? 'الٹراساؤنڈ' : 
+                                 (stripos($category->name, 'CT Scan') !== false || stripos($category->name, 'CT-Scan') !== false ? 'سی ٹی اسکین' : 
+                                 (stripos($category->name, 'OPG') !== false ? 'او پی جی' : 'درجہ بندی')));
                     @endphp
                     <div class="fl11-service-card fl11-neon-card" data-color="{{ $color }}" data-category-id="{{ $category->id }}" data-category-name="{{ $category->name }}">
                         <div class="fl11-card-checkbox">
@@ -315,13 +372,10 @@
                             @elseif(stripos($category->name, 'Ultrasound') !== false)
                                 <!-- Ultrasound Probe Icon -->
                                 <svg viewBox="0 0 64 64" fill="none" class="fl11-category-svg">
-                                    <!-- Probe handle -->
                                     <rect x="28" y="10" width="8" height="18" rx="2" stroke="{{ $colorCode }}" stroke-width="2.5"/>
                                     <line x1="28" y1="16" x2="36" y2="16" stroke="{{ $colorCode }}" stroke-width="1.5"/>
                                     <line x1="28" y1="20" x2="36" y2="20" stroke="{{ $colorCode }}" stroke-width="1.5"/>
-                                    <!-- Probe head -->
                                     <path d="M26 28 L26 35 Q26 40, 32 42 Q38 40, 38 35 L38 28 Z" stroke="{{ $colorCode }}" stroke-width="2.5" fill="none"/>
-                                    <!-- Sound waves -->
                                     <path d="M32 42 L32 46" stroke="{{ $colorCode }}" stroke-width="2"/>
                                     <path d="M28 48 L36 48" stroke="{{ $colorCode }}" stroke-width="2" opacity="0.8"/>
                                     <path d="M24 50 L40 50" stroke="{{ $colorCode }}" stroke-width="2" opacity="0.6"/>
@@ -330,13 +384,10 @@
                             @elseif(stripos($category->name, 'CT Scan') !== false || stripos($category->name, 'CT-Scan') !== false)
                                 <!-- CT Scanner Machine Icon -->
                                 <svg viewBox="0 0 64 64" fill="none" class="fl11-category-svg">
-                                    <!-- Scanner ring -->
                                     <circle cx="32" cy="32" r="20" stroke="{{ $colorCode }}" stroke-width="3"/>
                                     <circle cx="32" cy="32" r="14" stroke="{{ $colorCode }}" stroke-width="2"/>
-                                    <!-- Patient table -->
                                     <rect x="26" y="30" width="12" height="20" stroke="{{ $colorCode }}" stroke-width="2" rx="1"/>
                                     <line x1="26" y1="35" x2="38" y2="35" stroke="{{ $colorCode }}" stroke-width="1.5"/>
-                                    <!-- Scan beam indicators -->
                                     <line x1="32" y1="12" x2="32" y2="18" stroke="{{ $colorCode }}" stroke-width="2.5" opacity="0.7"/>
                                     <line x1="32" y1="46" x2="32" y2="52" stroke="{{ $colorCode }}" stroke-width="2.5" opacity="0.7"/>
                                     <line x1="12" y1="32" x2="18" y2="32" stroke="{{ $colorCode }}" stroke-width="2.5" opacity="0.7"/>
@@ -345,35 +396,11 @@
                             @elseif(stripos($category->name, 'OPG') !== false)
                                 <!-- OPG Dental Panoramic Icon -->
                                 <svg viewBox="0 0 64 64" fill="none" class="fl11-category-svg">
-                                    <!-- Jaw arc -->
                                     <path d="M12 20 Q32 8 52 20" stroke="{{ $colorCode }}" stroke-width="3" fill="none"/>
                                     <path d="M12 44 Q32 56 52 44" stroke="{{ $colorCode }}" stroke-width="3" fill="none"/>
-                                    <!-- Teeth representation -->
                                     <rect x="20" y="22" width="6" height="10" rx="2" stroke="{{ $colorCode }}" stroke-width="2"/>
                                     <rect x="29" y="20" width="6" height="12" rx="2" stroke="{{ $colorCode }}" stroke-width="2"/>
                                     <rect x="38" y="22" width="6" height="10" rx="2" stroke="{{ $colorCode }}" stroke-width="2"/>
-                                </svg>
-                            @elseif(stripos($category->name, 'Mammography') !== false)
-                                <!-- Mammography Icon -->
-                                <svg viewBox="0 0 64 64" fill="none" class="fl11-category-svg">
-                                    <!-- Breast shape -->
-                                    <circle cx="32" cy="32" r="18" stroke="{{ $colorCode }}" stroke-width="3"/>
-                                    <circle cx="32" cy="32" r="8" stroke="{{ $colorCode }}" stroke-width="2" opacity="0.6"/>
-                                    <!-- Compression plates -->
-                                    <line x1="10" y1="20" x2="54" y2="20" stroke="{{ $colorCode }}" stroke-width="2.5"/>
-                                    <line x1="10" y1="44" x2="54" y2="44" stroke="{{ $colorCode }}" stroke-width="2.5"/>
-                                </svg>
-                            @elseif(stripos($category->name, 'HSG') !== false)
-                                <!-- HSG Uterus/Fallopian Tubes Icon -->
-                                <svg viewBox="0 0 64 64" fill="none" class="fl11-category-svg">
-                                    <!-- Uterus shape -->
-                                    <path d="M24 40 L32 54 L40 40" stroke="{{ $colorCode }}" stroke-width="3" fill="none"/>
-                                    <!-- Fallopian tubes -->
-                                    <path d="M10 20 Q18 30 24 40" stroke="{{ $colorCode }}" stroke-width="2.5" fill="none"/>
-                                    <path d="M54 20 Q46 30 40 40" stroke="{{ $colorCode }}" stroke-width="2.5" fill="none"/>
-                                    <!-- Ovaries -->
-                                    <circle cx="10" cy="20" r="6" stroke="{{ $colorCode }}" stroke-width="2"/>
-                                    <circle cx="54" cy="20" r="6" stroke="{{ $colorCode }}" stroke-width="2"/>
                                 </svg>
                             @else
                                 <!-- Default Medical Icon -->
@@ -386,7 +413,10 @@
                                 </svg>
                             @endif
                         </div>
-                        <h5 class="fl11-card-title">{{ $category->name }}</h5>
+                        <div class="fl11-bilingual" style="align-items: center;">
+                            <h5 class="fl11-card-title">{{ $category->name }}</h5>
+                            <span class="fl11-ur" style="font-size: 11px; opacity: 0.8; color: {{ $colorCode }};">{{ $isUrdu }}</span>
+                        </div>
                         <p class="fl11-card-description">{{ Str::limit($category->description ?? __('Select this category to view available services'), 80) }}</p>
                     </div>
                 @endforeach
@@ -396,21 +426,32 @@
             @stack('shopping_cart_icon')
 
             <!-- Continue Button -->
-            <button type="button" class="fl11-continue-btn" id="fl11ContinueStep1">
-                {{ __('Continue to Time Selection') }} →
-            </button>
+            <div class="fl11-button-group">
+                <button type="button" class="fl11-continue-btn" id="fl11ContinueStep1">
+                    <div class="fl11-bilingual" style="align-items: center; justify-content: center;">
+                        <span>{{ __('Continue to Time Selection') }} →</span>
+                        <span class="fl11-ur" style="font-size: 13px; margin-top: 0;">وقت کے انتخاب کے لیے جاری رکھیں</span>
+                    </div>
+                </button>
+            </div>
         </div>
 
         <!-- STEP 2: Pick a Time -->
         <div class="fl11-step-content fl11-step-2" id="fl11Step2" style="display: none;">
             <div class="fl11-content-header">
-                <h1>{{ __('Pick a Time:') }}</h1>
+                <h1 class="fl11-bilingual">
+                    <span>{{ __('Pick a Time:') }}</span>
+                    <span class="fl11-ur" style="color: #64748b; font-size: 16px;">وقت کا انتخاب کریں</span>
+                </h1>
             </div>
 
             <div class="fl11-content-body fl11-time-section">
                 <div class="fl11-form-section fl11-full-width">
                     <div class="fl11-form-group">
-                        <label>{{ __('Select Date') }} <span class="fl11-required">*</span></label>
+                        <label class="fl11-bilingual">
+                            <span>{{ __('Select Date') }} <span class="fl11-required">*</span></span>
+                            <span class="fl11-ur" style="font-size: 13px; opacity: 0.8; margin-top: 2px;">تاریخ منتخب کریں</span>
+                        </label>
                         <div class="fl11-select-wrapper">
                             <input type="text" name="appointment_date" id="datepicker" class="fl11-input" placeholder="{{ __('Select date') }}" readonly required>
                             <svg class="fl11-select-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -423,7 +464,10 @@
                     </div>
 
                     <div class="fl11-time-slots-container">
-                        <label>{{ __('Available Time Slots') }} <span class="fl11-required">*</span></label>
+                        <label class="fl11-bilingual">
+                            <span>{{ __('Available Time Slots') }} <span class="fl11-required">*</span></span>
+                            <span class="fl11-ur" style="font-size: 13px; opacity: 0.8; margin-top: 2px;">دستیاب اوقات</span>
+                        </label>
                         <ul class="fl11-time-slots" id="timeSlotsContainer">
                             <p class="fl11-time-placeholder">{{ __('Please select a date to view available time slots') }}</p>
                         </ul>
@@ -433,7 +477,10 @@
                 <!-- Summary Panel for Step 2 -->
                 <div class="fl11-summary-panel">
                     <div class="fl11-summary-header">
-                        <h4>{{ __('Summary') }}</h4>
+                        <h4 class="fl11-bilingual">
+                            <span>{{ __('Summary') }}</span>
+                            <span class="fl11-ur" style="font-size: 14px; color: #00e5cc;">خلاصہ</span>
+                        </h4>
                         <svg class="fl11-summary-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                             <rect x="3" y="3" width="18" height="18" rx="2"></rect>
                             <line x1="9" y1="9" x2="15" y2="9"></line>
@@ -443,19 +490,31 @@
                     </div>
                     <div class="fl11-summary-content">
                         <div class="fl11-summary-row">
-                            <span class="fl11-summary-label">{{ __('Service:') }}</span>
+                            <div class="fl11-bilingual">
+                                <span class="fl11-summary-label">{{ __('Service:') }}</span>
+                                <span class="fl11-ur" style="font-size: 11px; opacity: 0.7;">سروس</span>
+                            </div>
                             <span class="fl11-summary-value" id="summaryServiceStep2">{{ __('None yet') }}</span>
                         </div>
                         <div class="fl11-summary-row">
-                            <span class="fl11-summary-label">{{ __('Date:') }}</span>
+                            <div class="fl11-bilingual">
+                                <span class="fl11-summary-label">{{ __('Date:') }}</span>
+                                <span class="fl11-ur" style="font-size: 11px; opacity: 0.7;">تاریخ</span>
+                            </div>
                             <span class="fl11-summary-value" id="summaryDate">{{ __('None yet') }}</span>
                         </div>
                         <div class="fl11-summary-row">
-                            <span class="fl11-summary-label">{{ __('Time:') }}</span>
+                            <div class="fl11-bilingual">
+                                <span class="fl11-summary-label">{{ __('Time:') }}</span>
+                                <span class="fl11-ur" style="font-size: 11px; opacity: 0.7;">وقت</span>
+                            </div>
                             <span class="fl11-summary-value" id="summaryTime">{{ __('None yet') }}</span>
                         </div>
                         <div class="fl11-summary-row">
-                            <span class="fl11-summary-label">{{ __('Cost:') }}</span>
+                            <div class="fl11-bilingual">
+                                <span class="fl11-summary-label">{{ __('Cost:') }}</span>
+                                <span class="fl11-ur" style="font-size: 11px; opacity: 0.7;">لاگت</span>
+                            </div>
                             <span class="fl11-summary-value fl11-cost" id="summaryCostStep2">{{ $currency_symbol ?? '$' }}0</span>
                         </div>
                     </div>
@@ -464,10 +523,16 @@
 
             <div class="fl11-button-group">
                 <button type="button" class="fl11-back-btn" id="fl11BackStep2">
-                    ← {{ __('Back') }}
+                    <div class="fl11-bilingual" style="align-items: center;">
+                        <span>← {{ __('Back') }}</span>
+                        <span class="fl11-ur" style="font-size: 11px;">واپس</span>
+                    </div>
                 </button>
                 <button type="button" class="fl11-continue-btn" id="fl11ContinueStep2">
-                    {{ __('Continue') }} →
+                    <div class="fl11-bilingual" style="align-items: center;">
+                        <span>{{ __('Continue') }} →</span>
+                        <span class="fl11-ur" style="font-size: 13px; margin-top: 0;">جاری رکھیں</span>
+                    </div>
                 </button>
             </div>
         </div>
@@ -477,7 +542,10 @@
         <!-- STEP 3: Additional Details -->
         <div class="fl11-step-content fl11-step-3" id="fl11Step3" style="display: none;">
             <div class="fl11-content-header">
-                <h1>{{ __('Additional Details:') }}</h1>
+                <h1 class="fl11-bilingual">
+                    <span>{{ __('Additional Details:') }}</span>
+                    <span class="fl11-ur" style="color: #64748b; font-size: 16px;">اضافی تفصیلات</span>
+                </h1>
             </div>
 
             <div class="fl11-content-body">
@@ -585,7 +653,10 @@
         <!-- STEP 4: Share Your Details -->
         <div class="fl11-step-content fl11-step-4" id="fl11Step4" style="display: none;">
             <div class="fl11-content-header">
-                <h1>{{ __('Share Your Details:') }}</h1>
+                <h1 class="fl11-bilingual">
+                    <span>{{ __('Share Your Details:') }}</span>
+                    <span class="fl11-ur" style="color: #64748b; font-size: 16px;">اپنی تفصیلات بتائیں</span>
+                </h1>
             </div>
 
             <div class="fl11-content-body">
@@ -601,13 +672,20 @@
                     <!-- User Type Tabs -->
                     <div class="fl11-user-tabs">
                         @if ($hasRegistered)
-                            <button type="button" class="fl11-user-tab active" data-tab="new-user">{{ __('New User') }}</button>
-                            <button type="button" class="fl11-user-tab" data-tab="existing-user">{{ __('Existing User') }}</button>
+                            <button type="button" class="fl11-user-tab fl11-bilingual active" data-tab="new-user">
+                                <span>{{ __('New User') }}</span>
+                                <span class="fl11-ur" style="font-size: 11px;">نیا صارف</span>
+                            </button>
+                            <button type="button" class="fl11-user-tab fl11-bilingual" data-tab="existing-user">
+                                <span>{{ __('Existing User') }}</span>
+                                <span class="fl11-ur" style="font-size: 11px;">موجودہ صارف</span>
+                            </button>
                         @endif
-                        @if ($hasGuest && !$hasRegistered)
-                            <button type="button" class="fl11-user-tab active" data-tab="guest-user">{{ __('Guest') }}</button>
-                        @elseif ($hasGuest)
-                            <button type="button" class="fl11-user-tab" data-tab="guest-user">{{ __('Guest') }}</button>
+                        @if ($hasGuest)
+                            <button type="button" class="fl11-user-tab fl11-bilingual {{ !$hasRegistered ? 'active' : '' }}" data-tab="guest-user">
+                                <span>{{ __('Guest') }}</span>
+                                <span class="fl11-ur" style="font-size: 11px;">مہمان</span>
+                            </button>
                         @endif
                     </div>
                     <input type="hidden" name="type" id="selected_tab" value="{{ $defaultTab }}">
@@ -617,27 +695,42 @@
                         <div class="fl11-user-form" id="new-user-form" style="display: block;">
                             <div class="fl11-form-row">
                                 <div class="fl11-form-group fl11-half">
-                                    <label>{{ __('Full Name') }} <span class="fl11-required">*</span></label>
+                                    <label class="fl11-bilingual">
+                                        <span>{{ __('Full Name') }} <span class="fl11-required">*</span></span>
+                                        <span class="fl11-ur" style="font-size: 13px;">پورا نام</span>
+                                    </label>
                                     <input type="text" name="name" id="new_name" class="fl11-input" placeholder="{{ __('Enter your name') }}">
                                 </div>
                                 <div class="fl11-form-group fl11-half">
-                                    <label>{{ __('Email') }} <span class="fl11-required">*</span></label>
+                                    <label class="fl11-bilingual">
+                                        <span>{{ __('Email') }} <span class="fl11-required">*</span></span>
+                                        <span class="fl11-ur" style="font-size: 13px;">ای میل</span>
+                                    </label>
                                     <input type="email" name="email" id="new_email" class="fl11-input" placeholder="{{ __('Enter your email') }}">
                                 </div>
                             </div>
                             <div class="fl11-form-row">
                                 <div class="fl11-form-group fl11-half">
-                                    <label>{{ __('Phone') }} <span class="fl11-required">*</span></label>
+                                    <label class="fl11-bilingual">
+                                        <span>{{ __('Phone') }} <span class="fl11-required">*</span></span>
+                                        <span class="fl11-ur" style="font-size: 13px;">فون</span>
+                                    </label>
                                     <input type="tel" name="contact" id="new_contact" class="fl11-input" placeholder="{{ __('Enter phone number') }}">
                                 </div>
                                 <div class="fl11-form-group fl11-half">
-                                    <label>{{ __('Password') }} <span class="fl11-required">*</span></label>
+                                    <label class="fl11-bilingual">
+                                        <span>{{ __('Password') }} <span class="fl11-required">*</span></span>
+                                        <span class="fl11-ur" style="font-size: 13px;">پاس ورڈ</span>
+                                    </label>
                                     <input type="password" name="password" id="new_password" class="fl11-input" placeholder="{{ __('Create password') }}">
                                 </div>
                             </div>
                             <div class="fl11-form-row">
                                 <div class="fl11-form-group fl11-full" style="width: 100%;">
-                                    <label>{{ __('Referred By') }}</label>
+                                    <label class="fl11-bilingual">
+                                        <span>{{ __('Referred By') }}</span>
+                                        <span class="fl11-ur" style="font-size: 13px;">کس نے بھیجا؟</span>
+                                    </label>
                                     <input type="text" name="referred_by" class="fl11-input" placeholder="{{ __('Doctor Name (Optional)') }}">
                                 </div>
                             </div>
@@ -647,17 +740,26 @@
                         <div class="fl11-user-form" id="existing-user-form" style="display: none;">
                             <div class="fl11-form-row">
                                 <div class="fl11-form-group fl11-half">
-                                    <label>{{ __('Email') }} <span class="fl11-required">*</span></label>
+                                    <label class="fl11-bilingual">
+                                        <span>{{ __('Email') }} <span class="fl11-required">*</span></span>
+                                        <span class="fl11-ur" style="font-size: 13px;">ای میل</span>
+                                    </label>
                                     <input type="email" name="email" id="existing_email" class="fl11-input" placeholder="{{ __('Enter your email') }}">
                                 </div>
                                 <div class="fl11-form-group fl11-half">
-                                    <label>{{ __('Password') }} <span class="fl11-required">*</span></label>
+                                    <label class="fl11-bilingual">
+                                        <span>{{ __('Password') }} <span class="fl11-required">*</span></span>
+                                        <span class="fl11-ur" style="font-size: 13px;">پاس ورڈ</span>
+                                    </label>
                                     <input type="password" name="password" id="existing_password" class="fl11-input" placeholder="{{ __('Enter password') }}">
                                 </div>
                             </div>
                             <div class="fl11-form-row">
                                 <div class="fl11-form-group fl11-full" style="width: 100%;">
-                                    <label>{{ __('Referred By') }}</label>
+                                    <label class="fl11-bilingual">
+                                        <span>{{ __('Referred By') }}</span>
+                                        <span class="fl11-ur" style="font-size: 13px;">کس نے بھیجا؟</span>
+                                    </label>
                                     <input type="text" name="referred_by" class="fl11-input" placeholder="{{ __('Doctor Name (Optional)') }}">
                                 </div>
                             </div>
@@ -669,20 +771,32 @@
                         <div class="fl11-user-form" id="guest-user-form" style="{{ !$hasRegistered ? 'display: block;' : 'display: none;' }}">
                             <div class="fl11-form-row">
                                 <div class="fl11-form-group fl11-half">
-                                    <label>{{ __('Full Name') }} <span class="fl11-required">*</span></label>
+                                    <label class="fl11-bilingual">
+                                        <span>{{ __('Full Name') }} <span class="fl11-required">*</span></span>
+                                        <span class="fl11-ur" style="font-size: 13px;">پورا نام</span>
+                                    </label>
                                     <input type="text" name="name" id="guest_name" class="fl11-input" placeholder="{{ __('Enter your name') }}">
                                 </div>
                                 <div class="fl11-form-group fl11-half">
-                                    <label>{{ __('Email') }} <span class="fl11-required">*</span></label>
+                                    <label class="fl11-bilingual">
+                                        <span>{{ __('Email') }} <span class="fl11-required">*</span></span>
+                                        <span class="fl11-ur" style="font-size: 13px;">ای میل</span>
+                                    </label>
                                     <input type="email" name="email" id="guest_email" class="fl11-input" placeholder="{{ __('Enter your email') }}">
                                 </div>
                             </div>
                             <div class="fl11-form-group">
-                                <label>{{ __('Phone') }} <span class="fl11-required">*</span></label>
+                                <label class="fl11-bilingual">
+                                    <span>{{ __('Phone') }} <span class="fl11-required">*</span></span>
+                                    <span class="fl11-ur" style="font-size: 13px;">فون</span>
+                                </label>
                                 <input type="tel" name="contact" id="guest_contact" class="fl11-input" placeholder="{{ __('Enter phone number') }}">
                             </div>
                             <div class="fl11-form-group">
-                                <label>{{ __('Referred By') }}</label>
+                                <label class="fl11-bilingual">
+                                    <span>{{ __('Referred By') }}</span>
+                                    <span class="fl11-ur" style="font-size: 13px;">کس نے بھیجا؟</span>
+                                </label>
                                 <input type="text" name="referred_by" class="fl11-input" placeholder="{{ __('Doctor Name (Optional)') }}">
                             </div>
                         </div>
@@ -692,10 +806,16 @@
 
             <div class="fl11-button-group">
                 <button type="button" class="fl11-back-btn" id="fl11BackStep4">
-                    ← {{ __('Back') }}
+                    <div class="fl11-bilingual" style="align-items: center;">
+                        <span>← {{ __('Back') }}</span>
+                        <span class="fl11-ur" style="font-size: 11px;">واپس</span>
+                    </div>
                 </button>
                 <button type="button" class="fl11-continue-btn" id="fl11ContinueStep4">
-                    {{ __('Continue to Payment') }} →
+                    <div class="fl11-bilingual" style="align-items: center;">
+                        <span>{{ __('Continue to Payment') }} →</span>
+                        <span class="fl11-ur" style="font-size: 13px; margin-top: 0;">ادائیگی کی تفصیلات</span>
+                    </div>
                 </button>
             </div>
         </div>
@@ -703,22 +823,34 @@
         <!-- STEP 5: Payment -->
         <div class="fl11-step-content fl11-step-5" id="fl11Step5" style="display: none;">
             <div class="fl11-content-header">
-                <h1>{{ __('Payment:') }}</h1>
+                <h1 class="fl11-bilingual">
+                    <span>{{ __('Payment:') }}</span>
+                    <span class="fl11-ur" style="color: #64748b; font-size: 16px;">ادائیگی</span>
+                </h1>
             </div>
 
             <div class="fl11-content-body">
                 <div class="fl11-form-section fl11-full-width">
                     <div class="fl11-payment-summary">
                         <div class="fl11-summary-row">
-                            <span class="fl11-summary-label">{{ __('Service:') }}</span>
+                            <div class="fl11-bilingual">
+                                <span class="fl11-summary-label">{{ __('Service:') }}</span>
+                                <span class="fl11-ur" style="font-size: 11px; opacity: 0.7;">سروس</span>
+                            </div>
                             <span class="fl11-summary-value" id="paymentService">-</span>
                         </div>
                         <div class="fl11-summary-row">
-                            <span class="fl11-summary-label">{{ __('Date & Time:') }}</span>
+                            <div class="fl11-bilingual">
+                                <span class="fl11-summary-label">{{ __('Date & Time:') }}</span>
+                                <span class="fl11-ur" style="font-size: 11px; opacity: 0.7;">تاریخ اور وقت</span>
+                            </div>
                             <span class="fl11-summary-value" id="paymentDateTime">-</span>
                         </div>
                         <div class="fl11-summary-row fl11-total">
-                            <span class="fl11-summary-label">{{ __('Total:') }}</span>
+                            <div class="fl11-bilingual">
+                                <span class="fl11-summary-label">{{ __('Total:') }}</span>
+                                <span class="fl11-ur" style="font-size: 11px; opacity: 0.7;">کل لاگت</span>
+                            </div>
                             <span class="fl11-summary-value fl11-cost" id="paymentTotal">{{ $currency_symbol ?? '$' }}0</span>
                         </div>
                         @stack('apply_coupon')
@@ -733,7 +865,10 @@
                                     <rect x="1" y="4" width="22" height="16" rx="2" ry="2"></rect>
                                     <line x1="1" y1="10" x2="23" y2="10"></line>
                                 </svg>
-                                <span>{{ __('Pay at Location') }}</span>
+                                <span class="fl11-bilingual">
+                                    <span>{{ __('Pay at Location') }}</span>
+                                    <span class="fl11-ur" style="font-size: 12px; margin-top: -2px;">کاؤنٹر پر ادائیگی کریں</span>
+                                </span>
                             </span>
                         </label>
                         @stack('appointment_payment')
@@ -743,10 +878,16 @@
 
             <div class="fl11-button-group">
                 <button type="button" class="fl11-back-btn" id="fl11BackStep5">
-                    ← {{ __('Back') }}
+                    <div class="fl11-bilingual" style="align-items: center;">
+                        <span>← {{ __('Back') }}</span>
+                        <span class="fl11-ur" style="font-size: 11px;">واپس</span>
+                    </div>
                 </button>
                 <button type="submit" class="fl11-continue-btn fl11-submit-btn" id="fl11SubmitBtn">
-                    {{ __('Confirm Booking') }} ✓
+                    <div class="fl11-bilingual" style="align-items: center;">
+                        <span>{{ __('Confirm Booking') }} ✓</span>
+                        <span class="fl11-ur" style="font-size: 13px; margin-top: 0;">بکنگ کی تصدیق کریں</span>
+                    </div>
                 </button>
             </div>
         </div>
@@ -761,43 +902,59 @@
                     </svg>
                 </div>
                 
-                <h1>{{ __('Booking Confirmed!') }}</h1>
-                <p>{{ __('Your appointment has been successfully booked.') }}</p>
+                <h1 class="fl11-bilingual" style="justify-content: center;">
+                    <span>{{ __('Booking Confirmed!') }}</span>
+                    <span class="fl11-ur" style="font-size: 20px; color: #00e5cc;">بکنگ کی تصدیق ہو گئی!</span>
+                </h1>
+                <p class="fl11-bilingual" style="justify-content: center; opacity: 0.8;">
+                    <span>{{ __('Your appointment has been successfully booked.') }}</span>
+                    <span class="fl11-ur" style="font-size: 14px;">آپ کی ملاقات کامیابی کے ساتھ بک کر لی گئی ہے۔</span>
+                </p>
                 
                 <div class="fl11-booking-details">
                     <div class="fl11-detail-row">
-                        <span class="fl11-detail-label">{{ __('Booking Number:') }}</span>
+                        <div class="fl11-bilingual">
+                            <span class="fl11-detail-label">{{ __('Booking Number:') }}</span>
+                            <span class="fl11-ur" style="font-size: 11px; opacity: 0.7;">بکنگ نمبر</span>
+                        </div>
                         <span class="fl11-detail-value" id="bookingNumber">-</span>
                     </div>
                     <div class="fl11-detail-row">
-                        <span class="fl11-detail-label">{{ __('Service:') }}</span>
+                        <div class="fl11-bilingual">
+                            <span class="fl11-detail-label">{{ __('Service:') }}</span>
+                            <span class="fl11-ur" style="font-size: 11px; opacity: 0.7;">سروس</span>
+                        </div>
                         <span class="fl11-detail-value" id="bookingService">-</span>
                     </div>
                     <div class="fl11-detail-row">
-                        <span class="fl11-detail-label">{{ __('Date & Time:') }}</span>
+                        <div class="fl11-bilingual">
+                            <span class="fl11-detail-label">{{ __('Date & Time:') }}</span>
+                            <span class="fl11-ur" style="font-size: 11px; opacity: 0.7;">تاریخ اور وقت</span>
+                        </div>
                         <span class="fl11-detail-value" id="bookingDateTime">-</span>
                     </div>
                     <div class="fl11-detail-row">
-                        <span class="fl11-detail-label">{{ __('Location:') }}</span>
+                        <div class="fl11-bilingual">
+                            <span class="fl11-detail-label">{{ __('Location:') }}</span>
+                            <span class="fl11-ur" style="font-size: 11px; opacity: 0.7;">جگہ</span>
+                        </div>
                         <span class="fl11-detail-value" id="bookingLocation">-</span>
                     </div>
-                    <div class="fl11-detail-row">
-                        <span class="fl11-detail-label">{{ __('Staff:') }}</span>
-                        <span class="fl11-detail-value" id="bookingStaff">-</span>
-                    </div>
                 </div>
                 
-                <!-- QR Code Display -->
                 <div class="fl11-qr-section">
-                    <h4>{{ __('Scan to View Appointment Details') }}</h4>
-                    <div id="appointmentQrCode" class="fl11-qr-code">
-                        <!-- QR Code will be generated here -->
-                    </div>
+                    <h4 class="fl11-bilingual" style="justify-content: center;">
+                        <span>{{ __('Scan to View Details') }}</span>
+                        <span class="fl11-ur" style="font-size: 13px;">تفصیلات دیکھنے کے لیے اسکین کریں</span>
+                    </h4>
+                    <div id="appointmentQrCode" class="fl11-qr-code"></div>
                 </div>
                 
-                @stack('iCal_exports')
                 <a href="{{ route('appointments.form', $slug) }}" class="fl11-continue-btn">
-                    {{ __('Book Another Appointment') }}
+                    <div class="fl11-bilingual" style="align-items: center; justify-content: center;">
+                        <span>{{ __('Book Another Appointment') }}</span>
+                        <span class="fl11-ur" style="font-size: 13px; margin-top: 0;">ایک اور بکنگ کریں</span>
+                    </div>
                 </a>
             </div>
         </div>
@@ -829,11 +986,18 @@
                 }
             });
             
-            // Update sidebar header text
-            var stepLabels = ['Service Selection', 'Pick a Time', 'Additional Details', 'Share Your Details', 'Payment', 'Done'];
+            // Update sidebar header text (Bilingual)
+            var stepLabels = [
+                'Service Selection <br><small class="fl11-ur" style="color: #64748b; font-size:12px;">سروس کا انتخاب</small>', 
+                'Pick a Time <br><small class="fl11-ur" style="color: #64748b; font-size:12px;">وقت کا انتخاب</small>', 
+                'Additional Details <br><small class="fl11-ur" style="color: #64748b; font-size:12px;">اضافی تفصیلات</small>', 
+                'Share Your Details <br><small class="fl11-ur" style="color: #64748b; font-size:12px;">ذاتی تفصیلات</small>', 
+                'Payment <br><small class="fl11-ur" style="color: #64748b; font-size:12px;">ادائیگی</small>', 
+                'Done <br><small class="fl11-ur" style="color: #64748b; font-size:12px;">مکمل</small>'
+            ];
             var headerH3 = document.querySelector('.fl11-sidebar-header h3');
             if (headerH3 && stepLabels[stepNumber - 1]) {
-                headerH3.textContent = stepLabels[stepNumber - 1];
+                headerH3.innerHTML = stepLabels[stepNumber - 1];
             }
         };
         

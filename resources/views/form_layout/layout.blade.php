@@ -12,6 +12,7 @@
     <meta name="keywords" content="form-one">
     <link rel="icon" href="{{ asset('form_layouts/' . $business->layouts . '/images/favicon.png') }}">
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@100..900&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Arabic:wght@100..900&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="{{ asset('form_layouts/' . $business->layouts . '/css/main-style.css') }}">
     <link rel="stylesheet" href="{{ asset('form_layouts/' . $business->layouts . '/css/responsive.css') }}">
     <link rel="stylesheet" href="{{ asset('module_assets/loader.css') }}">

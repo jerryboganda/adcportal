@@ -12,16 +12,30 @@
 }
 
 .fl11-booking-container {
-    font-family: 'Poppins', sans-serif;
+    font-family: 'Poppins', 'Noto Sans Arabic', sans-serif;
     display: flex;
     background: #ffffff;
     border-radius: 24px;
     box-shadow: 0 25px 80px rgba(0, 0, 0, 0.12);
     max-width: 1200px;
     width: 100%;
-    margin: 40px auto;
+    margin: 20px auto;
     overflow: hidden;
-    min-height: 700px;
+    height: 90vh;
+    height: 90dvh;
+}
+
+/* Urdu Text Support */
+.fl11-ur {
+    font-family: 'Noto Sans Arabic', sans-serif;
+    direction: rtl;
+    line-height: 1.2;
+    margin-top: 2px;
+}
+
+.fl11-bilingual {
+    display: flex;
+    flex-direction: column;
 }
 
 /* ================================
@@ -29,9 +43,9 @@
    ================================ */
 .fl11-sidebar {
     background: linear-gradient(180deg, #1a2a4a 0%, #0f1c36 100%);
-    padding: 40px 30px;
-    min-width: 280px;
-    max-width: 280px;
+    padding: 30px 20px;
+    min-width: 260px;
+    max-width: 260px;
     color: #ffffff;
 }
 
