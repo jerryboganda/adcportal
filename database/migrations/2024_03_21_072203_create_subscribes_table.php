@@ -19,7 +19,6 @@ return new class extends Migration
                 $table->unsignedBigInteger('business_id')->nullable();
                 $table->timestamps();
 
-                $table->foreign('business_id')->references('id')->on('businesses')->onDelete('cascade');
             });
         }
     }

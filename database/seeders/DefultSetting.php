@@ -154,26 +154,26 @@ class DefultSetting extends Seeder
         }
 
         // admin settings
-        $admin = User::where('type', 'super admin')->first();
+        $admin = User::where('type', 'admin')->first();
         $admin_setting = [
             "currency_format" => "1",
             "defult_currancy" => "PKR",
             "defult_currancy_symbol" => "₨",
             "defult_language" => "en",
             "defult_timezone" => "Asia/Kolkata",
-            "title_text" => !empty(env('APP_NAME')) ? env('APP_NAME') : 'BookingGo',
-            "footer_text" => "Copyright © " . (!empty(env('APP_NAME')) ? env('APP_NAME') : 'BookingGo'),
+            "title_text" => !empty(env('APP_NAME')) ? env('APP_NAME') : 'ADC Patient Management',
+            "footer_text" => "Copyright © " . (!empty(env('APP_NAME')) ? env('APP_NAME') : 'ADC'),
             "landing_page" => "off",
             "site_rtl" => "off",
             "cust_darklayout" => "off",
             "site_transparent" => "on",
-            "signup" => "on",
+            "signup" => "off",
             "color" => "theme-1",
 
             //seo
-            "meta_title" => "BookingGo SaaS - Multi Business Appointment Booking and Scheduling",
-            "meta_keywords" => "BookingGo,SaaS solution,Multi-business functionality, Cloud-based access,Scalability,Multi-addons,Collaboration tool,Data management,Business productivity,Operational effectiveness",
-            "meta_description" => "Discover the efficiency of BookingGo, a user-friendly web application by Rajodiya Apps. Streamline project management, organize tasks, collaborate seamlessly, and track progress effortlessly. Boost productivity with BookingGo's intuitive interface and comprehensive features. Revolutionize your project management process today. Try BookingGo!",
+            "meta_title" => !empty(env('APP_NAME')) ? env('APP_NAME') : 'ADC Patient Management',
+            "meta_keywords" => "clinic,appointments,patient management,scheduling",
+            "meta_description" => "Single-clinic appointment booking and patient management system.",
 
             // for cookie
             'enable_cookie' => 'on',
@@ -186,9 +186,6 @@ class DefultSetting extends Seeder
             'more_information_description' => 'For any queries in relation to our policy on cookies and your choices, please contact us',
             'contactus_url' => '#',
 
-            // for plan
-            "plan_package" => "on",
-            "custome_package" => "on",
             'email_verification' => 'on',
             "storage_setting" => "local",
             "local_storage_max_upload_size" => "204800",

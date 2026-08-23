@@ -21,11 +21,10 @@ return new class extends Migration
                 $table->string('phone')->nullable();
                 $table->string('email')->nullable();
                 $table->boolean('is_active')->default(true);
-                $table->unsignedBigInteger('business_id');
+                $table->unsignedBigInteger('business_id')->default(0);
                 $table->unsignedBigInteger('created_by')->default(0);
                 $table->timestamps();
 
-                $table->foreign('business_id')->references('id')->on('businesses')->onDelete('cascade');
             });
         }
 

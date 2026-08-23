@@ -15,11 +15,10 @@ return new class extends Migration
             Schema::create('custom_statuses', function (Blueprint $table) {
                 $table->id();
                 $table->string('title');
-                $table->unsignedBigInteger('business_id');
+                $table->unsignedBigInteger('business_id')->default(0);
                 $table->unsignedBigInteger('created_by')->default(0);
                 $table->timestamps();
 
-                $table->foreign('business_id')->references('id')->on('businesses')->onDelete('cascade');
                 $table->foreign('created_by')->references('id')->on('users')->onDelete('cascade');
             });
         }

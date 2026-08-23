@@ -18,14 +18,10 @@ class DatabaseSeeder extends Seeder
     {
         $this->call(NotificationsTableSeeder::class);
         $this->call(EmailTemplates::class);
-        $this->call(Plans::class);
+        // Single-clinic app: Plans and PackagesName (SaaS) seeders removed.
         $this->call(PermissionTableSeeder::class);
         $this->call(UserSeeder::class);
         $this->call(DefultSetting::class);
         $this->call(LanguageTableSeeder::class);
-        $this->call(PackagesName::class);
-        // if(module_is_active('AIAssistant')){
-        //     $this->call(AIAssistantTemplateListTableSeeder::class);
-        // }
     }
 }

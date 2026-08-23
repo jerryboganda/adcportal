@@ -26,14 +26,13 @@ return new class extends Migration
                 $table->string('notes')->nullable();
                 $table->string('payment_type')->nullable();
                 $table->string('appointment_status')->nullable();
-                $table->unsignedBigInteger('business_id');
+                $table->unsignedBigInteger('business_id')->default(0);
                 $table->unsignedBigInteger('created_by')->default(0);
                 $table->timestamps();
 
                 $table->foreign('location_id')->references('id')->on('locations')->onDelete('cascade');
                 $table->foreign('service_id')->references('id')->on('services')->onDelete('cascade');
                 $table->foreign('staff_id')->references('id')->on('staff')->onDelete('cascade');
-                $table->foreign('business_id')->references('id')->on('businesses')->onDelete('cascade');
                 $table->foreign('created_by')->references('id')->on('users')->onDelete('cascade');
             });
         }

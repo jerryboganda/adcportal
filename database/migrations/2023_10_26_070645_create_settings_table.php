@@ -17,6 +17,7 @@ return new class extends Migration
                 $table->id();
                 $table->string('key');
                 $table->longText('value')->nullable();
+                // Single-clinic app: kept for compatibility (0 = system settings, >0 = clinic settings).
                 $table->integer('business')->default(0);
                 $table->integer('created_by')->default(0);
                 $table->timestamps();
