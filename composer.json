@@ -9,23 +9,14 @@
     "license": "MIT",
     "require": {
         "php": "^8.1",
-        "anandsiddharth/laravel-paytm-wallet": "^2.0",
-        "anhskohbo/no-captcha": "^3.6",
-        "authorizenet/authorizenet": "^2.0",
         "aws/aws-sdk-php": "^3.322",
         "barryvdh/laravel-debugbar": "^3.13",
-        "braintree/braintree_php": "^6.20",
-        "eluceo/ical": "^2.14",
-        "fedapay/fedapay-php": "^0.4.2",
-        "globalpayments/php-sdk": "^12.0",
         "google/apiclient": "^2.17",
         "guzzlehttp/guzzle": "^7.9",
         "kavenegar/php": "^1.2",
         "kkomelin/laravel-translatable-string-exporter": "^1.22",
         "konekt/html": "^6.5",
-        "lab404/laravel-impersonate": "^1.7",
         "laravel/breeze": "^2.1",
-        "laravel/cashier-paddle": "^2.5",
         "laravel/framework": "^11.9",
         "laravel/sanctum": "^4.0",
         "laravel/tinker": "^2.9",
@@ -36,7 +27,6 @@
         "mediaburst/clockworksms": "^2.0",
         "melipayamak/php": "^1.0",
         "milon/barcode": "^11.0",
-        "omise/omise-php": "^2.18",
         "orhanerday/open-ai": "^5.2",
         "php-open-source-saver/jwt-auth": "^2.7",
         "pragmarx/google2fa-laravel": "^2.2",
@@ -45,15 +35,10 @@
         "simplesoftwareio/simple-qrcode": "^4.2",
         "smsgatewayme/client": "^0.0.1",
         "spatie/laravel-google-calendar": "^3.8",
-        "square/square": "38.1.0.20240919",
-        "srmklive/paypal": "^3.0",
-        "stripe/stripe-php": "^15.8",
         "twilio/sdk": "^8.3",
         "tzsk/sms": "^8.0",
         "whichbrowser/parser": "^2.1",
-        "wikimedia/composer-merge-plugin": "^2.1",
-        "yajra/laravel-datatables": "^11.0",
-        "yoomoney/yookassa-sdk-php": "^3.6"
+        "yajra/laravel-datatables": "^11.0"
     },
     "require-dev": {
         "fakerphp/faker": "^1.23",
@@ -98,14 +83,6 @@
     "extra": {
         "laravel": {
             "dont-discover": []
-        },
-        "merge-plugin": {
-            "include": [
-                "packages/workdo/*/composer.json"
-            ],
-            "recurse": false,
-            "replace": false,
-            "merge-dev": false
         }
     },
     "config": {
@@ -116,9 +93,11 @@
             "pestphp/pest-plugin": true,
             "php-http/discovery": true,
             "wikimedia/composer-merge-plugin": true
+        },
+        "audit": {
+            "abandoned": "report"
         }
     },
     "minimum-stability": "stable",
     "prefer-stable": true
 }
-
