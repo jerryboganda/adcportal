@@ -47,7 +47,7 @@
                                         <label class="form-check-label"
                                             for="local_calendar">{{ __('Local Calendar') }}</label>
                                     </div>
-                                    @if (module_is_active('GoogleCalendar') && isset($company_settings['google_calendar_enable']))
+                                    @if (false && isset($company_settings['google_calendar_enable']))
                                         @if (isset($company_settings['google_calendar_enable']) && $company_settings['google_calendar_enable'] == 'on')
                                             <div class="mb-0 form-check">
                                                 <input type="radio" id="google_calendar" value="google_calendar"
@@ -58,7 +58,7 @@
                                             </div>
                                         @endif
                                     @endif
-                                    @if (module_is_active('OutlookCalendar') && isset($company_settings['outlook_calendar_enable']))
+                                    @if (false && isset($company_settings['outlook_calendar_enable']))
                                         @if (isset($company_settings['outlook_calendar_enable']) && $company_settings['outlook_calendar_enable'] == 'on')
                                             <div class="mb-0 form-check">
                                                 <input type="radio" id="outlook_calendar" value="outlook_calendar"

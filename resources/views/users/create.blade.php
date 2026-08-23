@@ -1,12 +1,6 @@
 @php
-    if(Auth::user()->type=='super admin')
-    {
-        $name = __('Subscriber');
-    }
-    else{
-
-        $name =__('User');
-    }
+    // Single-clinic app: subscriber naming removed.
+    $name =__('User');
 @endphp
     {{Form::open(array('url'=>'users','method'=>'post','class'=>'needs-validation','novalidate'))}}
     <div class="modal-body">
@@ -22,19 +16,7 @@
                     @enderror
                 </div>
             </div>
-            @if(Auth::user()->type == 'super admin')
-                <div class="col-md-12">
-                    <div class="form-group">
-                        {{Form::label('Business_name',__('Business Name'),['class'=>'form-label']) }}
-                        {{Form::text('Business_name',null,array('class'=>'form-control','placeholder'=>__('Enter Business Name'),'required'=>'required'))}}
-                        @error('name')
-                        <small class="invalid-name" role="alert">
-                            <strong class="text-danger">{{ $message }}</strong>
-                        </small>
-                        @enderror
-                    </div>
-                </div>
-            @endif
+            {{-- Single-clinic app: Business Name field removed. --}}
             <div class="col-md-12">
                 <div class="form-group">
                     {{Form::label('email',__('Email'),['class'=>'form-label'])}}
@@ -46,7 +28,7 @@
                     @enderror
                 </div>
             </div>
-            @if(Auth::user()->type != 'super admin')
+            {{-- Single-clinic app: roles selector always shown. --}}
                 <div class="col-md-12">
                     <div class="form-group">
                         {{ Form::label('roles', __('Roles'),['class'=>'form-label']) }}
@@ -71,7 +53,6 @@
                         @enderror
                     </div>
                 </div>
-            @endif
 
             <div class="col-md-5 mb-3">
                 <label for="password_switch">{{ __('Login is enable') }}</label>

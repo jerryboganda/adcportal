@@ -56,7 +56,7 @@
                     </div>
                     @endif
                 </div>
-                @if(module_is_active('GoogleCaptcha') && (isset($admin_settings['google_recaptcha_is_on']) ? $admin_settings['google_recaptcha_is_on'] : 'off') == 'on' )
+                @if(false && (isset($admin_settings['google_recaptcha_is_on']) ? $admin_settings['google_recaptcha_is_on'] : 'off') == 'on' )
                     @if (isset($admin_settings['google_recaptcha_version']) && $admin_settings['google_recaptcha_version'] == 'v2')
                         <div class="form-group col-lg-12 col-md-12 mt-3">
                             {!! NoCaptcha::display() !!}
@@ -97,7 +97,7 @@
             return true;
         });
     </script>
-    @if(module_is_active('GoogleCaptcha') && (isset($admin_settings['google_recaptcha_is_on']) ? $admin_settings['google_recaptcha_is_on'] : 'off') == 'on' )
+    @if(false && (isset($admin_settings['google_recaptcha_is_on']) ? $admin_settings['google_recaptcha_is_on'] : 'off') == 'on' )
         @if (isset($admin_settings['google_recaptcha_version']) && $admin_settings['google_recaptcha_version'] == 'v2')
             {!! NoCaptcha::renderJs() !!}
         @else

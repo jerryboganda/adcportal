@@ -8,12 +8,12 @@
 @endsection
 @php
     $company_settings = getCompanyAllSetting();
-    $deposit_module_active = module_is_active('EasyDepositPayments');
+    $deposit_module_active = false;
 @endphp
 @section('page-action')
     <div class="d-flex col-auto gap-2">
         @stack('addButtonHook')
-        @if (module_is_active('ImportExport'))
+        @if (false)
             @permission('appointment export')
             @include('import-export::export.button', ['module' => 'appointment'])
             @endpermission
@@ -224,7 +224,7 @@
         }
     </style>
 @endpush
-@if (module_is_active('OutlookCalendar'))
+@if (false)
     @push('css')
         <link rel="stylesheet" href="{{ asset('packages/workdo/OutlookCalendar/src/Resources/assets/custom.css') }}">
     @endpush
@@ -319,7 +319,7 @@
                 var labels = ['No', 'Date/Duration', 'Customer', 'Staff', 'Service', 'Location', 'Payment', 'Status'];
 
                 // Check if Rating column exists (AppointmentReview module)
-                @if(module_is_active('AppointmentReview'))
+                @if(false)
                     labels.push('Rating');
                 @endif
 

@@ -2,11 +2,11 @@
 {{ Form::open(['url' => 'custom-status', 'method' => 'post', 'enctype' => 'multipart/form-data','class'=>'needs-validation','novalidate']) }}
 <div class="modal-body">
     <div class="text-start mb-3">
-        @if (module_is_active('AIAssistant'))
+        @if (false)
             @php
                 $admin_settings = getAdminAllSetting();
             @endphp
-            @if (module_is_active('AIAssistant') && !empty($admin_settings['chatgpt_is']) && $admin_settings['chatgpt_is'] == 'on')
+            @if (false && !empty($admin_settings['chatgpt_is']) && $admin_settings['chatgpt_is'] == 'on')
                 @include('aiassistant::ai.generate_ai_btn',['template_module' => 'custom status','module'=>'General'])
             @endif
         @endif

@@ -1,7 +1,7 @@
 <div class="d-flex">
 <div class="action-btn me-2">
     <a href="javascript:void(0)" class="btn btn-sm  bg-primary align-items-center cp_link"
-        data-link="{{ route('appointments.form', $business->slug) }}" data-bs-placement="top" data-bs-toggle="tooltip"
+        data-link="{{ route('appointments.form') }}" data-bs-placement="top" data-bs-toggle="tooltip"
         data-bs-original-title="{{ __('Click To Copy Form Link') }}">
         <i class="ti ti-link text-white"></i>
     </a>

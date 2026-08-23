@@ -105,42 +105,16 @@ class CompanyMenuListener
             'group' => 'base'
         ]);
         $menu->add([
-            'title' => __('Create Business'),
+            'title' => __('Clinic Settings'),
             'icon' => '',
-            'name' => 'role',
-            'parent' => 'business',
-            'order' => 10,
-            'ignore_if' => [],
-            'depend_on' => [],
-            'route' => '',
-            'module' => $module,
-            'permission' => 'business create',
-            'group' => 'base'
-        ]);
-        $menu->add([
-            'title' => __('Edit Business'),
-            'icon' => '',
-            'name' => 'role',
+            'name' => 'clinic-settings',
             'parent' => 'business',
             'order' => 20,
             'ignore_if' => [],
             'depend_on' => [],
-            'route' => 'manage.business',
+            'route' => 'business.manage',
             'module' => $module,
             'permission' => 'business update',
-            'group' => 'base'
-        ]);
-        $menu->add([
-            'title' => __('Businesses'),
-            'icon' => '',
-            'name' => 'role',
-            'parent' => 'business',
-            'order' => 30,
-            'ignore_if' => [],
-            'depend_on' => [],
-            'route' => 'business.index',
-            'module' => $module,
-            'permission' => 'business manage',
             'group' => 'base'
         ]);
 
@@ -157,36 +131,20 @@ class CompanyMenuListener
             'permission' => 'customer manage',
             'group' => 'base'
         ]);
-        if(in_array('TeamBooking',$event->menu->modules))
-        {
-            $menu->add([
-                'title' => __('Appointments'),
-                'icon' => 'credit-card custom-icon appointments',
-                'name' => 'appointments',
-                'parent' => null,
-                'order' => 170,
-                'ignore_if' => [],
-                'depend_on' => [],
-                'route' => 'appointments.index',
-                'module' => $module,
-                'permission' => 'appointment manage',
-                'group' => 'appointments'
-            ]);
-        }else{
-            $menu->add([
-                'title' => __('Appointments'),
-                'icon' => 'credit-card custom-icon appointments',
-                'name' => 'appointments',
-                'parent' => null,
-                'order' => 170,
-                'ignore_if' => [],
-                'depend_on' => [],
-                'route' => 'appointment.index',
-                'module' => $module,
-                'permission' => 'appointment manage',
-                'group' => 'appointments'
-            ]);
-        }
+        // Single-clinic app: TeamBooking add-on removed; core appointments menu only.
+        $menu->add([
+            'title' => __('Appointments'),
+            'icon' => 'credit-card custom-icon appointments',
+            'name' => 'appointments',
+            'parent' => null,
+            'order' => 170,
+            'ignore_if' => [],
+            'depend_on' => [],
+            'route' => 'appointment.index',
+            'module' => $module,
+            'permission' => 'appointment manage',
+            'group' => 'appointments'
+        ]);
         $menu->add([
             'title' => __('Appointment Calendar'),
             'icon' => 'calendar custom-icon calender',
@@ -278,31 +236,6 @@ class CompanyMenuListener
             'permission' => 'setting manage',
             'group' => 'others'
         ]);
-        $menu->add([
-            'title' => __('Setup Subscription Plan'),
-            'icon' => '',
-            'name' => 'setup-subscription-plan',
-            'parent' => 'settings',
-            'order' => 20,
-            'ignore_if' => [],
-            'depend_on' => [],
-            'route' => 'plans.index',
-            'module' => $module,
-            'permission' => 'plan manage',
-            'group' => 'others'
-        ]);
-        $menu->add([
-            'title' => __('Order'),
-            'icon' => '',
-            'name' => 'order',
-            'parent' => 'settings',
-            'order' => 30,
-            'ignore_if' => [],
-            'depend_on' => [],
-            'route' => 'plan.order.index',
-            'module' => $module,
-            'permission' => 'plan orders',
-            'group' => 'others'
-        ]);
+        // Single-clinic app: subscription plan / order menu items removed.
     }
 }

@@ -15,7 +15,7 @@
                                 </li>
 
                                 {{-- menu for Additional Services after service step --}}
-                                @if (module_is_active('AdditionalServices', $business->created_by))
+                                @if (false)
                                     @php
                                         $additional = $company_settings['additional_services'] ?? 2;
                                     @endphp
@@ -33,17 +33,17 @@
                                 </li>
 
                                 {{-- menu for Additional Services after time step --}}
-                                @if (module_is_active('AdditionalServices', $business->created_by))
+                                @if (false)
                                     @if (isset($company_settings['additional_services']) && $company_settings['additional_services'] == 1)
                                         <li class="stapes_status" id="additionalServicesStep" style="display: none;">
                                         </li>
                                     @endif
                                 @endif
 
-                                @if (module_is_active('ShoppingCart', $business->created_by) ||
-                                        module_is_active('RepeatAppointments', $business->created_by))
+                                @if (false ||
+                                        false)
                                     <li class="stapes_status">
-                                        @if (module_is_active('ShoppingCart', $business->created_by))
+                                        @if (false)
                                             <span>{{ __('Shopping Cart') }}</span>
                                         @else
                                             <span>{{ __('Repeat Appointment') }}</span>
@@ -53,23 +53,23 @@
                                 @if ((!empty($files) && $files->value == 'on') || (!empty($custom_field) && $custom_field == 'on'))
                                     <li class="stapes_status">
                                         <span>
-                                            {{ module_is_active('ShoppingCart', $business->created_by) || module_is_active('RepeatAppointments', $business->created_by) ? 'Additional Details' : 'Additional Details' }}
+                                            {{ false || false ? 'Additional Details' : 'Additional Details' }}
                                         </span>
                                     </li>
                                 @endif
                                 <li class="stapes_status">
                                     @if ((!empty($files) && $files->value == 'on') || (!empty($custom_field) && $custom_field == 'on'))
                                         <span>
-                                            {{ module_is_active('ShoppingCart', $business->created_by) || module_is_active('RepeatAppointments', $business->created_by) ? 'Share Your Details' : 'Share Your Details' }}
+                                            {{ false || false ? 'Share Your Details' : 'Share Your Details' }}
                                         </span>
                                     @else
                                         <span>
-                                            {{ module_is_active('ShoppingCart', $business->created_by) || module_is_active('RepeatAppointments', $business->created_by) ? 'Share Your Details' : 'Share Your Details' }}
+                                            {{ false || false ? 'Share Your Details' : 'Share Your Details' }}
                                         </span>
                                     @endif
                                 </li>
                                 {{-- menu for Online Meeting step --}}
-                                @if (module_is_active('ZoomMeeting', $business->created_by) || module_is_active('GoogleMeet', $business->created_by))
+                                @if (false || false)
                                     <li class="stapes_status" id="onlineAppointmentStep" style="display: none;">
                                     </li>
                                 @endif
@@ -79,22 +79,22 @@
                                 <li class="stapes_status">
                                     @if ((!empty($files) && $files->value == 'on') || (!empty($custom_field) && $custom_field == 'on'))
                                         <span>
-                                            {{ module_is_active('ShoppingCart', $business->created_by) || module_is_active('RepeatAppointments', $business->created_by) ? 'payment' : 'payment' }}
+                                            {{ false || false ? 'payment' : 'payment' }}
                                         </span>
                                     @else
                                         <span>
-                                            {{ module_is_active('ShoppingCart', $business->created_by) || module_is_active('RepeatAppointments', $business->created_by) ? 'payment' : 'payment' }}
+                                            {{ false || false ? 'payment' : 'payment' }}
                                         </span>
                                     @endif
                                 </li>
                                 <li class="stapes_status">
                                     @if ((!empty($files) && $files->value == 'on') || (!empty($custom_field) && $custom_field == 'on'))
                                         <span>
-                                            {{ module_is_active('ShoppingCart', $business->created_by) || module_is_active('RepeatAppointments', $business->created_by) ? 'Done' : 'Done' }}
+                                            {{ false || false ? 'Done' : 'Done' }}
                                         </span>
                                     @else
                                         <span>
-                                            {{ module_is_active('ShoppingCart', $business->created_by) || module_is_active('RepeatAppointments', $business->created_by) ? 'Done' : 'Done' }}
+                                            {{ false || false ? 'Done' : 'Done' }}
                                         </span>
                                     @endif
                                 </li>
@@ -172,7 +172,7 @@
 
                             {{-- section for Additional Service after service step --}}
                             {{-- section for Additional Service after service step --}}
-                            @if (module_is_active('AdditionalServices', $business->created_by))
+                            @if (false)
                                 @php
                                     $additional = $company_settings['additional_services'] ?? 2;
                                 @endphp
@@ -217,7 +217,7 @@
                             </div>
 
                             {{-- section for Additional Service after time step --}}
-                            @if (module_is_active('AdditionalServices', $business->created_by))
+                            @if (false)
                                 @if (isset($company_settings['additional_services']) && $company_settings['additional_services'] == 1)
                                     <div class="step-container" id="addition-services-section">
 
@@ -439,7 +439,7 @@
                                 </div>
                             </div>
                             {{-- section for online meetings --}}
-                            @if (module_is_active('ZoomMeeting', $business->created_by) || module_is_active('GoogleMeet', $business->created_by))
+                            @if (false || false)
                                 <div class="step-container" id="online-meeting-section"></div>
                             @endif
 
@@ -508,7 +508,7 @@
                                     </div>
                                     <div class="step-btns">
                                         @stack('iCal_exports')
-                                        <a href="{{ route('appointments.form', ['slug' => $slug, 'appointment' => '']) }}"
+                                        <a href="{{ route('appointments.form') }}"
                                             class="btn btn-transparent">{{ __('Book an Appointment') }}
                                         </a>
                                     </div>

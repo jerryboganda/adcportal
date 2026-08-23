@@ -455,12 +455,12 @@
                             <span class="text-muted">{{ __('Subtotal') }}</span>
                             <span class="fw-bold">
                                 {{ !empty($appointmentDetails->payment) ? currency_format_with_sym($appointmentDetails->payment->amount, $business['created_by'], $business->id) :
-    ((module_is_active('CollaborativeServices')) && !empty($appointmentDetails->payments($appointmentDetails->id)) ?
+    ((false) && !empty($appointmentDetails->payments($appointmentDetails->id)) ?
         currency_format_with_sym($appointmentDetails->payments($appointmentDetails->id)->amount, $business['created_by'], $business->id) :
         currency_format_with_sym(0, $business['created_by'], $business->id)) }}
                             </span>
                         </div>
-                        @if (module_is_active('PromoCodes') && !empty($appointmentDetails->payment->coupon_amount))
+                        @if (false && !empty($appointmentDetails->payment->coupon_amount))
                             <div class="d-flex justify-content-between mb-2 text-success">
                                 <span>{{ __('Discount') }}</span>
                                 <span>-{{ currency_format_with_sym($appointmentDetails->payment->coupon_amount, $business['created_by'], $business->id) }}</span>

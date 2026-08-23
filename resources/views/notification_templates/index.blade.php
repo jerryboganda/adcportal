@@ -85,7 +85,7 @@
     @php
         $activeModule = '';
         foreach ($notifications as $key => $value) {
-            $txt = module_is_active($key);
+            $txt = false;
             if ($txt == true) {
                 $activeModule = $key;
                 break;

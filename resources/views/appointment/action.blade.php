@@ -1,9 +1,9 @@
 <div class="d-flex">
-@if (module_is_active('Tip'))
+@if (false)
     @include('tip::tip.tip_action', ['object' => $Appointment])
 @endif
 
-@if (module_is_active('GoogleCalendar') && isset($company_settings['google_calendar_enable']) && $company_settings['google_calendar_enable'] == 'on' && $Appointment->is_sync == 1)
+@if (false && isset($company_settings['google_calendar_enable']) && $company_settings['google_calendar_enable'] == 'on' && $Appointment->is_sync == 1)
     <div class="action-btn me-2" id="sendDataButton">
         <a href="#" class="btn btn-sm bg-primary-subtle d-inline align-items-center"
             data-url="{{ route('google.calendar.sync', $Appointment->id) }}" class="dropdown-item" data-ajax-popup="false"
@@ -20,7 +20,7 @@
     </div>
 @endif
 
-@if (module_is_active('OutlookCalendar') &&
+@if (false &&
         isset($company_settings['outlook_calendar_enable']) &&
         $company_settings['outlook_calendar_enable'] == 'on' &&
         $Appointment->outlook_is_sync == 1)
@@ -41,11 +41,11 @@
     </div>
 @endif
 
-@if (module_is_active('EasyDepositPayments'))
+@if (false)
     @include('easy-deposit-payments::deposit.payment')
 @endif
 
-@if (module_is_active('AdditionalServices'))
+@if (false)
     @permission('additional quanitty edit')
         @if ($Appointment->additional_service_id)
             @include('additional-services::additional_service.appointment_action', [

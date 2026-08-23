@@ -8,46 +8,11 @@
             <div class="row bookinggo-dash-row justify-content-between align-items-center">
                 <div class="d-flex bookinggo-row-inner col-md-10 mb-0">
                     <h5 class="h3 mb-0">{{ __('Dashboard') }}</h5>
-                    <div class="dropdown dash-h-item drp-language">
-                        <a class="dash-head-link dropdown-toggle arrow-none me-0 cust-btn" data-bs-toggle="dropdown"
-                            href="#" role="button" aria-haspopup="false" aria-expanded="false"
-                            data-bs-placement="bottom" data-bs-original-title="Select your bussiness">
-                            <i class="ti ti-apps"></i>
-                            <span class="hide-mob">{{ $business->name }}</span>
-                            <i class="ti ti-chevron-down drp-arrow "></i>
-                        </a>
-                        <div class="dropdown-menu dash-h-dropdown dropdown-menu-end"
-                            style="max-height: 190px;overflow: hidden; overflow-y: auto;">
-                            @foreach (getBusiness() as $businesses)
-                                @if ($businesses->id == $business->id)
-                                    <div class="d-flex justify-content-between bd-highlight">
-                                        <a href=" # " class="dropdown-item ">
-                                            <i class="ti ti-checks text-primary"></i>
-                                            <span>{{ $businesses->name }}</span>
-                                        </a>
-                                    </div>
-                                @else
-                                    @php
-                                        $route =
-                                            $businesses->is_disable == 1
-                                                ? route('business.change', $businesses->id)
-                                                : '#';
-                                    @endphp
-                                    <div class="d-flex justify-content-between bd-highlight">
-
-                                        <a href="{{ $route }}" class="dropdown-item">
-                                            <span>{{ $businesses->name }}</span>
-                                        </a>
-                                        @if ($businesses->is_disable == 0)
-                                            <div class="action-btn mt-2">
-                                                <i class="ti ti-lock"></i>
-                                            </div>
-                                        @endif
-                                    </div>
-                                @endif
-                            @endforeach
-                        </div>
-                    </div>
+                    {{-- Single-clinic app: business switcher removed. --}}
+                    <span class="dash-head-link me-0 cust-btn">
+                        <i class="ti ti-apps"></i>
+                        <span class="hide-mob">{{ $business->name }}</span>
+                    </span>
                 </div>
             </div>
         </div>
@@ -75,7 +40,7 @@
                                         </a>
                                         <a href="javascript:"
                                             class="btn btn-primary d-flex align-items-center gap-1 cp_link" tabindex="0"
-                                            data-link="{{ route('appointments.form', $business->slug) }}"
+                                            data-link="{{ route('appointments.form') }}"
                                             data-bs-toggle="tooltip" data-bs-placement="top"
                                             title="{{ __('Click To Copy Link') }}">
                                             <i class="ti ti-link text-white"></i>
@@ -111,14 +76,14 @@
                         <div class="qr-card">
                             <div class="qr-card-inner">
                                 <div class="shareqrcode">
-                                    {!! QrCode::generate(route('appointments.form', $business->slug)) !!}
+                                    {!! QrCode::generate(route('appointments.form')) !!}
                                 </div>
                                 <div class="qr-card-content">
                                     <div class="qr-btn">
                                         <span>{{ $business->name }}</span>
                                         <h3 id="greetings" style="display: none;"></h3>
                                         <a href="#" class="cp_link" tabindex="0"
-                                            data-link="{{ route('appointments.form', $business->slug) }}"
+                                            data-link="{{ route('appointments.form') }}"
                                             data-bs-toggle="tooltip" data-bs-placement="top"
                                             title="{{ __('Click To Copy Link') }}">
                                             <i class="ti ti-layers-linked text-primary"></i>
@@ -324,9 +289,9 @@
                                                 @foreach ($latest_services as $latest_service)
                                                     @php
                                                         $valuesString = '';
-                                                        if (module_is_active('CompoundService')) {
+                                                        if (false) {
                                                             $valuesString = $latest_service->service_id;
-                                                        } elseif (module_is_active('CollaborativeServices')) {
+                                                        } elseif (false) {
                                                             $valuesString = $latest_service->collaborative_service_id;
                                                         }
                                                         $valuesString = trim($valuesString);
@@ -370,8 +335,8 @@
                                                         {{-- <td>{{ $latest_service->price }}</td> --}}
                                                         <td>
                                                             @if (
-                                                                (module_is_active('CompoundService') && $latest_service->service_type == 'compound') ||
-                                                                    (module_is_active('CollaborativeServices') && $latest_service->service_type == 'collaborative'))
+                                                                (false && $latest_service->service_type == 'compound') ||
+                                                                    (false && $latest_service->service_type == 'collaborative'))
                                                                 {{ $count . ' Services' }}
                                                             @else
                                                                 {{ $latest_service->duration }}
@@ -388,7 +353,7 @@
                         <div class="col-xl-4 col-12">
                             <div class="card overflow-auto card-dash">
                                 <div class="card-header">
-                                    <h5>{{ __('Latest Business') }}</h5>
+                                    <h5>{{ __('Clinic') }}</h5>
                                 </div>
                                 <div class="card-body">
                                     <div class="table-responsive common-scroll h-100"
@@ -410,9 +375,9 @@
                                                         <td>
                                                             <div class="d-flex align-items-center gap-2">
                                                                 <div class="action-btn">
-                                                                    <a href="javascript:void(0)"
+                                                                    <a href="{{ route('appointments.form') }}"
                                                                         class="btn btn-sm  bg-primary align-items-center cp_link"
-                                                                        data-link="{{ route('appointments.form', $latest_business->slug) }}"
+                                                                        data-link="{{ route('appointments.form') }}"
                                                                         data-bs-placement="bottom"
                                                                         data-bs-toggle="tooltip"
                                                                         data-bs-original-title="{{ __('Click To Copy Form Link') }}">
@@ -423,27 +388,9 @@
                                                                     <div class="action-btn">
                                                                         <a href="{{ route('business.manage', $latest_business->id) }}"
                                                                             class="btn btn-sm  bg-info align-items-center"
-                                                                            data-bs-toggle="tooltip" title='Manage Business'>
+                                                                            data-bs-toggle="tooltip" title='Manage Clinic'>
                                                                             <span class="text-white"> <i
                                                                                     class="ti ti-corner-up-left"></i></span></a>
-                                                                    </div>
-                                                                @endpermission
-                                                                @permission('business delete')
-                                                                    <div class="action-btn">
-                                                                        <form method="POST"
-                                                                            action="{{ route('business.destroy', $latest_business->id) }}"
-                                                                            id="user-form-{{ $latest_business->id }}">
-                                                                            @csrf
-                                                                            @method('DELETE')
-                                                                            <input name="_method" type="hidden"
-                                                                                value="DELETE">
-                                                                            <button type="button"
-                                                                                class="btn btn-sm  bg-danger align-items-center show_confirm"
-                                                                                data-bs-toggle="tooltip" title='Delete'>
-                                                                                <span class="text-white"> <i
-                                                                                        class="ti ti-trash"></i></span>
-                                                                            </button>
-                                                                        </form>
                                                                     </div>
                                                                 @endpermission
                                                             </div>
@@ -512,7 +459,7 @@
                                                 d="M15,3C8.373,3,3,8.373,3,15c0,6.627,5.373,12,12,12s12-5.373,12-12C27,8.373,21.627,3,15,3z M21.707,12.707l-7.56,7.56 c-0.188,0.188-0.442,0.293-0.707,0.293s-0.52-0.105-0.707-0.293l-3.453-3.453c-0.391-0.391-0.391-1.023,0-1.414s1.023-0.391,1.414,0 l2.746,2.746l6.853-6.853c0.391-0.391,1.023-0.391,1.414,0S22.098,12.316,21.707,12.707z" />
                                         </svg>
                                         <span
-                                            style="background-color: #{{ !empty($latest_appointment->StatusData->status_color) ? $latest_appointment->StatusData->status_color : 'a2e0c2' }};">{{ !empty($latest_appointment->StatusData) ? $latest_appointment->StatusData->title : (module_is_active('WaitingList') && $latest_appointment->appointment_status == 'Waiting List' ? $latest_appointment->appointment_status : 'Pending') }}</span>
+                                            style="background-color: #{{ !empty($latest_appointment->StatusData->status_color) ? $latest_appointment->StatusData->status_color : 'a2e0c2' }};">{{ !empty($latest_appointment->StatusData) ? $latest_appointment->StatusData->title : (false && $latest_appointment->appointment_status == 'Waiting List' ? $latest_appointment->appointment_status : 'Pending') }}</span>
                                     </li>
                                 </ul>
                                 <ul class="appointment-card-btn d-flex align-items-center justify-content-center">
@@ -829,7 +776,7 @@
         })();
 
         $(document).ready(function() {
-            var customURL = '{{ route('appointments.form', $business->slug) }}';
+            var customURL = '{{ route('appointments.form') }}';
             $('.Demo1').socialSharingPlugin({
                 url: customURL,
                 title: $('meta[property="og:title"]').attr('content'),

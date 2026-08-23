@@ -1,15 +1,8 @@
  @extends('layouts.main')
 @php
-if(Auth::user()->type=='super admin')
-{
-$plural_name = __('Subscribers');
-$singular_name = __('Subscriber');
-}
-else{
-
+// Single-clinic app: subscriber naming removed.
 $plural_name =__('Users');
 $singular_name =__('User');
-}
 @endphp
 @section('page-title')
 {{ $plural_name}}
@@ -19,7 +12,7 @@ $singular_name =__('User');
 @endsection
 @section('page-action')
 <div class="d-flex gap-2">
-    @if (module_is_active('ImportExport'))
+    @if (false)
         @permission('user import')
             @include('import-export::import.button',['module'=>'users'])
         @endpermission
@@ -46,7 +39,7 @@ $singular_name =__('User');
 @section('content')
 <!-- [ Main Content ] start -->
 <div class="row">
-    @if (Auth::user()->type != 'super admin')
+    {{-- Single-clinic app: filter always shown. --}}
         <div class="mb-4">
             <div class="card mb-0">
                 <div class="card-body user-card-head header-btn-wrp">
@@ -82,7 +75,6 @@ $singular_name =__('User');
                 </div>
             </div>
         </div>
-    @endif
         <div id="loading-bar-spinner" class="spinner">
             <div class="spinner-icon"></div>
         </div>
@@ -90,15 +82,10 @@ $singular_name =__('User');
             <div class="col-xxl-3 col-xl-4 col-md-6 mb-4 subscriber-user-card">
                 <div class="card user-card">
                     <div class="card-header border border-bottom p-3">
-                        @if (Auth::user()->type == 'super admin')
                             <div class="d-flex align-items-center">
                                 <span class="badge bg-primary p-2">{{ ucfirst($user->type) }}</span>
                             </div>
                             <div class="card-header-right">
-                                @permission('user manage')
-                                    <div class="btn-group card-option">
-                                        @if ($user->is_disable == 1 || Auth::user()->type == 'super admin')
-                                            <button type="button" class="btn dropdown-toggle" data-bs-toggle="dropdown"
                                                 aria-haspopup="true" aria-expanded="true">
                                                 <i class="feather icon-more-vertical"></i>
                                             </button>
@@ -138,11 +125,7 @@ $singular_name =__('User');
                                                 {{ Form::close() }}
                                             @endpermission
 
-                                            <a href="{{ route('login.with.company', $user->id) }}" class="dropdown-item"
-                                                data-bs-original-title="{{ __('Login As Company') }}">
-                                                <i class="ti ti-replace"></i>
-                                                <span class="">{{ __('Login As Company') }}</span>
-                                            </a>
+                                            {{-- Single-clinic app: Login As Company removed. --}}
 
                                             @if (admin_setting('email_verification') == 'on' && $user->email_verified_at == null)
                                                 <a href="{{ route('user.verified', $user->id) }}" class="dropdown-item"
@@ -153,13 +136,7 @@ $singular_name =__('User');
                                                 </a>
                                             @endif
 
-                                            <a href="#!" data-url="{{ route('business.links', $user->id) }}"
-                                                data-ajax-popup="true" data-size="md" class="dropdown-item"
-                                                data-title="{{ __('Business Link') }}"
-                                                data-bs-original-title="{{ __('Business Link') }}">
-                                                <i class="ti ti-trending-up"></i>
-                                                <span class="">{{ __('Business Link') }}</span>
-                                            </a>
+                                            {{-- Single-clinic app: Business Link removed. --}}
                                             @permission('user reset password')
                                                 <a href="#!"
                                                     data-url="{{ route('users.reset', \Crypt::encrypt($user->id)) }}"
@@ -212,55 +189,8 @@ $singular_name =__('User');
 
                     </div>
                     <div class="card-body p-3 text-center">
-                        @if (Auth::user()->type == 'super admin')
-                        <div class="user-image rounded border-2 border border-primary m-auto">
-                            <img src="{{ check_file($user->avatar) ? get_file($user->avatar) : get_file('uploads/users-avatar/avatar.png') }}"
-                                alt="user-image" class="h-100 w-100 ">
-                        </div>
-                            <h4 class="mt-2">{{ $user->name }}</h4>
-                            <span class="text-dark text-md">{{ $user->email }}</span>
-
-                            <div class="mt-3">
-                                <div class="row justify-content-between align-items-center">
-                                    <div class="col-6 text-center">
-                                        <span
-                                            class="d-block font-bold mb-0">{{ !empty($user->plan) ? (!empty($user->plan->name) ? $user->plan->name : 'Basic Plan') : 'Plan Not Activated' }}</span>
-                                    </div>
-                                    <div class="col-6 text-center Id ">
-                                        <a href="#" data-url="{{ route('company.info', $user->id) }}"
-                                            data-size="lg" data-ajax-popup="true" class="btn btn-outline-primary text-break px-3"
-                                            data-title="{{ __('Company Info') }}">{{ __('AdminHub') }}</a>
-                                    </div>
-                                    <div class="col-12">
-                                        <hr class="my-3">
-                                    </div>
-                                    @php
-                                        $plan_expire_date = !empty($user->plan_expire_date)
-                                            ? $user->plan_expire_date
-                                            : '';
-                                        if ($plan_expire_date == '0000-00-00') {
-                                            $plan_expire_date = date('d-m-Y');
-                                        }
-                                        if (empty($plan_expire_date)) {
-                                            $plan_expire_date = !empty($user->trial_expire_date)
-                                                ? $user->trial_expire_date
-                                                : '--';
-                                        }
-                                    @endphp
-                                    <div class="col-12 text-center">
-                                        <span class="text-dark text-md">{{ __('Plan Expired :') }}
-                                            @if (!empty($user->plan))
-                                                {{ company_date_formate($plan_expire_date) }}
-                                            @else
-                                                --
-                                            @endif
-                                        </span>
-                                    </div>
-                                </div>
-                            </div>
-                        @else
                             <div class="bottom-icons d-flex flex-wrap align-items-center justify-content-between">
-                                @if ($user->is_disable == 1 || Auth::user()->type == 'super admin')
+                                @if ($user->is_disable == 1)
 
                                 <div class="edit-btn-wrp d-flex flex-wrap align-items-center">
                                     @permission('user edit')

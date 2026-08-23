@@ -24,7 +24,7 @@
                                         </li>
 
                                         {{-- menu for Additional Services after service step --}}
-                                        @if (module_is_active('AdditionalServices', $business->created_by))
+                                        @if (false)
                                             @php
                                                 $additional = $company_settings['additional_services'] ?? 2;
                                             @endphp
@@ -45,7 +45,7 @@
                                         </li>
 
                                         {{-- menu for Additional Services after time step --}}
-                                        @if (module_is_active('AdditionalServices', $business->created_by))
+                                        @if (false)
                                             @if (isset($company_settings['additional_services']) && $company_settings['additional_services'] == 1)
                                                 <li class="stapes_status" id="additionalServicesStep"
                                                     style="display: none;">
@@ -53,10 +53,10 @@
                                             @endif
                                         @endif
 
-                                        @if (module_is_active('ShoppingCart', $business->created_by) ||
-                                                module_is_active('RepeatAppointments', $business->created_by))
+                                        @if (false ||
+                                                false)
                                             <li class="stapes_status">
-                                                @if (module_is_active('ShoppingCart', $business->created_by))
+                                                @if (false)
                                                     <span></span>
                                                     <div class="tooltip tooltip-three">{{ __('Shopping Cart') }}</div>
                                                 @else
@@ -76,7 +76,7 @@
                                             <div class="tooltip tooltip-four">{{ __('Your Details') }}</div>
                                         </li>
                                         {{-- menu for Online Meeting step --}}
-                                        @if (module_is_active('ZoomMeeting', $business->created_by) || module_is_active('GoogleMeet', $business->created_by))
+                                        @if (false || false)
                                             <li class="stapes_status" id="onlineAppointmentStep" style="display: none;">
                                             </li>
                                         @endif
@@ -168,7 +168,7 @@
 
                                     {{-- section for Additional Service after service step --}}
                                     {{-- section for Additional Service after service step --}}
-                                    @if (module_is_active('AdditionalServices', $business->created_by))
+                                    @if (false)
                                         @php
                                             $additional = $company_settings['additional_services'] ?? 2;
                                         @endphp
@@ -215,7 +215,7 @@
                                     </div>
 
                                     {{-- section for Additional Service after time step --}}
-                                    @if (module_is_active('AdditionalServices', $business->created_by))
+                                    @if (false)
                                         @if (isset($company_settings['additional_services']) && $company_settings['additional_services'] == 1)
                                             <div class="step-container" id="addition-services-section">
 
@@ -451,7 +451,7 @@
 
 
                                     {{-- section for online meetings --}}
-                                    @if (module_is_active('ZoomMeeting', $business->created_by) || module_is_active('GoogleMeet', $business->created_by))
+                                    @if (false || false)
                                         <div class="step-container" id="online-meeting-section"></div>
                                     @endif
 
@@ -520,7 +520,7 @@
                                             </div>
                                             <div class="step-btns">
                                                 @stack('iCal_exports')
-                                                <a href="{{ route('appointments.form', ['slug' => $slug, 'appointment' => '']) }}"
+                                                <a href="{{ route('appointments.form') }}"
                                                     class="btn btn-transparent">{{ __('Book an Appointment') }}
                                                 </a>
                                             </div>

@@ -950,7 +950,7 @@
                     <div id="appointmentQrCode" class="fl11-qr-code"></div>
                 </div>
                 
-                <a href="{{ route('appointments.form', $slug) }}" class="fl11-continue-btn">
+                <a href="{{ route('appointments.form') }}" class="fl11-continue-btn">
                     <div class="fl11-bilingual" style="align-items: center; justify-content: center;">
                         <span>{{ __('Book Another Appointment') }}</span>
                         <span class="fl11-ur" style="font-size: 13px; margin-top: 0;">ایک اور بکنگ کریں</span>

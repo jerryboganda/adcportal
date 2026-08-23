@@ -18,11 +18,11 @@
         rel="stylesheet">
 
     {{-- WhatsAppMessenger --}}
-    @if (module_is_active('WhatsAppMessenger', $business->created_by))
+    @if (false)
         <link rel="stylesheet"
             href=" {{ asset('packages/workdo/WhatsAppMessenger/src/Resources/assets/css/floating-wpp.min.css') }}">
     @endif
-    @if (module_is_active('AdditionalCustomField'))
+    @if (false)
         <link rel="stylesheet"
             href="{{ asset('packages/workdo/AdditionalCustomField/src/Resources/assets/custom.css') }}">
     @endif
@@ -107,7 +107,7 @@
     @include('web_layouts.appointment-rtl')
     @include('web_layouts.appointment-tracking')
     {{-- WhatsAppMessenger --}}
-    @if (module_is_active('WhatsAppMessenger', $business->created_by))
+    @if (false)
         <div class="floating-wpp"></div>
     @endif
 
@@ -157,7 +157,7 @@
         </script>
     @endif
     {{-- WhatsAppMessenger --}}
-    @if (module_is_active('WhatsAppMessenger', $business->created_by) &&
+    @if (false &&
             isset($company_settings['whatsappmessenger_number']))
         <script src="{{ asset('packages/workdo/WhatsAppMessenger/src/Resources/assets/js/floating-wpp.min.js') }}"></script>
         <script type="text/javascript">
@@ -305,7 +305,7 @@
                 $.each(staffData, function(index, staff) {
                     staffSelect.append($('<option>', {
                         value: staff.id,
-                        @if (module_is_active('AppointmentReview', $business->created_by) &&
+                        @if (false &&
                                 isset($company_settings['appointment_review_is_on']) &&
                                 $company_settings['appointment_review_is_on'] == 'on')
                             text: '<i class="fas fa-star"></i>' + ' ' + staff.review.toFixed(
@@ -324,7 +324,7 @@
             var daysOfWeek = '{{ json_encode($combinedArray) }}';
             var unavailableDates = {!! json_encode($businesholiday) !!};
 
-            @if (module_is_active('FlexibleDays', $business->created_by) == true)
+            @if (false == true)
                 function flexibleDaysDayOff(selectedStaff) {
                     if (selectedStaff) {
                         var csrfToken = $('meta[name="csrf-token"]').attr('content');
@@ -384,7 +384,7 @@
                 var selectedService = $('#serviceSelect').val();
                 var selectedStaff = $(this).val();
                 var selectedDate = $('#datepicker').val();
-                @if (module_is_active('FlexibleDays', $business->created_by) == true)
+                @if (false == true)
                     flexibleDaysDayOff(selectedStaff);
                 @endif
                 appointmentTimeSlot(selectedService, selectedDate, selectedStaff);
@@ -395,13 +395,13 @@
                 var selectedService = $('#serviceSelect').val();
                 var selectedDate = $(this).val();
                 var selectedStaff = $('#staffSelect').val();
-                @if (module_is_active('FlexibleDays', $business->created_by) == true)
+                @if (false == true)
                     flexibleDaysDayOff(selectedStaff);
                 @endif
                 appointmentTimeSlot(selectedService, selectedDate, selectedStaff);
             });
 
-            @if (module_is_active('FlexibleDuration', $business->created_by) != true)
+            @if (false != true)
                 function appointmentTimeSlot(selectedService, selectedDate, selectedStaff) {
                     if (selectedService && selectedDate) {
                         var csrfToken = $('meta[name="csrf-token"]').attr('content');
@@ -478,7 +478,7 @@
                                             label.append(svgIcon);
                                             label.append(span);
 
-                                            @if (module_is_active('WaitingList'))
+                                            @if (false)
                                                 if (timeSlot.waiting_list && timeSlot
                                                     .waiting_list >
                                                     0) {
@@ -712,7 +712,7 @@
 
         function validateCurrentStep(buttonClicked) {
             var currentStep = buttonClicked.parents(".step-container");
-            var isAdditionalServicesActive = @json(module_is_active('AdditionalServices'));
+            var isAdditionalServicesActive = @json(false);
 
             if (currentStep.hasClass('final_stepss')) {
                 var selectedTab = $(".tabs-wrapper .tabs .active").attr("data-tab");
@@ -856,7 +856,7 @@
                 }
             }
             isValid = true;
-            <?php if(module_is_active('SequentialAppointment')): ?>
+            <?php if(false): ?>
             $('[data-repeater-item]').each(function(index, element) {
                 var $repeaterItem = $(element);
                 var sequential_service = $repeaterItem.find('.sequential_service').val();
@@ -889,7 +889,7 @@
 
 
         // script for online booking option
-        @if (module_is_active('ZoomMeeting') || module_is_active('GoogleMeet'))
+        @if (false || false)
            $(document).ready(function() {
                 $('#serviceSelect').change(function() {
                     var serviceValue = $('#serviceSelect').val();
@@ -939,7 +939,7 @@
         @endif
         // end
         //script for additional services module
-        @if (module_is_active('AdditionalServices'))
+        @if (false)
             $('#serviceSelect').change(function() {
                 var serviceValue = $('#serviceSelect').val();
                 let url = window.location.href;
@@ -1013,17 +1013,17 @@
         })
     </script>
     <div class="vertical-btns">
-        @if (module_is_active('TawktoMessenger', $business->created_by))
+        @if (false)
             {!! $company_settings['TawktoMessenger'] ?? '' !!}
             <script src="{{ asset('packages/workdo/TawktoMessenger/src/Resources/assets/js/tawkto.js') }}"></script>
         @endif
 
-        @if (module_is_active('WizzChat', $business->created_by))
+        @if (false)
             {!! $company_settings['wizzchat'] ?? '' !!}
             <script src="{{ asset('packages/workdo/WizzChat/src/Resources/assets/js/wizzchat.js') }}"></script>
         @endif
 
-        @if (module_is_active('Crisp', $business->created_by))
+        @if (false)
             <script type="text/javascript">
                 window.$crisp = [];
                 window.CRISP_WEBSITE_ID = "{!! $company_settings['crisp_website_id'] ?? '' !!}";

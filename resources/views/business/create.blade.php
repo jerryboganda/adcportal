@@ -1,7 +1,7 @@
 {{ Form::open(['route' => 'business.store', 'enctype' => 'multipart/form-data','class'=>'needs-validation','novalidate']) }}
 <div class="modal-body create-bussiness-popup">
     <div class="text-start mb-3">
-        @if (module_is_active('AIAssistant'))
+        @if (false)
             @php
                 $admin_settings = getAdminAllSetting();
             @endphp

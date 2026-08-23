@@ -33,7 +33,7 @@
         <meta name="apple-mobile-web-app-status-bar"
             content="{{ $business->pwa_business($business->slug)->background_color }}" />
     @endif
-    @if (module_is_active('AdditionalCustomField'))
+    @if (false)
         <link rel="stylesheet"
             href="{{ asset('packages/workdo/AdditionalCustomField/src/Resources/assets/custom.css') }}">
     @endif
@@ -277,7 +277,7 @@ $currency_setting = json_encode(
             var daysOfWeek = '{{ json_encode($combinedArray) }}';
             var unavailableDates = {!! json_encode($businesholiday) !!};
 
-            @if (module_is_active('FlexibleDays', $business->created_by) == true)
+            @if (false == true)
                 function flexibleDaysDayOff(selectedStaff) {
                     if (selectedStaff) {
                         var csrfToken = $('meta[name="csrf-token"]').attr('content');
@@ -345,7 +345,7 @@ $currency_setting = json_encode(
                 var selectedService = $('#serviceSelect').val();
                 var selectedStaff = $(this).val();
                 var selectedDate = $('#datepicker').val();
-                @if (module_is_active('FlexibleDays', $business->created_by) == true)
+                @if (false == true)
                     flexibleDaysDayOff(selectedStaff);
                 @endif
                 appointmentTimeSlot(selectedService, selectedDate, selectedStaff);
@@ -354,13 +354,13 @@ $currency_setting = json_encode(
                 var selectedService = $('#serviceSelect').val();
                 var selectedStaff = $('#staffSelect').val();
                 var selectedDate = $(this).val();
-                @if (module_is_active('FlexibleDays', $business->created_by) == true)
+                @if (false == true)
                     flexibleDaysDayOff(selectedStaff);
                 @endif
                 appointmentTimeSlot(selectedService, selectedDate, selectedStaff);
             });
 
-            @if (module_is_active('FlexibleDuration', $business->created_by) != true)
+            @if (false != true)
                 function appointmentTimeSlot(selectedService, selectedDate, selectedStaff) {
                     if (selectedService && selectedDate) {
                         var csrfToken = $('meta[name="csrf-token"]').attr('content');
@@ -444,7 +444,7 @@ $currency_setting = json_encode(
                                             label.append(svgIcon);
                                             label.append(span);
 
-                                            @if (module_is_active('WaitingList'))
+                                            @if (false)
                                                 if (timeSlot.waiting_list && timeSlot
                                                     .waiting_list >
                                                     0) {
@@ -691,7 +691,7 @@ $currency_setting = json_encode(
 
             function validateCurrentStep(buttonClicked) {
                 var currentStep = buttonClicked.parents(".step-container");
-                var isAdditionalServicesActive = @json(module_is_active('AdditionalServices'));
+                var isAdditionalServicesActive = @json(false);
 
                 if (currentStep.hasClass('final_stepss')) {
                     var selectedTab = $(".tabs-wrapper .tabs .active").attr("data-tab");
@@ -842,7 +842,7 @@ $currency_setting = json_encode(
                 }
 
                 isValid = true;
-                <?php if(module_is_active('SequentialAppointment')): ?>
+                <?php if(false): ?>
                 $('[data-repeater-item]').each(function(index, element) {
                     var $repeaterItem = $(element);
                     var sequential_service = $repeaterItem.find('.sequential_service').val();
@@ -874,7 +874,7 @@ $currency_setting = json_encode(
             // step form validation end
 
             // script for online booking option
-            @if (module_is_active('ZoomMeeting') || module_is_active('GoogleMeet'))
+            @if (false || false)
                $(document).ready(function() {
                 $('#serviceSelect').change(function() {
                     var serviceValue = $('#serviceSelect').val();
@@ -923,7 +923,7 @@ $currency_setting = json_encode(
             @endif
             // end
             //script for additional services module
-            @if (module_is_active('AdditionalServices'))
+            @if (false)
                 $('#serviceSelect').change(function() {
                     var serviceValue = $('#serviceSelect').val();
                     let url = window.location.href;

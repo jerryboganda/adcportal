@@ -7,7 +7,7 @@
                 {{ Form::select('service', $service, null, ['class' => 'form-control service', 'required' => 'required', 'id' => 'service']) }}
                 @permission('business update')
                     <div class=" text-xs mt-1">{{ __('Create service here. ') }}
-                        <a href="{{ route('manage.business') }}"><b>{{ __('Create service') }}</b></a>
+                        <a href="{{ route('business.manage', getActiveBusiness()) }}"><b>{{ __('Create service') }}</b></a>
                     </div>
                 @endpermission
                 @error('service')
@@ -91,7 +91,7 @@
                 {{ Form::select('location', $location, null, ['class' => 'form-control', 'required' => 'required']) }}
                 @permission('business update')
                     <div class=" text-xs mt-1">{{ __('Create location here. ') }}
-                        <a href="{{ route('manage.business') }}"><b>{{ __('Create location') }}</b></a>
+                        <a href="{{ route('business.manage', getActiveBusiness()) }}"><b>{{ __('Create location') }}</b></a>
                     </div>
                 @endpermission
                 @error('location')
@@ -109,7 +109,7 @@
                 {{ Form::select('staff', $staff, null, ['class' => 'form-control', 'id' => 'staff']) }}
                 @permission('business update')
                     <div class=" text-xs mt-1">{{ __('Create staff here. ') }}
-                        <a href="{{ route('manage.business') }}"><b>{{ __('Create staff') }}</b></a>
+                        <a href="{{ route('business.manage', getActiveBusiness()) }}"><b>{{ __('Create staff') }}</b></a>
                     </div>
                 @endpermission
                 @error('staff')
@@ -180,3 +180,4 @@
         }
     });
 </script>
+

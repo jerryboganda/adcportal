@@ -35,7 +35,7 @@
         <div class="appointment-detail-item d-flex flex-wrap align-items-start gap-2">
             <div class="form-control-label text-md mb-0 h6">{{ __('Status') }} :</div>
             <p class="text-md mb-0">
-                {{ !empty($appointments->StatusData) ? $appointments->StatusData->title : (module_is_active('WaitingList') && $appointments->appointment_status == 'Waiting List' ? $appointments->appointment_status : 'Pending') }}
+                {{ !empty($appointments->StatusData) ? $appointments->StatusData->title : (false && $appointments->appointment_status == 'Waiting List' ? $appointments->appointment_status : 'Pending') }}
             </p>
         </div>
         <div class="appointment-detail-item d-flex flex-wrap align-items-start gap-2">

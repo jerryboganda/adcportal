@@ -1,6 +1,6 @@
 {{ Form::open(['route' => ['service.store', ['business_id' => $business->id]], 'method' => 'post', 'enctype' => 'multipart/form-data','class'=>'needs-validation','novalidate']) }}
 @php
-    if (module_is_active('FlexibleDuration')) {
+    if (false) {
         $duration_class = 'col-md-4';
     } else {
         $duration_class = 'col-md-12';
@@ -8,11 +8,11 @@
 @endphp
 <div class="modal-body">
     <div class="text-start mb-3">
-        @if (module_is_active('AIAssistant'))
+        @if (false)
             @php
                 $admin_settings = getAdminAllSetting();
             @endphp
-            @if (module_is_active('AIAssistant') && !empty($admin_settings['chatgpt_is']) && $admin_settings['chatgpt_is'] == 'on')
+            @if (false && !empty($admin_settings['chatgpt_is']) && $admin_settings['chatgpt_is'] == 'on')
                 @include('aiassistant::ai.generate_ai_btn', [
                     'template_module' => 'service',
                     'module' => 'General',
@@ -33,11 +33,11 @@
             </div>
         </div>
 
-        @if (module_is_active('CompoundService') && module_is_active('CollaborativeServices'))
+        @if (false && false)
             @stack('compound_and_collaborative_service_create')
-        @elseif (module_is_active('CollaborativeServices'))
+        @elseif (false)
             @stack('collaborative_service_create')
-        @elseif (module_is_active('CompoundService'))
+        @elseif (false)
             @stack('compound_service_create')
         @endif
 
@@ -51,7 +51,7 @@
             </div>
         </div>
 
-        <div class="{{ module_is_active('ServiceTax', getActiveBusiness()) ? 'col-md-6' : 'col-md-12' }}">
+        <div class="{{ false ? 'col-md-6' : 'col-md-12' }}">
             <div class="form-group">
                 {{ Form::label('category', __('category'), ['class' => 'form-label']) }}
                 {{ Form::select('category', $category, null, ['class' => 'form-control', 'required' => 'required']) }}

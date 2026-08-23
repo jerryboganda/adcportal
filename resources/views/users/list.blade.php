@@ -1,13 +1,9 @@
 @extends('layouts.main')
 
 @php
-    if (Auth::user()->type == 'super admin') {
-        $plural_name = __('Subscribers');
-        $singular_name = __('Subscriber');
-    } else {
-        $plural_name = __('Users');
-        $singular_name = __('User');
-    }
+    // Single-clinic app: subscriber naming removed.
+    $plural_name = __('Users');
+    $singular_name = __('User');
 @endphp
 
 @section('page-title')
@@ -20,7 +16,7 @@
 
 @section('page-action')
     <div class="d-flex gap-2">
-        @if (module_is_active('ImportExport'))
+        @if (false)
             @permission('user import')
                 @include('import-export::import.button', ['module' => 'users'])
             @endpermission

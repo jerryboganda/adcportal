@@ -9,7 +9,7 @@
 @endsection
 @section('page-action')
 <div class="d-flex">
-    <a href="#" class="btn btn-sm btn-primary cp_link me-2" data-link="{{ route('appointments.form', $business->slug) }}"
+    <a href="#" class="btn btn-sm btn-primary cp_link me-2" data-link="{{ route('appointments.form') }}"
             data-bs-placement="top" data-bs-toggle="tooltip" data-bs-original-title="{{ __('Click To Copy Form Link') }}">
             <i class="text-white ti ti-link"></i>
         </a>
@@ -30,17 +30,17 @@
 @endsection
 
 @push('css')
-    @if (module_is_active('PWA'))
+    @if (false)
         <link rel="stylesheet" href="{{ asset('packages/workdo/PWA/src/Resources/assets/css/pwa.css') }}">
     @endif
     <link rel="stylesheet" href="{{ asset('assets/css/main.css') }}">
-    @if (module_is_active('FlexibleHours'))
+    @if (false)
         <link rel="stylesheet" href="{{ asset('packages/workdo/FlexibleHours/src/Resources/assets/custom.css') }}">
     @endif
-    @if (module_is_active('FlexibleDays'))
+    @if (false)
         <link rel="stylesheet" href="{{ asset('packages/workdo/FlexibleDays/src/Resources/assets/custom.css') }}">
     @endif
-    @if (module_is_active('AdditionalCustomField'))
+    @if (false)
         <link rel="stylesheet" href="{{ asset('packages/workdo/AdditionalCustomField/src/Resources/assets/custom.css') }}">
     @endif
 
@@ -276,7 +276,7 @@
                             id="location-setting" role="tabpanel" aria-labelledby="pills-user-tab-1">
 
                             <div class="my-3 mt-0 gap-2 header-btn-wrp d-flex justify-content-end">
-                                @if (module_is_active('ImportExport'))
+                                @if (false)
                                     @permission('user import')
                                         @include('import-export::import.button',['module'=>'locations'])
                                     @endpermission
@@ -369,7 +369,7 @@
                         <div class="tab-pane fade @if (session('tab') and session('tab') == 2) show active @endif"
                             id="details-setting" role="tabpanel" aria-labelledby="pills-user-tab-2">
                             <div class="my-3 mt-0 gap-2 header-btn-wrp d-flex justify-content-end">
-                                @if (module_is_active('ImportExport'))
+                                @if (false)
                                     @permission('service import')
                                         @include('import-export::import.button', ['module' => 'service'])
                                     @endpermission
@@ -417,10 +417,10 @@
                                                                 </td>
                                                                 @php
                                                                     $valuesString = '';
-                                                                    if (module_is_active('CompoundService')) {
+                                                                    if (false) {
                                                                         $valuesString = $service->service_id;
                                                                     } elseif (
-                                                                        module_is_active('CollaborativeServices')
+                                                                        false
                                                                     ) {
                                                                         $valuesString =
                                                                             $service->collaborative_service_id;
@@ -439,7 +439,7 @@
                                                                 <td>{{ currency_format_with_sym($service->price, $service->created_by, $service->business_id) }}
                                                                 </td>
                                                                 <td>
-                                                                    @if ((module_is_active('CompoundService') && $service->service_type == 'compound') || (module_is_active('CollaborativeServices') && $service->service_type == 'collaborative'))
+                                                                    @if ((false && $service->service_type == 'compound') || (false && $service->service_type == 'collaborative'))
                                                                         {{ $count . ' Services' }}
                                                                     @else
                                                                         {{ $service->duration }}
@@ -447,7 +447,7 @@
                                                                 </td>
                                                                 <td>
                                                                     <div class="d-flex">
-                                                                        @if (module_is_active('TeamBooking'))
+                                                                        @if (false)
                                                                             @include(
                                                                                 'team-booking::team_booking.service_action',
                                                                                 [
@@ -455,7 +455,7 @@
                                                                                 ]
                                                                             )
                                                                         @endif
-                                                                        @if (module_is_active('AdditionalServices', $business->created_by))
+                                                                        @if (false)
                                                                             @permission('additional service create')
                                                                                 @include(
                                                                                     'additional-services::additional_service.service_action',
@@ -463,14 +463,14 @@
                                                                                 )
                                                                             @endpermission
                                                                         @endif
-                                                                        @if (module_is_active('EasyDepositPayments'))
+                                                                        @if (false)
                                                                             @include('easy-deposit-payments::deposit.deposit_details')
                                                                         @endif
 
-                                                                        @if (module_is_active('WaitingList'))
+                                                                        @if (false)
                                                                             @include('waiting-list::servicebutton.setting')
                                                                         @endif
-                                                                        @if (module_is_active('ZoomMeeting') || module_is_active('GoogleMeet'))
+                                                                        @if (false || false)
                                                                             @include(
                                                                                 'online_appointment.online_appointment_btn',
                                                                                 [
@@ -507,7 +507,7 @@
                                                                                 {{ Form::close() }}
                                                                             </div>
                                                                         @endpermission
-                                                                        @if (module_is_active('ServiceSlotScheduler'))
+                                                                        @if (false)
                                                                             @permission('service slot scheduler manage')
                                                                                 <div class="action-btn">
                                                                                     <a href="#"
@@ -539,7 +539,7 @@
                         <div class="tab-pane fade @if (session('tab') and session('tab') == 3) show active @endif"
                             id="domain-setting" role="tabpanel" aria-labelledby="pills-user-tab-3">
                             <div class="my-3 mt-0 gap-2 header-btn-wrp d-flex justify-content-end">
-                                @if (module_is_active('ImportExport'))
+                                @if (false)
                                     @permission('staff import')
                                         @include('import-export::import.button', ['module' => 'staff'])
                                     @endpermission
@@ -568,7 +568,7 @@
                                                             <th>{{ __('Email') }}</th>
                                                             <th>{{ __('Location') }}</th>
                                                             <th>{{ __('Service') }}</th>
-                                                            @if (module_is_active('AppointmentReview'))
+                                                            @if (false)
                                                                 <th>{{ __('Average Rating') }}</th>
                                                             @endif
                                                             @if (Laratrust::hasPermission('staff edit') || Laratrust::hasPermission('staff delete'))
@@ -592,7 +592,7 @@
                                                                 </td>
                                                                 <td>{{ $staff->Service()->pluck('name')->implode(', ') }}
                                                                 </td>
-                                                                @if (module_is_active('AppointmentReview'))
+                                                                @if (false)
                                                                     <td>
                                                                         @if ($staff->review == 0.0)
                                                                             <span class="theme-text-color">-</span>
@@ -617,7 +617,7 @@
                                                                 @endif
                                                                 <td>
                                                                     <div class="d-flex">
-                                                                        @if (module_is_active('TeamBooking'))
+                                                                        @if (false)
                                                                             @include(
                                                                                 'team-booking::team_booking.staff_action',
                                                                                 [
@@ -653,7 +653,7 @@
                                                                                 {{ Form::close() }}
                                                                             </div>
                                                                         @endpermission
-                                                                        @if (module_is_active('FlexibleDays'))
+                                                                        @if (false)
                                                                             @permission('flexible days manage')
                                                                                 <div class="action-btn me-2">
                                                                                     <a href="#"
@@ -669,7 +669,7 @@
                                                                                 </div>
                                                                             @endpermission
                                                                         @endif
-                                                                        @if (module_is_active('FlexibleHours'))
+                                                                        @if (false)
                                                                             @permission('flexible hour view')
                                                                                 <div class="action-btn">
                                                                                     <a href="#"
@@ -702,7 +702,7 @@
                         <div class="tab-pane fade @if (session('tab') and session('tab') == 5) show active @endif" id="seo-setting"
                             role="tabpanel" aria-labelledby="pills-user-tab-5">
                             <div class="my-3 mt-0 gap-2 header-btn-wrp d-flex justify-content-end">
-                                @if (module_is_active('ImportExport'))
+                                @if (false)
                                     @permission('category import')
                                         @include('import-export::import.button', ['module' => 'category'])
                                     @endpermission

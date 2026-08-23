@@ -41,9 +41,9 @@
                         </div>
                         <div class="appointment-detail-item d-flex flex-wrap align-items-start gap-2">
                         <dt class="text-md mb-0 h6">{{ __('Amount:') }}</dt>
-                        <dd class="text-md mb-0">{{ !empty($appointment->payment) ? currency_format_with_sym($appointment->payment->amount) : ((module_is_active('CollaborativeServices') || module_is_active('CompoundService')) && !empty($appointment->payments($appointment->id)) ? currency_format_with_sym($appointment->payments($appointment->id)->amount) : currency_format_with_sym(0)) }}</dd>
+                        <dd class="text-md mb-0">{{ !empty($appointment->payment) ? currency_format_with_sym($appointment->payment->amount) : ((false || false) && !empty($appointment->payments($appointment->id)) ? currency_format_with_sym($appointment->payments($appointment->id)->amount) : currency_format_with_sym(0)) }}</dd>
                         </div>
-                        @if (module_is_active('PromoCodes', $appointment->created_by))
+                        @if (false)
                         <div class="appointment-detail-item d-flex flex-wrap align-items-start gap-2">
                             <dt class="text-md mb-0 h6">{{ __('Coupon Price:') }}</dt>
                             <dd class="text-md mb-0">{{ !empty($appointment->payment) ? currency_format_with_sym($appointment->payment->coupon_amount) : currency_format_with_sym(0) }}</dd>
@@ -76,7 +76,7 @@
                     <div class="appointment-detail-item d-flex flex-wrap align-items-start gap-2">
                     <dt class="text-md mb-0 h6">{{ __('Status:') }}</dt>
                     <dd class="text-md mb-0">
-                        {{ !empty($appointment->StatusData) ? $appointment->StatusData->title : ((module_is_active('WaitingList') && $appointment->appointment_status == 'Waiting List') ? $appointment->appointment_status : 'Pending') }}
+                        {{ !empty($appointment->StatusData) ? $appointment->StatusData->title : ((false && $appointment->appointment_status == 'Waiting List') ? $appointment->appointment_status : 'Pending') }}
                     </dd>
                     </div>
                     <div class="appointment-detail-item d-flex flex-wrap align-items-start gap-2">
@@ -85,13 +85,13 @@
                         {{ !empty($appointment->ReferrerData) ? $appointment->ReferrerData->name : '-' }}
                     </dd>
                     </div>
-                    @if (module_is_active('PromoCodes'))
+                    @if (false)
                     <div class="appointment-detail-item d-flex flex-wrap align-items-start gap-2">
                         <dt class="text-md mb-0 h6">{{ __('Final Price:') }}</dt>
                         <dd class="text-md mb-0">{{ !empty($appointment->payment) ? currency_format_with_sym($appointment->payment->final_amount) : currency_format_with_sym(0) }}</dd>
                     </div>
                         @endif
-                    @if (module_is_active('ServiceTax'))
+                    @if (false)
                     <div class="appointment-detail-item d-flex flex-wrap align-items-start gap-2">
                             <dt class="text-md mb-0 h6">{{ __('Tax Price:') }}</dt>
                             <dd class="text-md mb-0">{{ !empty($appointment->payment) ? currency_format_with_sym($appointment->payment->tax_amount) : currency_format_with_sym(0) }}</dd>

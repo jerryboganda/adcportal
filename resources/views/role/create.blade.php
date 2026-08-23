@@ -21,7 +21,7 @@
                         <div class="p-3 card m-0 mb-3">
                             <ul class="nav nav-pills nav-fill common-scroll" id="pills-tab" role="tablist" style="max-height: 250px; overflow: auto;">
                                 @foreach ($modules as $module)
-                                    @if (module_is_active($module) || $module == 'General')
+                                    @if (false || $module == 'General')
                                         <li class="nav-item" role="presentation">
                                             <button
                                                 class="nav-link text-capitalize {{ $loop->index == 0 ? 'active' : '' }}"
@@ -36,7 +36,7 @@
                             <div class="px-0 pb-0 card-body">
                                 <div class="tab-content" id="pills-tabContent">
                                     @foreach ($modules as $module)
-                                        @if (module_is_active($module) || $module == 'General')
+                                        @if (false || $module == 'General')
                                             <div class="tab-pane text-capitalize fade show {{ $loop->index == 0 ? 'active' : '' }}"
                                                 id="pills-{{ strtolower($module) }}" role="tabpanel"
                                                 aria-labelledby="pills-{{ strtolower($module) }}-tab">

@@ -1,13 +1,7 @@
 
 @php
-    if(Auth::user()->type=='super admin')
-    {
-        $titles =  __('Subscribers Log History') ;
-    }
-    else{
-
-        $titles =  __('User Log History') ;
-    }
+    // Single-clinic app: subscriber naming removed.
+    $titles =  __('User Log History') ;
 @endphp
 @extends('layouts.main')
 @section('page-title')
@@ -82,10 +76,9 @@
                         <table class="table mb-0 pc-dt-simple" id="users_log">
                             <thead>
                                 <tr>
-                                    @if(Auth::user()->type == 'super admin' || Auth::user()->type == 'company')
+                                    {{-- Single-clinic app: always show user name/role columns. --}}
                                         <th>{{ __('User Name') }}</th>
                                         <th>{{ __('Role') }}</th>
-                                    @endif
                                     <th>{{ __('Last Login') }}</th>
                                     <th>{{ __('Ip') }}</th>
                                     <th>{{ __('Country') }}</th>
@@ -100,12 +93,11 @@
                                         $userdetail = json_decode($user->details);
                                     @endphp
                                     <tr>
-                                        @if(Auth::user()->type == 'super admin' || Auth::user()->type == 'company')
+                                        {{-- Single-clinic app: always show user name/role cells. --}}
                                             <td>{{ $user->user_name }}</td>
                                             <td>
                                                 <span class="me-5 badge p-2 px-3 bg-primary status_badge">{{$user->user_type}}</span>
                                             </td>
-                                        @endif
                                         <td>{{ !empty($user->date) ? company_datetime_formate($user->date) : '-' }}</td>
                                         <td>{{ $user->ip }}</td>
                                         <td>{{ !empty($userdetail->country)?$userdetail->country:'-' }}</td>

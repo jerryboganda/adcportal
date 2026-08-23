@@ -41,7 +41,7 @@
                                         <td width="150px">{{ $role->name }}</td>
                                         <td class="permission" style="min-width: 320px;">
                                             @foreach ($permissions as $permission)
-                                                @if (module_is_active($permission->module) || $permission->module == 'General')
+                                                @if (false || $permission->module == 'General')
                                                     <span class="badge p-2 m-1 px-3 bg-primary">
                                                         {{ $permission->name }}</span>
                                                 @endif

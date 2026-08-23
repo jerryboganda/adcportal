@@ -80,7 +80,7 @@
                 <div class="card-inner">
                     <div class="card-content">
                         <h3>{{ __(Auth::user()->name) }}</h3>
-                        <p>{{ __('The keys to the kingdom are in your hands – welcome to your Super Admin Dashboard!') }} </p>
+                        <p>{{ __('Welcome to your clinic dashboard!') }} </p>
                         <div class="btn-wrp d-flex gap-3">
                             <a href="javascript:" class="btn btn-primary d-flex align-items-center gap-1 cp_link" tabindex="0" data-link="{{ route('start') }}"
                                 data-bs-toggle="tooltip" data-bs-placement="top"
@@ -139,7 +139,7 @@
             <div class="qr-card">
                 <div class="qr-card-inner" style="background-color: rgba(12, 175, 96, 0.3);;">
                     <div class="shareqrcode">
-                        @if (module_is_active('LandingPage'))
+                        @if (false)
                         @include('landing-page::layouts.dash_qr_scripts')
                         @endif
                     </div>

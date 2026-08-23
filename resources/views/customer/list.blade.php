@@ -8,7 +8,7 @@
 @endsection
 @section('page-action')
     <div class="col-auto d-flex gap-2">
-        @if (module_is_active('ImportExport'))
+        @if (false)
         @permission('customer import')
             @include('import-export::import.button', ['module' => 'customers'])
         @endpermission

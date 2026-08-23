@@ -1,12 +1,6 @@
 @php
-    if(Auth::user()->type=='super admin')
-    {
-        $name = __('Subscriber');
-    }
-    else{
-
-        $name =__('User');
-    }
+    // Single-clinic app: subscriber naming removed.
+    $name =__('User');
 @endphp
     {{Form::model($user,array('route' => array('users.update', $user->id), 'method' => 'PUT','class'=>'needs-validation','novalidate')) }}
     <div class="modal-body pb-0">
@@ -33,7 +27,7 @@
                     @enderror
                 </div>
             </div>
-            @if(Auth::user()->type != 'super admin')
+            {{-- Single-clinic app: roles selector always shown. --}}
                 <div class="col-md-12">
                     <div class="form-group">
                         {{ Form::label('roles', __('Roles'),['class'=>'form-label']) }}
@@ -54,7 +48,6 @@
                         @enderror
                     </div>
                 </div>
-            @endif
         </div>
     </div>
     <div class="modal-footer gap-3">
