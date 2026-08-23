@@ -6,7 +6,6 @@ use App\Models\Permission;
 use App\Models\Role;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Http\Request;
-use App\Facades\ModuleFacade as Module;
 
 class PermissionController extends Controller
 {
@@ -17,7 +16,7 @@ class PermissionController extends Controller
         if(Auth::user()->isAbleTo('permission manage'))
         {
             $permissions = Permission::all();
-            $modules = array_merge(['General'],getModuleList());
+            $modules = ['General'];
             return view('permission.index',compact('permissions','modules'));
         }
         else
@@ -29,7 +28,7 @@ class PermissionController extends Controller
     public function create()
     {
         $roles = Role::get();
-        $modules = array_merge(['General'],getModuleList());
+        $modules = ['General'];
         return view('permission.create',compact('modules','roles'));
     }
 
@@ -76,7 +75,7 @@ class PermissionController extends Controller
     {
 
         $roles = Role::where('created_by', '=', \Auth::user()->id)->get();
-        $modules = array_merge(['General'],getModuleList());
+        $modules = ['General'];
         return view('permission.edit', compact('roles', 'permission','modules'));
 
 
@@ -112,3 +111,4 @@ class PermissionController extends Controller
 
     }
 }
+

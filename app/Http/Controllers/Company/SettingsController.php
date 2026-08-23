@@ -16,7 +16,6 @@ class SettingsController extends Controller
     {
 
         $timezones = config('timezones');
-        $activatedModules = ActivatedModule();
         return view('company.settings.index',compact('settings','timezones'));
     }
 

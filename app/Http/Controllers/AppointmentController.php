@@ -5,6 +5,9 @@ namespace App\Http\Controllers;
 use App\DataTables\AppointmentDataTable;
 use App\Events\AdditionalServicePayment;
 use App\Events\CreateAppoinment;
+use App\Events\AppointmentPaymentData;
+use App\Events\AppointmentStatus;
+use App\Events\DeleteAppointment;
 use App\Models\Appointment;
 use App\Models\AppointmentPayment;
 use App\Models\Location;
@@ -33,30 +36,8 @@ use Carbon\Carbon;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
-use Workdo\CollaborativeServices\Entities\CollaborativeServiceUtility;
-use Workdo\CompoundService\Entities\CompoundUtility;
-use Workdo\ShoppingCart\Entities\ShoppingCart;
-use Workdo\TrackingPixel\Entities\PixelFields;
-use App\Events\AppointmentStatus;
-use Workdo\FlexibleHours\Entities\FlexibleHour;
-use App\Events\AppointmentPaymentData;
-use App\Events\DeleteAppointment;
-use Workdo\RepeatAppointments\Entities\Utility;
-use Workdo\SequentialAppointment\Entities\SequentialUtility;
-use Workdo\SequentialAppointment\Events\CreateSequentialAppointment;
-use Workdo\FlexibleDays\Entities\FlexibleDayUtility;
-use Workdo\FlexibleDays\Entities\FlexibleStaffHours;
 use Cookie;
 use Illuminate\Support\Facades\DB;
-use Workdo\GoogleCalendar\Entities\CalendarUtility;
-use Workdo\BulkAppointments\Entities\BulkAppointment;
-use Workdo\FlexibleDuration\Entities\FlexibleDurationUtility;
-use Workdo\OutlookCalendar\Entities\OutlookUtility;
-use Workdo\ServiceSlotScheduler\Entities\ServiceScheduleDay;
-use Workdo\ServiceSlotScheduler\Entities\ServiceScheduleUtility;
-use Workdo\TeamBooking\Entities\TeamBooking;
-use App\Facades\ModuleFacade as Module;
-use Workdo\WaitingList\Entities\WaitingListUtility;
 
 class AppointmentController extends Controller
 {
@@ -307,11 +288,7 @@ class AppointmentController extends Controller
             // $combinedArray = array_merge($busineshours, $businesholiday);
             $combinedArray = $busineshours;
 
-            // if(module_is_active('CompoundService', getActiveBusiness())){
-            //     $timeSlots = CompoundUtility::compoundTimeSlote($appointment->service_id, $appointment->date);
-            // } else {
             $timeSlots = timeSlot($appointment->service_id, $appointment->date);
-            // }
 
             $referrers = Referrer::where('business_id', getActiveBusiness())->where('is_active', true)->orderBy('name')->pluck('name', 'id')->prepend(__('Select Referring Doctor'), '');
 
@@ -394,50 +371,8 @@ class AppointmentController extends Controller
         $service_data = null;
         $flexible_data = null;
 
-        if (module_is_active('CompoundService', $service->created_by) && $service->service_type == 'compound') {
-            $compoundTimeSlot = CompoundUtility::compoundTimeSlote($request->service, $request->date);
-
-            return response()->json(['timeSlots' => $compoundTimeSlot, 'result' => 'success']);
-        }
-        if (module_is_active('WaitingList', $service->created_by)) {
-            $waitingListTimeSlot = WaitingListUtility::waitingListTimeSlote($request->service, $request->date);
-            return response()->json(['timeSlots' => $waitingListTimeSlot, 'result' => 'success']);
-        }
-
-        if (module_is_active('CollaborativeServices', $service->created_by) && $service->service_type == 'collaborative') {
-            $slots = CollaborativeServiceUtility::collaborativeTimeSlote($request->service, $request->date);
-
-            return response()->json(['timeSlots' => $slots, 'result' => 'success']);
-        }
-
         if (!empty($request->service) && !empty($request->date)) {
-            if (module_is_active('FlexibleHours', $service->created_by)) {
-                $flexible_data = FlexibleHour::where('staff_id', $request->staff)
-                    ->where('service_id', $request->service)
-                    ->get();
-            }
-            if (module_is_active('FlexibleDays', $service->created_by)) {
-                $flexible_days = FlexibleStaffHours::where('created_by', $service->created_by)
-                    ->where('business_id', $service->business_id)
-                    ->where('staff_id', $request->staff)->get();
-                if ($flexible_days->isNotEmpty()) {
-                    $flexibleDayTimeSlot = FlexibleDayUtility::flexibleDayTimeSlot($request->service, $request->date, $request->staff, $flexible_data);
-                    return response()->json(['timeSlots' => $flexibleDayTimeSlot, 'result' => 'success']);
-                }
-            }
-            if (module_is_active('ServiceSlotScheduler', $service->created_by) && !module_is_active('FlexibleDays', $service->created_by)) {
-                $ServiceDayTimeSlot = ServiceScheduleUtility::ServiceDayTimeSlot($request->service, $request->date, $request->staff, $service_data);
-                return response()->json(['timeSlots' => $ServiceDayTimeSlot, 'result' => 'success']);
-            }
-            if (module_is_active('FlexibleDuration', $service->created_by)) {
-                $ServiceDurationTimeSlot = FlexibleDurationUtility::ServiceDurationTimeSlot($request->service, $request->date, $request->staff, $request->serviceduration);
-                return response()->json(['timeSlots' => $ServiceDurationTimeSlot, 'result' => 'success']);
-            }
-            if (module_is_active('TeamBooking', $service->created_by) && !empty($request->team)) {
-                $bookingTimeSlot = TeamBooking::timeSlot($request->service, $request->date, $flexible_data, $request->team);
-
-                return response()->json(['timeSlots' => $bookingTimeSlot, 'result' => 'success']);
-            }
+            // Single-clinic app: add-on module time-slot engines removed; core slot logic only.
             return response()->json(['timeSlots' => timeSlot($request->service, $request->date, $flexible_data, $service_data), 'result' => 'success']);
         } else {
             return response()->json(['result' => 'error']);
@@ -459,28 +394,9 @@ class AppointmentController extends Controller
             $locations = Location::where('business_id', $business->id)->get();
             $staffs = Staff::where('business_id', $business->id)->get();
 
-            if (module_is_active('FlexibleDays', $business->created_by)) {
-                $busineshours = FlexibleStaffHours::where('created_by', $business->created_by)
-                    ->where('business_id', $business->id)
-                    ->where('day_off', 'on')
-                    ->select('day_name')
-                    ->get()
-                    ->pluck('day_name')
-                    ->map(function ($day) {
-                        return date('w', strtotime($day));
-                    })
-                    ->toArray();
-            } elseif (module_is_active('ServiceSlotScheduler', $business->created_by) && !module_is_active('FlexibleDays', $business->created_by)) {
-                $busineshours = ServiceScheduleDay::where('created_by', $business->created_by)
-                    ->where('business_id', $business->id)
-                    ->where('day_off', 'on')
-                    ->select('day_name')
-                    ->get()
-                    ->pluck('day_name')
-                    ->map(function ($day) {
-                        return date('w', strtotime($day));
-                    })
-                    ->toArray();
+            if (false) {
+                // Single-clinic app: FlexibleDays / ServiceSlotScheduler add-ons removed.
+                $busineshours = [];
             } else {
                 $busineshours = BusinessHours::where('created_by', $business->created_by)
                     ->where('business_id', $business->id)
@@ -533,12 +449,7 @@ class AppointmentController extends Controller
             $currency_symbol = company_setting('currency_symbol', $business->created_by, $business->id) ?? company_setting('currency', $business->created_by, $business->id) ?? '$';
 
             $pixelScript = [];
-            if (module_is_active('TrackingPixel', $business->created_by)) {
-                $pixels = PixelFields::where('created_by', $business->created_by)->where('business_id', $business->id)->get();
-                foreach ($pixels as $pixel) {
-                    $pixelScript[] = pixelSourceCode($pixel['platform'], $pixel['pixel_id']);
-                }
-            }
+            // Single-clinic app: TrackingPixel add-on removed.
             if (!empty($appointment)) {
                 $appointments = Appointment::find($appointment);
                 if (!empty($appointments)) {
@@ -557,21 +468,8 @@ class AppointmentController extends Controller
             if ($business->form_type == 'form-layout') {
                 return view('form_layout.' . $business->layouts . '.index', compact('slug', 'business', 'categories', 'services', 'locations', 'staffs', 'customCss', 'customJs', 'combinedArray', 'files', 'custom_field', 'custom_fields', 'options', 'businesholiday', 'appointment_number', 'pixelScript', 'company_settings', 'bookingModes', 'currency_symbol'));
             } else {
-
-                $module = $business->layouts;
-
-
-                if (module_is_active($business->layouts, $business->created_by)) {
-                    $themeSetting = ThemeSetting::where('theme', $module)->where('business_id', $business->id)->pluck('value', 'key');
-                    $testimonials = Testimonial::where('business_id', $business->id)->where('theme', $module)->get();
-                    $blogs = Blog::where('business_id', $business->id)->where('theme', $module)->get();
-                    $modules = Module::find($business->layouts);
-
-                    return view($modules->package_name . '::form_layout.index', compact('slug', 'business', 'categories', 'services', 'locations', 'staffs', 'customCss', 'customJs', 'combinedArray', 'files', 'custom_field', 'custom_fields', 'options', 'module', 'themeSetting', 'workingDays', 'testimonials', 'blogs', 'businesholiday', 'appointment_number', 'pixelScript', 'company_settings', 'bookingModes', 'currency_symbol'));
-                } else {
-                    return view('web_layouts.module_not_found', compact('module'));
-                    //    return redirect()->back()->with('error', __('please activate this module '.$business->layouts));
-                }
+                // Single-clinic app: module-based web layouts removed; fall back to the core form layout.
+                return view('form_layout.' . $business->layouts . '.index', compact('slug', 'business', 'categories', 'services', 'locations', 'staffs', 'customCss', 'customJs', 'combinedArray', 'files', 'custom_field', 'custom_fields', 'options', 'businesholiday', 'appointment_number', 'pixelScript', 'company_settings', 'bookingModes', 'currency_symbol'));
             }
         }
 
@@ -586,33 +484,9 @@ class AppointmentController extends Controller
         $business = Business::find($request->business_id);
         $service = Service::find($request->service);
 
-        if (module_is_active('CompoundService', $business->created_by) && $service->service_type == 'compound') {
-            $data = CompoundUtility::storeCompoundService($request->all());
-            $redirecturl = route("appointments.form", ["slug" => $business->slug, "appointment" => $data->data]);
-            return response()->json(['status' => $data->status, 'message' => $data->message, 'url' => $redirecturl]);
-        }
-        if (module_is_active('CollaborativeServices', $business->created_by) && $service->service_type == 'collaborative') {
-            $data = CollaborativeServiceUtility::storeCollaborativeService($request->all());
-            $redirecturl = route("appointments.form", ["slug" => $business->slug, "appointment" => $data->data]);
-            return response()->json(['status' => $data->status, 'message' => $data->message, 'url' => $redirecturl]);
-        }
-        if (module_is_active('ShoppingCart', $business->created_by) && $request->has('selectedCartIds')) {
-            $data = ShoppingCart::Appointments($request->all());
-            $redirecturl = route("appointments.form", ["slug" => $business->slug, "appointment" => $data->data]);
-            return response()->json(['status' => $data->status, 'message' => $data->message, 'url' => $redirecturl]);
-        }
+        // Single-clinic app: CompoundService / CollaborativeServices / ShoppingCart / TeamBooking /
+        // BulkAppointments add-on flows removed — core booking flow only.
 
-        if (module_is_active('TeamBooking', $business->created_by) && $request->person) {
-            $data = TeamBooking::teamBooking($request->all());
-            $redirecturl = route("appointments.form", ["slug" => $business->slug, "appointment" => $data->data]);
-            return response()->json(['status' => $data->status, 'message' => $data->message, 'url' => $redirecturl]);
-        }
-
-        if (module_is_active('BulkAppointments', $business->created_by) && $request->quantity) {
-            $data = BulkAppointment::bulkAppointment($request->all());
-            $redirecturl = route("appointments.form", ["slug" => $business->slug, "appointment" => $data->data]);
-            return response()->json(['status' => $data->status, 'message' => $data->message, 'url' => $redirecturl]);
-        }
         if (!empty($request->service) && !empty($request->staff) && !empty($request->appointment_date) && !empty($request->email) && !empty($request->business_id) && !empty($request->payment)) {
             try {
                 // Log incoming request data for debugging
@@ -627,18 +501,7 @@ class AppointmentController extends Controller
 
                 $service = Service::find($request->service);
 
-                if (module_is_active('RepeatAppointments', $business->created_by)) {
-                    if (!empty($request->date) && !empty($request->booked_slot)) {
-                        $event = Utility::RepeatAppointmentStore($request->all());
-                        $redirecturl = route("appointments.form", ["slug" => $business->slug, "appointment" => $event->data]);
-                        return response()->json(['status' => $event->status, 'message' => $event->message, 'url' => $redirecturl]);
-                    }
-                }
-                if (module_is_active('SequentialAppointment', $business->created_by) && $request->sequential_services) {
-                    $sequential_utility = SequentialUtility::storeSequentialAppointment($request->all());
-                    $redirecturl = route("appointments.form", ["slug" => $business->slug, "appointment" => $sequential_utility->data]);
-                    return response()->json(['status' => $sequential_utility->status, 'message' => $sequential_utility->message, 'url' => $redirecturl]);
-                }
+                // Single-clinic app: RepeatAppointments / SequentialAppointment add-on flows removed.
 
                 // Validate that staff exists (log warning but allow null staff)
                 $staff = null;
@@ -811,49 +674,21 @@ class AppointmentController extends Controller
                 return response()->json(['status' => 'error', 'message' => 'Failed to create appointment.', 'error' => 'There was an error processing your booking. Please try again.']);
             }
 
-            if (module_is_active('FlexibleHours', $business->created_by) && isset($request->flexible_id)) {
-                $flexible_hour = FlexibleHour::find($request->flexible_id);
-            }
-
             $final_amount = $service->price;
 
-            $promo_code_id = 0;
-            $after_promo_price = 0;
-            if (module_is_active('PromoCodes') && $request->promo_code_id != null) {
-                $promo_code_id = $request->promo_code_id;
-            }
-            if (module_is_active('PromoCodes') && $request->after_promo_price != null) {
-                $after_promo_price = $service->price - $request->after_promo_price;
-                $final_amount = $service->price - $after_promo_price;
-            }
-
-            if (module_is_active('PromoCodes') && module_is_active('ServiceTax')) {
-                $after_promo_price = $service->price - $request->service_price;
-                $final_amount = $request->final_amount;
-            }
-
-            if (module_is_active('FlexibleHours', $business->created_by) && isset($request->flexible_id)) {
-                $flexible_hour = FlexibleHour::find($request->flexible_id);
-            }
-
-            if (module_is_active('Discount', $business->created_by) && isset($request->discount_amount)) {
-                $final_amount = $service->price - $request->discount_amount;
-            }
+            // Single-clinic app: PromoCodes / ServiceTax / FlexibleHours-pricing / Discount /
+            // AdditionalServices add-on pricing removed — the service price is the final amount.
 
             $payment = AppointmentPayment::create([
                 'appointment_id' => $Appointment->id,
                 'payment_type' => $Appointment->payment_type,
-                'amount' => module_is_active('FlexibleHours', $business->id) && !empty($flexible_hour) ? $flexible_hour->price : $service->price,
+                'amount' => $service->price,
                 'payment_date' => now(),
                 'business_id' => $business->id,
                 'created_by' => $business->created_by,
             ]);
 
             event(new AppointmentPaymentData($request->all(), $payment, $service));
-
-            if (module_is_active('AdditionalServices', $business->created_by) && isset($request->additional_service) && isset($request->additional_service_price)) {
-                event(new AdditionalServicePayment($request->all(), $payment, $service));
-            }
 
 
             $appointment_number = Appointment::appointmentNumberFormat($Appointment->id, $business->created_by, $business->id);
@@ -896,10 +731,6 @@ class AppointmentController extends Controller
         $appointment = Appointment::find($id);
 
         $CustomStatus = CustomStatus::where('created_by', creatorId())->where('business_id', getActiveBusiness())->pluck('title', 'id')->prepend('Pending', '0');
-
-        if (module_is_active('WaitingList') && $appointment->appointment_status == 'Waiting List') {
-            $CustomStatus = CustomStatus::where('created_by', creatorId())->where('business_id', getActiveBusiness())->pluck('title', 'id')->prepend('Waiting List', '0');
-        }
 
         return view('appointment.change-status', compact('appointment', 'CustomStatus'));
     }

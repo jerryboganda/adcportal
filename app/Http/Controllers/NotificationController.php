@@ -16,12 +16,8 @@ class NotificationController extends Controller
     {
         if (Auth::user() && Auth::user()->isAbleTo('notification template manage')) {
             $notifications = Notification::where('type','!=','mail')->get()->groupBy('type');
-            $activeNotifications = [];
-             foreach($notifications as $key => $value){
-                if (module_is_active($key)){
-                    $activeNotifications[$key] = $value;
-                }
-             }
+            // Single-clinic app: module gating removed; all notification types shown.
+            $activeNotifications = $notifications;
 
             return view('notification_templates.index', compact('notifications','activeNotifications'));
         } else {

@@ -13,8 +13,7 @@ class EmailVerificationNotificationController extends Controller
      * Send a new email verification notification.
      */
     public function __construct() {
-        $user = User::where('type','super admin')->first();
-        SetConfigEmail(!empty($user->id) ? $user->id : null);
+        SetConfigEmail();
     }
     public function store(Request $request)
     {

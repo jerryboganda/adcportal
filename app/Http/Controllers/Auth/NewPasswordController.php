@@ -24,12 +24,6 @@ class NewPasswordController extends Controller
             header('location:install');
             die;
         }
-        $admin_settings = getAdminAllSetting();
-        if(module_is_active('GoogleCaptcha') && (isset($admin_settings['google_recaptcha_is_on']) ? $admin_settings['google_recaptcha_is_on'] : 'off') == 'on' )
-        {
-            config(['captcha.secret' => isset($admin_settings['google_recaptcha_secret']) ? $admin_settings['google_recaptcha_secret'] : '']);
-            config(['captcha.sitekey' => isset($admin_settings['google_recaptcha_key']) ? $admin_settings['google_recaptcha_key'] : '']);
-        }
     }
     public function create(Request $request): View
     {

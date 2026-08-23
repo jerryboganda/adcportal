@@ -21,32 +21,13 @@ class SettingsController extends Controller
     }
     public function getSettingSection($module,$method = 'index')
     {
+        // Single-clinic app: super-admin/company split removed; always company settings.
+        $settings = getCompanyAllSetting();
         $folder = 'Company';
-        if(auth()->user()->type == 'super admin')
-        {
-            $settings = getAdminAllSetting();
-
-            $folder = 'SuperAdmin';
-        }
-        else
-        {
-            $settings = getCompanyAllSetting();
-        }
         if(!empty($module) && $module != 'Base')
         {
-            $controllerClass = "Workdo\\" . $module . "\\Http\\Controllers\\" . $folder . "\\SettingsController";
-
-            if (class_exists($controllerClass)) {
-                $controller = \App::make($controllerClass);
-                if (method_exists($controller, $method)) {
-                    $output =  $controller->{$method}($settings);
-                    $return = [
-                        'status' => 200,
-                        'html' => $output->toHtml(),
-                    ];
-                    return  response()->json($return);
-                }
-            }
+            // Single-clinic app: module settings sections removed.
+            return response()->json(['status' => 200, 'html' => '']);
         }
         else
         {
@@ -76,19 +57,6 @@ class SettingsController extends Controller
                 }
             }
 
-            $method = 'settingGet';
-            $controllerClass = "App\\Http\\Controllers\\BanktransferController";
-
-            if (class_exists($controllerClass)) {
-                $controller = \App::make($controllerClass);
-                if (method_exists($controller, $method)) {
-                    $output =  $controller->{$method}($settings);
-                    if ($output !== null) {
-                        $html .= $output->toHtml();
-                    }
-                }
-            }
-
             $return = [
                 'status' => 200,
                 'html' => $html,
@@ -102,8 +70,8 @@ class SettingsController extends Controller
 
     public function emailSettingGet($settings)
     {
-        $activatedModules = ActivatedModule();
-        $email_notification_modules = Notification::where('type','mail')->whereIn('module', $activatedModules)->orwhere('module','general')->groupBy('module')->pluck('module');
+        // Single-clinic app: module gating removed; all general mail notifications shown.
+        $email_notification_modules = Notification::where('type','mail')->where('module','general')->groupBy('module')->pluck('module');
         $email_notify = Notification::where('type', 'mail')->whereIn('module', $email_notification_modules)->get(['module', 'action', 'permissions']);
 
         return view('email.index',compact('settings','email_notification_modules','email_notify'));

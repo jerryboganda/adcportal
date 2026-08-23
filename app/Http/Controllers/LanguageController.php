@@ -2,14 +2,12 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\AddOn;
 use App\Models\EmailTemplateLang;
 use App\Models\Language;
 use App\Models\Setting;
 use App\Models\User;
 use Exception;
 use Illuminate\Http\Request;
-use App\Facades\ModuleFacade as Module;
 use Illuminate\Filesystem\Filesystem;
 use ZipArchive;
 
@@ -29,15 +27,8 @@ class LanguageController extends Controller
                 if ($module == 'general') {
                     $dir = base_path() . '/resources/lang/' . $lang;
                 } else {
-                    $module = AddOn::where('name', $module)->first();
-                    if ($module) {
-                        $module = $module->module;
-                        $this_module = Module::find($module);
-                        $path = $this_module->getPath();
-                        $dir = $path . '/src/Resources/lang/' . $lang;
-                    } else {
-                        return redirect()->back()->with('error', __('Please active this module.'));
-                    }
+                    // Single-clinic app: module language files removed.
+                    return redirect()->back()->with('error', __('Permission denied.'));
                 }
                 try {
                     if (file_exists($dir . '.json')) {
@@ -134,36 +125,7 @@ class LanguageController extends Controller
                 }
                 $Filesystem->copyDirectory($langDir . "en", $dir . "/");
 
-                $modules = Module::all();
-                if ($modules) {
-                    foreach ($modules as $module) {
-                        $path = $module->getPath();
-                        $Filesystem = new Filesystem();
-                        $langCode = strtolower($request->code);
-                        $path = $module->getPath();
-                        $langDir = $path . '/src/Resources/lang/';
-                        $dir = $langDir;
-                        if (!is_dir($dir)) {
-                            mkdir($dir);
-                            chmod($dir, 0777);
-                        }
-                        $dir = $dir . $langCode;
-
-                        $jsonFile = $dir . ".json";
-
-                        if (file_exists($langDir . 'en.json')) {
-                            \File::copy($langDir . 'en.json', $jsonFile);
-                            chmod($jsonFile, 0777);
-
-                        }
-                        if (!is_dir($dir)) {
-                            mkdir($dir);
-                            chmod($dir, 0777);
-                        }
-
-                        $Filesystem->copyDirectory($langDir . "en", $dir . "/");
-                    }
-                }
+                // Single-clinic app: module language seeding removed.
                 // make entry in email_tempalte_lang table for email template content
                 // makeEmailLang($langCode);
             } catch (Exception $e) {
@@ -221,7 +183,7 @@ class LanguageController extends Controller
     {
         if (\Auth::user()->isAbleTo('language delete')) {
             $usr = \Auth::user();
-            if ($usr->type == 'super admin') {
+            {
                 $default_lang = $usr->lang;
 
                 // Remove Email Template Language
@@ -236,27 +198,12 @@ class LanguageController extends Controller
                     }
                 }
 
-                $modules = Module::all();
-                if ($modules) {
-                    foreach ($modules as $module) {
-                        $path = $module->getPath();
-                        $langDir = $path . '/src/Resources/lang/';
-                        if (is_dir($langDir)) {
-                            // remove directory and file
-                            delete_directory($langDir . $lang);
-                            if (file_exists($langDir . $lang . '.json')) {
-                                unlink($langDir . $lang . '.json');
-                            }
-                        }
-                    }
-                }
+                // Single-clinic app: module language cleanup removed.
                 // update user that has assign deleted language.
                 User::where('lang', 'LIKE', $lang)->update(['lang' => $default_lang]);
                 Language::where('code', $lang)->first()->delete();
 
                 return redirect()->route('lang.index', $default_lang)->with('success', __('Language Deleted Successfully!'));
-            } else {
-                return redirect()->back()->with('error', __('Permission Denied.'));
             }
         } else {
             return redirect()->back()->with('error', __('Permission denied.'));
@@ -271,15 +218,8 @@ class LanguageController extends Controller
             if ($module == 'general') {
                 $dir = base_path() . '/resources/lang/';
             } else {
-                $modules = AddOn::where('name', $module)->first();
-                if (!empty($modules)) {
-                    $this_module = Module::find($modules->module);
-                    $path = $this_module->getPath();
-                    $dir = $path . '/src/Resources/lang/';
-                } else {
-                    return redirect()->back()->with('error', __('Please active this module.'));
-                }
-
+                // Single-clinic app: module language files removed.
+                return redirect()->back()->with('error', __('Permission denied.'));
             }
             try {
 
@@ -443,16 +383,7 @@ class LanguageController extends Controller
             copy($filePath, $tempDirectory . DIRECTORY_SEPARATOR . $newFileName);
         }
 
-        $modules = Module::all();
-        foreach ($modules as $module) {
-            $moduleLangDirectories = base_path('packages/workdo/' . $module->name . '/src/Resources/lang');
-            $moduleJsonFiles = glob($moduleLangDirectories . DIRECTORY_SEPARATOR . "*.json");
-            foreach ($moduleJsonFiles as $moduleFilePath) {
-                $moduleFileName = basename($moduleFilePath);
-                $newModuleFileName = $module->name . '-' . $moduleFileName;
-                copy($moduleFilePath, $tempDirectory . DIRECTORY_SEPARATOR . $newModuleFileName);
-            }
-        }
+        // Single-clinic app: module language export removed.
 
         $exportableFileName = 'language-file-version-' . config('verification.system_version') . '.zip';
         $zipFilePath = storage_path($exportableFileName);

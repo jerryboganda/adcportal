@@ -9,7 +9,6 @@ use App\Events\EditProfileUser;
 use App\Events\UpdateUser;
 use App\Models\EmailTemplate;
 use App\Models\LoginDetail;
-use App\Models\Plan;
 use App\Models\Role;
 use App\Models\User;
 use App\Models\Business;
@@ -21,11 +20,8 @@ use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\Rule;
 use Illuminate\Auth\Events\Registered;
-use Lab404\Impersonate\Impersonate;
 use App\DataTables\UsersDataTable;
 use Illuminate\Http\RedirectResponse;
-
-use function GuzzleHttp\Promise\all;
 
 class UserController extends Controller
 {
@@ -37,25 +33,17 @@ class UserController extends Controller
     public function index(Request $request)
     {
         if (Auth::user()->isAbleTo('user manage')) {
-            if (Auth::user()->type == 'super admin') {
-                $users = User::where('type', 'company')->paginate(perPage: 11);
-            } else {
-                if (Auth::user()->isAbleTo('business manage')) {
-                    $users = User::where('type', '!=', 'customer')->where('type', '!=', 'staff')->where('created_by', creatorId())->where('business_id', getActiveBusiness());
-                } else {
-
-                    $users = User::where('created_by', creatorId());
-                }
-                if($request->name)
-                {
-                    $users->where('name', 'like', '%' . $request->name . '%');
-                }
-                if($request->email)
-                {
-                    $users->where('email', 'like', '%' . $request->email . '%');
-                }
-                $users = $users->paginate(11);
+            // Single-clinic app: super-admin subscriber list removed; clinic users only.
+            $users = User::where('created_by', creatorId());
+            if($request->name)
+            {
+                $users->where('name', 'like', '%' . $request->name . '%');
             }
+            if($request->email)
+            {
+                $users->where('email', 'like', '%' . $request->email . '%');
+            }
+            $users = $users->paginate(11);
             return view('users.index', compact('users'));
         } else {
             return redirect()->back()->with('error', __('Permission denied.'));
@@ -94,12 +82,7 @@ class UserController extends Controller
     public function store(Request $request): RedirectResponse
     {
         if (Auth::user()->isAbleTo('user create')) {
-            if (Auth::user()->type != 'super admin') {
-                $canUse =  PlanCheck('User', Auth::user()->id);
-                if ($canUse == false) {
-                    return redirect()->back()->with('error', 'You have maxed out the total number of User allowed on your current plan');
-                }
-            }
+            // Single-clinic app: plan quota check removed.
             $validatorArray = [
                 'name' => 'required|max:120',
                 'email' => [
@@ -139,11 +122,8 @@ class UserController extends Controller
                     return redirect()->back()->with('error', $validator->errors()->first());
                 }
             }
-            if (Auth::user()->type == 'super admin') {
-                $roles = Role::where('name', 'company')->first();
-            } else {
-                $roles = Role::find($request->input('roles'));
-            }
+            // Single-clinic app: admin assigns roles directly; no company/business creation.
+            $roles = Role::find($request->input('roles'));
             $company_settings = getCompanyAllSetting();
 
             $userpassword               = $request->input('password');
@@ -157,38 +137,8 @@ class UserController extends Controller
             $user['business_id']       = getActiveBusiness();
             $user['active_business']   = getActiveBusiness();
             $user = User::create($user);
-            if (Auth::user()->type == 'super admin') {
-                $company = User::find($user->id);
 
-                // create  business
-                $business = new Business();
-                $business->name         = !empty($request->business_name) ? $request->business_name : $request->name;
-                $business->form_type    = !empty($request->form_type) ? $request->form_type : 'form-layout';
-                $business->layouts      = !empty($request->layouts) ? $request->layouts : 'Formlayout1';
-                $business->theme_color  = !empty($request->theme_color) ? $request->theme_color : 'color1-Formlayout1';
-                $business->created_by   = $company->id;
-                $business->save();
-
-                $company->active_business = $business->id;
-                $company->business_id = $business->id;
-                $company->save();
-
-                // comapny setting
-                User::CompanySetting($company->id);
-
-                //  create role
-                $user->MakeRole();
-
-                $plan = Plan::where('is_free_plan', 1)->first();
-                if ($plan) {
-                    $user->assignPlan($plan->id, 'Month', $plan->modules, 0, $user->id);
-                }
-
-
-                $role_r = Role::where('name', 'company')->first();
-            } else {
-                $role_r = Role::find($roles->id);
-            }
+            $role_r = Role::find($roles->id);
 
             $user->addRole($role_r);
             event(new CreateUser($user, $request));
@@ -292,20 +242,15 @@ class UserController extends Controller
             }
             $user = User::find($id);
             if (!empty($user)) {
-                if (Auth::user()->type == 'super admin') {
-                    $role = Role::where('name', 'company')->first();
-                } else {
-                    $role = Role::find($request->input('roles'));
-                }
+                // Single-clinic app: admin assigns roles directly.
+                $role = Role::find($request->input('roles'));
                 $user->name         = $request->name;
                 $user->email        = $request->email;
                 $user->type         = $role->name;
                 $user->mobile_no    = $request->mobile_no;
                 $user->save();
-                if (Auth::user()->type != 'super admin') {
-                    $roles[] = $request->roles;
-                    $user->roles()->sync($roles);
-                }
+                $roles[] = $request->roles;
+                $user->roles()->sync($roles);
                 event(new UpdateUser($user, $request));
 
                 return redirect()->route('users.index')->with(
@@ -561,14 +506,8 @@ class UserController extends Controller
             $filteruser = User::where('created_by', creatorId())->get()->pluck('name', 'id');
             $filteruser->prepend('Select User', '');
 
-            if (Auth::user()->type == 'super admin') {
-                $filteruser = User::where('type', 'company')->get()->pluck('name', 'id');
-
-                $query = \DB::table('login_details')
-                    ->join('users', 'login_details.user_id', '=', 'users.id')
-                    ->select(\DB::raw('login_details.*, users.id as user_id , users.name as user_name , users.email as user_email ,users.type as user_type'))
-                    ->where('login_details.type', 'company');
-            } elseif (Auth::user()->type == 'company') {
+            if (Auth::user()->type == 'admin') {
+                // Single-clinic app: admin sees all clinic login logs.
                 $query = \DB::table('login_details')
                     ->join('users', 'login_details.user_id', '=', 'users.id')
                     ->select(\DB::raw('login_details.*, users.id as user_id , users.name as user_name , users.email as user_email ,users.type as user_type'))
@@ -617,122 +556,8 @@ class UserController extends Controller
         }
     }
 
-    public function LoginWithCompany(Request $request, User $user,  $id)
-    {
-        $user = User::find($id);
-        if ($user && auth()->check()) {
-            Impersonate::take($request->user(), $user);
-            return redirect('/appointment-dashboard');
-        }
-    }
-
-    public function ExitCompany(Request $request)
-    {
-        \Auth::user()->leaveImpersonation($request->user());
-        return redirect('/home');
-    }
-
-    public function CompnayInfo($id)
-    {
-        if (!empty($id)) {
-            $data = $this->Counter($id);
-            if ($data['is_success']) {
-                $users_data = $data['response']['users_data'];
-                $business_data = $data['response']['business_data'];
-                return view('users.companyinfo', compact('id', 'users_data', 'business_data'));
-            }
-        } else {
-            return response()->json(['error' => __('Permission denied.')], 401);
-        }
-    }
-
-    public function UserUnable(Request $request)
-    {
-
-        if (!empty($request->id) && !empty($request->company_id)) {
-            if ($request->name == 'user') {
-                User::where('id', $request->id)->update(['is_disable' => $request->is_disable]);
-                $data = $this->Counter($request->company_id);
-            } elseif ($request->name == 'business') {
-                $company = User::find($request->company_id);
-                if ($company->active_business != $request->id) {
-                    Business::where('id', $request->id)->update(['is_disable' => $request->is_disable]);
-                } else {
-                    return response()->json(['error' => __('Active Business can not disable.')]);
-                }
-
-                if ($request->is_disable == 0) {
-                    User::where('business_id', $request->id)->where('type', '!=', 'company')->update(['is_disable' => $request->is_disable]);
-                }
-                $data = $this->Counter($request->company_id);
-            }
-            if ($data['is_success']) {
-                $users_data = $data['response']['users_data'];
-                $business_data = $data['response']['business_data'];
-            }
-            if ($request->is_disable == 1) {
-
-                return response()->json(['success' => __('Successfully Enable.'), 'users_data' => $users_data, 'business_data' => $business_data]);
-            } else {
-                return response()->json(['success' => __('Successfull Disable.'), 'users_data' => $users_data, 'business_data' => $business_data]);
-            }
-        }
-        return response()->json('error');
-    }
-
-    public function Counter($id)
-    {
-        $response = [];
-        if (!empty($id)) {
-            $business = Business::where('created_by', $id)
-                ->selectRaw('COUNT(*) as total_business, SUM(CASE WHEN is_disable = 0 THEN 1 ELSE 0 END) as disable_business, SUM(CASE WHEN is_disable = 1 THEN 1 ELSE 0 END) as active_business')
-                ->first();
-            $businesses = Business::where('created_by', $id)->get();
-            $users_data = [];
-            foreach ($businesses as $workspce) {
-                $users = User::where('created_by', $id)->where('business_id', $workspce->id)->selectRaw('COUNT(*) as total_users, SUM(CASE WHEN is_disable = 0 THEN 1 ELSE 0 END) as disable_users, SUM(CASE WHEN is_disable = 1 THEN 1 ELSE 0 END) as active_users')->first();
-                $users_data[$workspce->name] = [
-                    'business_id' => $workspce->id,
-                    'total_users' => !empty($users->total_users) ? $users->total_users : 0,
-                    'disable_users' => !empty($users->disable_users) ? $users->disable_users : 0,
-                    'active_users' => !empty($users->active_users) ? $users->active_users : 0,
-                ];
-            }
-            $business_data = [
-                'total_business' =>  $business->total_business,
-                'disable_business' => $business->disable_business,
-                'active_business' => $business->active_business,
-            ];
-            $response['users_data'] = $users_data;
-            $response['business_data'] = $business_data;
-            return [
-                'is_success' => true,
-                'response' => $response,
-            ];
-        }
-        return [
-            'is_success' => false,
-            'error' => 'Plan is deleted.',
-        ];
-    }
-
-    public function BusinessLinks($id)
-    {
-        if(!empty($id))
-        {
-            $businesses = Business::where('created_by', $id)->get();
-            $businessLinks = [];
-            foreach($businesses as $business)
-            {
-                $businessLinks[] = [
-                    'name' => $business->name,
-                    'link' => route('appointments.form', $business->slug),
-                ];
-            }
-            return view('users.business-link', compact('businessLinks'));
-
-        }
-    }
+    // Single-clinic app: LoginWithCompany / ExitCompany (impersonation) and
+    // CompnayInfo / UserUnable / Counter / BusinessLinks (SaaS subscriber tools) removed.
 
     public function verifeduser($id)
     {
@@ -740,12 +565,7 @@ class UserController extends Controller
         $user->email_verified_at = date('Y-m-d h:i:s');
         $user->save();
 
-        if(Auth::user()->type == 'super admin'){
-            $msg =  __('The subcriber has been verifed successfully.');
-        }
-        else{
-            $msg =  __('The user has been verifed successfully.');
-        }
+        $msg =  __('The user has been verifed successfully.');
 
         return redirect()->back()->with('success', $msg);
     }

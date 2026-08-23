@@ -33,17 +33,8 @@ class Business extends Model
     }
     public static function pwa_business($slug)
     {
-        $business = Business::where('slug',$slug)->first();
-        if(module_is_active('PWA',$business->created_by)){
-                try {
-                        $pwa_data = \File::get('uploads/theme_app/business_' . $business->id . '/manifest.json');
-
-                $pwa_data = json_decode($pwa_data);
-            } catch (\Throwable $th) {
-                $pwa_data = [];
-            }
-            return $pwa_data;
-        }
+        // Single-clinic app: PWA add-on removed.
+        return [];
     }
 
     private function createSlug($name)

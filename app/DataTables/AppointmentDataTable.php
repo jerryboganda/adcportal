@@ -96,7 +96,7 @@ class AppointmentDataTable extends DataTable
             })
 
             ->editColumn('appointment_status', function (Appointment $Appointment) {
-                $title = (!empty($Appointment->StatusData) ? $Appointment->StatusData->title : (module_is_active('WaitingList') && $Appointment->appointment_status == 'Waiting List' ? $Appointment->appointment_status : 'Pending'));
+                $title = (!empty($Appointment->StatusData) ? $Appointment->StatusData->title : 'Pending');
                 $color = (!empty($Appointment->StatusData->status_color) ? $Appointment->StatusData->status_color : '5bc0de');
                 return '<a href="#" class="btn btn-sm d-inline align-items-center"data-url="' . route('appointment.status.change', $Appointment->id) . '"data-ajax-popup="true"data-size="md"data-title="' . __('Update Status') . '"data-bs-toggle="tooltip"data-bs-original-title="' . __('Update Status') . '">
                 <span class="white-space" style="background-color: #' . $color . '">' . $title . '</span></a>';
@@ -106,13 +106,7 @@ class AppointmentDataTable extends DataTable
                 });
             });
 
-        // AppointmentReview
-        if (module_is_active('AppointmentReview')) {
-            $rowColumn = array_merge($rowColumn, ['rating']);
-            $dataTable->addColumn('rating', function (Appointment $Appointment) {
-                return view('appointment-review::appointment_rating.rating', compact('Appointment'));
-            });
-        }
+        // Single-clinic app: AppointmentReview add-on removed.
 
         if (\Laratrust::hasPermission(['additional quanitty edit', 'appointment edit', 'appointment delete',])) {
             $rowColumn = array_merge($rowColumn, ['action']);
@@ -287,15 +281,7 @@ class AppointmentDataTable extends DataTable
             Column::make('payment_type')->title(__('Payment')),
             Column::make('appointment_status')->title(__('Status'))->addClass('status_badge'),
         ];
-        if (module_is_active('AppointmentReview')) {
-            $ratingColumn = Column::computed('rating')
-                ->title(__('Rating'))
-                ->exportable(false)
-                ->printable(false)
-                ->searchable(false);
-
-            array_splice($columns, 10, 0, [$ratingColumn]);
-        }
+        // Single-clinic app: AppointmentReview add-on removed.
         if (\Laratrust::hasPermission(['user edit', 'user delete'])) {
             $columns[] = Column::computed('action')->exportable(false)->printable(false)->width(60);
         }

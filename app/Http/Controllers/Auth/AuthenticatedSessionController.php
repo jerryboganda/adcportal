@@ -5,16 +5,11 @@ namespace App\Http\Controllers\Auth;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Auth\LoginRequest;
 use App\Models\LoginDetail;
-use App\Models\Plan;
 use App\Models\User;
 use App\Providers\RouteServiceProvider;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\File;
-use Workdo\GoogleCaptcha\Events\VerifyReCaptchaToken;
-use App\Facades\ModuleFacade as Module;
 
 class AuthenticatedSessionController extends Controller
 {
@@ -27,12 +22,6 @@ class AuthenticatedSessionController extends Controller
         {
             header('location:install');
             die;
-        }
-        $admin_settings = getAdminAllSetting();
-        if(module_is_active('GoogleCaptcha') && (isset($admin_settings['google_recaptcha_is_on']) ? $admin_settings['google_recaptcha_is_on'] : 'off') == 'on' )
-        {
-            config(['captcha.secret' => isset($admin_settings['google_recaptcha_secret']) ? $admin_settings['google_recaptcha_secret'] : '']);
-            config(['captcha.sitekey' => isset($admin_settings['google_recaptcha_key']) ? $admin_settings['google_recaptcha_key'] : '']);
         }
     }
     public function create($lang = '')
@@ -54,27 +43,7 @@ class AuthenticatedSessionController extends Controller
      */
     public function store(LoginRequest $request): RedirectResponse
     {
-        if(module_is_active('GoogleCaptcha') && admin_setting('google_recaptcha_is_on') == 'on' )
-        {
-            if(admin_setting('google_recaptcha_version') == 'v2'){
-                $validation['g-recaptcha-response'] = 'required|captcha';
-
-            }elseif(admin_setting('google_recaptcha_version') == 'v3'){
-                $result = event(new VerifyReCaptchaToken($request));
-                if (!isset($result[0]['status']) || $result[0]['status'] != true) {
-                    $key = 'g-recaptcha-response';
-                    $request->merge([$key => null]); // Set the key to null
-
-                }
-                $validation['g-recaptcha-response'] = 'required';
-
-            }else{
-                $validation = [];
-            }
-        }else{
-            $validation = [];
-        }
-        $this->validate($request, $validation);
+        $this->validate($request, []);
 
         $request->authenticate();
 
@@ -113,62 +82,8 @@ class AuthenticatedSessionController extends Controller
             $login_detail->Details = $json;
             $login_detail->type = Auth::user()->type;
             $login_detail->created_by = creatorId();
-            $login_detail->business = (Auth::user()->type == 'super admin') ? null : getActiveBusiness();
+            $login_detail->business = getActiveBusiness();
             $login_detail->save();
-        }
-
-         // Update wizard
-        if(Auth::user()->type == 'super admin')
-        {
-            $ranMigrations = DB::table('migrations')->pluck('migration');
-            // $modules = Module::all();
-            $modules = Module::allModules();
-
-            $migrationFiles = collect(File::glob(database_path('migrations/*.php')))
-            ->map(function ($path) {
-                return File::name($path);
-            });
-          
-            foreach ($modules as $key => $module) {
-                // Get the module directorie in your project
-                $directory = "packages/workdo/".$module->package_name."/src/Database/Migrations";
-
-                $files = collect(File::glob("{$directory}/*.php"))
-                    ->map(function ($path) {
-                        return File::name($path);
-                    });
-                $migrationFiles = $migrationFiles->merge($files);
-            }
-            // Calculate the pending migrations by diffing the two lists
-            $pendingMigrations = $migrationFiles->diff($ranMigrations);
-            if(count($pendingMigrations) > 0)
-            {
-                return redirect()->route('LaravelUpdater::welcome');
-            }
-        }
-        elseif(Auth::user()->type == 'company')
-        {
-            $user = User::where('id', Auth::user()->id)->first();
-
-            if($user->plan_expire_date > (!empty($user->trial_expire_date) ? $user->trial_expire_date :''))
-            {
-                $datetime1 = new \DateTime($user->plan_expire_date);
-            }else{
-                $datetime1 = new \DateTime($user->trial_expire_date);
-            }
-            $datetime2 = new \DateTime(date('Y-m-d'));
-            $interval = $datetime2->diff($datetime1);
-            $days     = $interval->format('%r%a');
-            if($days <= 0)
-            {
-                $plan = Plan::where('is_free_plan',1)->first();
-                if($plan)
-                {
-                    $user->assignPlan($plan->id,'Month',$plan->modules,0,$user->id);
-                }
-                return redirect()->route('active.plans')->with('error', __('Your Plan is expired.'));
-            }
-
         }
 
         return redirect()->intended(RouteServiceProvider::HOME);

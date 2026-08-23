@@ -54,10 +54,10 @@ class LoginRequest extends FormRequest
                             'email' => __( $user->type ." is not allow to login here"),
                         ]);
                     }
-                    if($user->is_enable_login != 1 || $user->is_disable != 1 && $user->type != "super admin")
+                    if($user->is_enable_login != 1 || $user->is_disable != 1)
                     {
                         throw ValidationException::withMessages([
-                            'email' => __("Your account is disabled from company"),
+                            'email' => __("Your account is disabled"),
                         ]);
                     }
                     $id = $user->id;

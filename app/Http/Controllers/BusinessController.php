@@ -50,62 +50,8 @@ class BusinessController extends Controller
      */
     public function store(Request $request)
     {
-        if (Auth::user()->isAbleTo('business create')) {
-            if (Auth::user()->type != 'super admin') {
-                $canUse =  PlanCheck('Business', Auth::user()->id);
-                if ($canUse == false) {
-                    return redirect()->back()->with('error', 'You have maxed out the total number of Business allowed on your current plan');
-                }
-            }
-            $validator = \Validator::make(
-                $request->all(),
-                [
-                    'name' => 'required',
-                ]
-            );
-
-            if ($validator->fails()) {
-                $messages = $validator->getMessageBag();
-
-                return redirect()->back()->with('error', $messages->first());
-            }
-
-            try {
-                $business = new Business();
-                $business->name = $request->name;
-                $business->form_type = $request->form_type;
-                if ($request->form_type == 'form-layout') {
-                    $layout = explode('-', $request->theme_color)[1];
-                    $business->layouts = $layout;
-                } else {
-                    $business->layouts = $request->layouts;
-                }
-                $business->theme_color = (!empty($request->theme_color) && $request->form_type != 'website') ? $request->theme_color : '';
-                $business->created_by = creatorId();
-                $business->save();
-
-                $user = \Auth::user();
-                $user->active_business = $business->id;
-                $user->save();
-                User::CompanySetting(creatorId(), $business->id);
-
-                // if(!empty($request->layouts) && $request->form_type == 'website')
-                // {
-                    event(new DefaultData(creatorId(), $business->id, $request->layouts));
-                // }
-                // if (!empty(\Auth::user()->active_module)) {
-                //     event(new DefaultData(\Auth::user()->id, $business->id, \Auth::user()->active_module));
-                // } elseif (!empty($request->layouts) && $request->form_type == 'website') {
-                //     event(new DefaultData(\Auth::user()->id, $business->id, $request->layouts));
-                // }
-
-                return redirect()->route('dashboard')->with('success', __('Business create successfully!'));
-            } catch (\Exception $e) {
-                return redirect()->back()->with('error', $e->getMessage());
-            }
-        } else {
-            return redirect()->back()->with('error', __('Permission denied.'));
-        }
+        // Single-clinic app: creating additional businesses is not allowed.
+        return redirect()->back()->with('error', __('This is a single-clinic application; the clinic record already exists.'));
     }
 
     /**
@@ -198,33 +144,8 @@ class BusinessController extends Controller
      */
     public function destroy($business_id)
     {
-        if (Auth::user()->isAbleTo('business delete')) {
-            $objUser   = \Auth::user();
-            $business = Business::find($business_id);
-
-            if ($business) {
-                $other_business = Business::where('created_by', creatorId())->where('is_disable', 1)->where('id', '!=', $business->id)->first();
-
-                if ($other_business) {
-                    User::where('active_business', $business->id)->update(['active_business' => $other_business->id]);
-
-                    if (!empty($other_business)) {
-                        $objUser->active_business = $other_business->id;
-                        $objUser->save();
-                    }
-                    // first parameter business
-                    event(new DestroyBusiness($business));
-
-                    $business->delete();
-                    return redirect()->route('dashboard')->with('success', __('Business Deleted Successfully!'));
-                }
-                return redirect()->route('dashboard')->with('error', __("You can't delete Business! because your other businesses are disabled "));
-            } else {
-                return redirect()->route('dashboard')->with('error', __("You can't delete Business!"));
-            }
-        } else {
-            return redirect()->back()->with('error', __('Permission denied.'));
-        }
+        // Single-clinic app: deleting THE clinic is not allowed.
+        return redirect()->route('dashboard')->with('error', __("You can't delete the clinic in a single-clinic application."));
     }
 
     public function businessCheck(Request $request)
@@ -240,26 +161,8 @@ class BusinessController extends Controller
 
     public function change($business_id)
     {
-        $check = Business::find($business_id);
-        if (!empty($check)) {
-            $users = User::where('email', \Auth::user()->email)->where('business_id', $business_id)->where('created_by', Auth::user()->created_by)->first();
-            if (empty($users)) {
-                $users = User::where('email', \Auth::user()->email)->Where('id', $check->created_by)->first();
-            }
-            if (empty($users)) {
-                $users = User::where('email', \Auth::user()->email)->where('business_id', $business_id)->first();
-            }
-            $user = User::find($users->id);
-            $user->active_business = $business_id;
-            $user->save();
-            if (!empty($user)) {
-                Auth::login($user);
-                return redirect()->route('appointment.dashboard')->with('success', 'User Business change successfully.');
-            }
-            return redirect()->route('appointment.dashboard')->with('success', 'User Business change successfully.');
-        } else {
-            return redirect()->route('appointment.dashboard')->with('error', "Business not found.");
-        }
+        // Single-clinic app: business switching removed.
+        return redirect()->route('appointment.dashboard');
     }
 
     public function businessManage($id)
@@ -331,16 +234,8 @@ class BusinessController extends Controller
                 ->get();
             $custom_field = company_setting('custom_field_enable', creatorId(), $id);
 
-            //PWA
+            //PWA — Single-clinic app: PWA add-on removed.
             $pwa_data = '';
-            if (module_is_active('PWA', $business->created_by)) {
-                try {
-                    $pwa_data = \File::get('uploads/theme_app/business_' . $business->id . '/manifest.json');
-                    $pwa_data = json_decode($pwa_data);
-                } catch (\Throwable $th) {
-                    $pwa_data = '';
-                }
-            }
 
             return view('business.manage', compact('business', 'locations', 'categories', 'services', 'staffes', 'businessholidays', 'business_url', 'subdomain_Ip', 'subdomainPointing', 'domainip', 'domainPointing', 'serverIp', 'subdomain_name', 'company_settings', 'files', 'custom_field', 'custom_fields', 'pwa_data'));
         } else {

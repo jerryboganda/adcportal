@@ -20,7 +20,7 @@ class RoleController extends Controller
         if(Auth::user()->isAbleTo('roles manage'))
         {
             $roles = Role::where('created_by', '=', creatorId())->get();
-            $modules = array_merge(['General'],getModuleList());
+            $modules = ['General'];
             return view('role.index',compact('modules','roles'));
         }
         else
@@ -35,20 +35,13 @@ class RoleController extends Controller
         if(Auth::user()->isAbleTo('roles create'))
         {
             $user = \Auth::user();
-            if($user->type == 'super admin')
+            $permissions = new Collection();
+            foreach($user->roles as $role)
             {
-                $permissions = Permission::all()->pluck('name', 'id')->toArray();
+                $permissions = $permissions->merge($role->permissions);
             }
-            else
-            {
-                $permissions = new Collection();
-                foreach($user->roles as $role)
-                {
-                    $permissions = $permissions->merge($role->permissions);
-                }
-                $permissions = $permissions->pluck('name', 'id')->toArray();
-            }
-            $modules = array_merge(['General'],getshowModuleList());
+            $permissions = $permissions->pluck('name', 'id')->toArray();
+            $modules = ['General'];
             return view('role.create', compact('permissions','modules'));
         }
         else
@@ -112,7 +105,7 @@ class RoleController extends Controller
         {
             $user = \Auth::user();
             $permissions = Permission::all()->pluck('name', 'id')->toArray();
-            $modules = array_merge(['General'],getshowModuleList());
+            $modules = ['General'];
             return view('role.edit', compact('role', 'permissions','modules'));
         }
         else
@@ -181,3 +174,5 @@ class RoleController extends Controller
         }
     }
 }
+
+

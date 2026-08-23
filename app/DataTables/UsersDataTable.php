@@ -47,9 +47,8 @@ class UsersDataTable extends DataTable
     public function query(User $model): QueryBuilder
     {
         $user = Auth::user();
-        if ($user->type == 'super admin') {
-            $users = $model->where('type', 'company')->newQuery();
-        } elseif ($user->isAbleTo('business manage')) {
+        // Single-clinic app: super-admin subscriber list removed.
+        if ($user->isAbleTo('business manage')) {
             $users = $model->whereNotIn('type', ['customer', 'staff'])->where('created_by', creatorId())->where('business_id', getActiveBusiness())->newQuery();
         } else {
             $users = $model->where('created_by', creatorId())->newQuery();

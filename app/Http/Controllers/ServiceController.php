@@ -52,9 +52,7 @@ class ServiceController extends Controller
             ];
             $business = Business::find($request->business_id);
 
-            if (module_is_active('RepeatAppointments', $business->created_by) && $request->repeat_appointment_status == 'on') {
-                $rules['repeat_appointment_types'] = 'required';
-            }
+            // Single-clinic app: RepeatAppointments add-on removed.
             $validator = Validator::make($request->all(), $rules);
             if ($validator->fails()) {
                 $messages = $validator->getMessageBag();
@@ -86,14 +84,7 @@ class ServiceController extends Controller
             }
             $service->image  = !empty($request->service_image) ? $url : '';
 
-            if (module_is_active('RepeatAppointments', $business->created_by)) {
-                if ($request->repeat_appointment_status == 'on') {
-                    $service->repeat_appointment_status = 1;
-                    $service->repeat_appointment_types = json_encode($request->repeat_appointment_types);
-                } else {
-                    $service->repeat_appointment_status = 0;
-                }
-            }
+            // Single-clinic app: RepeatAppointments add-on removed.
             $service->save();
             $tab = 2;
 
@@ -142,9 +133,7 @@ class ServiceController extends Controller
                 // 'duration' => 'required',
             ];
 
-            if (module_is_active('RepeatAppointments', $service->created_by) &&  $request->repeat_appointment_status == 'on') {
-                $rules['repeat_appointment_types'] = 'required';
-            }
+            // Single-clinic app: RepeatAppointments add-on removed.
             $validator = Validator::make($request->all(), $rules);
             if ($validator->fails()) {
                 $messages = $validator->getMessageBag();
@@ -179,16 +168,7 @@ class ServiceController extends Controller
                 $service->image  = !empty($request->service_image) ? $url : '';
             }
 
-            if (module_is_active('RepeatAppointments', $service->created_by)) {
-                if ($request->repeat_appointment_status == 'on') {
-                    $service->repeat_appointment_status = 1;
-                    $service->repeat_appointment_types = json_encode($request->repeat_appointment_types);
-                } else {
-                    $service->repeat_appointment_status = 0;
-                }
-            }
-
-
+            // Single-clinic app: RepeatAppointments add-on removed.
             $service->save();
             $tab = 2;
 
@@ -258,7 +238,7 @@ class ServiceController extends Controller
         if (!empty($request->service)) {
             $service = Service::where('id', $request->service)->first();
             if ($service) {
-                if ((!empty($service->online_appointments)) && (module_is_active('GoogleMeet', $service->created_by) || module_is_active('ZoomMeeting', $service->created_by))) {
+                if ((!empty($service->online_appointments))) {
                     $html = '';
                     $loadStep = '';
                     $loadStep = view('online_appointment.online_appointment_step', compact('service'))->render();
@@ -283,7 +263,7 @@ class ServiceController extends Controller
             $service = Service::where('id', $request->service)->first();
             if ($service) {
                 $business = Business::where('id', $service->business_id)->first();
-                if ((!empty($service->online_appointments)) && (module_is_active('GoogleMeet', $service->created_by) || module_is_active('ZoomMeeting', $service->created_by))) {
+                if ((!empty($service->online_appointments))) {
                     $html = '';
                     $loadStep = '';
                     $loadStep = view('form_layout.online_appointment.online_appointment_step', compact('service', 'business'))->render();

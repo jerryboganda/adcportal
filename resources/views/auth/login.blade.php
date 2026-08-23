@@ -83,11 +83,7 @@
                 <div class="d-grid">
                     <button type="submit" class="btn btn-primary btn-block mt-2 login_button" tabindex="4">{{ __('Login') }}</button>
                 </div>
-                @if (empty( $admin_settings['signup']) ||  (isset($admin_settings['signup']) ? $admin_settings['signup'] : 'off') == "on")
-                    <p class="my-4 text-center">{{ __("Don't have an account?") }}
-                        <a href="{{route('register')}}" class="my-4 text-primary">{{__('Register')}}</a>
-                    </p>
-                @endif
+                {{-- Single-clinic app: public registration disabled. --}}
             </div>
         </form>
     </div>
