@@ -11,8 +11,8 @@ class Menu
     public function __construct($user)
     {
         $this->user = $user;
-        $this->modules = ActivatedModule();
-        $this->modules[] =  'Base';
+        // Single-clinic app: module system removed, everything is "Base".
+        $this->modules = ['Base'];
     }
 
     public function add(array $array): void {

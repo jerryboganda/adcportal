@@ -19,18 +19,6 @@ class CustomApiAuth
         try {
             JWTAuth::parseToken()->authenticate();
             $request['user_id'] = JWTAuth::user()->id;
-			$module = $request->segment(2);
-
-			if($module){
-				$module_status = module_is_active($module, creatorId());
-				if($module_status != true)
-				{
-					return response()->json(['status' => 0, 'message' => 'Your Add-on Is Not Activated!'], 401);
-				}
-				$request['module_name'] = $module;
-			}
-
-			$request->route()->forgetParameter('module');
 
         } catch (\PHPOpenSourceSaver\JWTAuth\Exceptions\TokenExpiredException $e) {
             return response()->json(['status' => 0, 'message' => 'Token has expired'], 401);

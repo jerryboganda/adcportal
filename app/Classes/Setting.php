@@ -13,8 +13,8 @@ class Setting
     {
         $this->user = $user;
         $this->settings = $settings;
-        $this->modules = ActivatedModule();
-        $this->modules[] =  'Base';
+        // Single-clinic app: module system removed, everything is "Base".
+        $this->modules = ['Base'];
     }
 
     public function add(array $array): void {

@@ -17,7 +17,6 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withMiddleware(function (Middleware $middleware) {
         $middleware->alias([
             'APILog' => \App\Http\Middleware\APILog::class,
-            'PlanModuleCheck' => \App\Http\Middleware\PlanModuleCheck::class,
             'jwt.api.auth' => CustomApiAuth::class,
         ]);
         // Append middleware to the 'web' group
@@ -25,17 +24,9 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->appendToGroup('web', AllowIframeEmbedding::class);
         // Exclude specific routes from CSRF protection
         $middleware->validateCsrfTokens(
-            except: ['plan-get-paytm-status',
-                    '/iyzipay/*',
-                    '/aamarpay/*',
-                    '/appointment/iyzipay/status/*',
-                    '/easebuzz/*',
-                    '/powertranz/plan/payment/status',
-                    '/powertranz/appointment/payment/status/*',
-                    '/sslcommerz/*',
-                    'appointments/{slug}/{appointment?}',
+            except: ['booking',
                     'appointment-duration',
-                    'appointment-book',
+                    'check-user-data',
                     ] // Add your routes here
         );
     })
