@@ -55,6 +55,10 @@ class HomeController extends Controller
             $services = Service::where('business_id', $business->id)->get();
             $locations = Location::where('business_id', $business->id)->get();
             $staffs = Staff::where('business_id', $business->id)->get();
+            $categories = \App\Models\Category::where('business_id', $business->id)
+                ->where('created_by', $business->created_by)
+                ->orderBy('id', 'asc')
+                ->get();
 
             $busineshours = BusinessHours::where('created_by', $business->created_by)
                 ->where('business_id', $business->id)
