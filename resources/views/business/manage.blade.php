@@ -120,106 +120,29 @@
         <div class="col-sm-12">
             <div class="row">
                 <div class="col-lg-12">
-                    <div class="tab-content" id="pills-tabContent">
-                        <div class="tab-pane fade @if (!session('tab') or session('tab') and session('tab') == 12) active show @endif"
-                            id="theme-setting" role="tabpanel" aria-labelledby="pills-user-tab-12">
-                            {{ Form::open(['route' => ['business.theme.update', 'business_id' => $business->id], 'enctype' => 'multipart/form-data']) }}
-                            @csrf
-                            <div class="card business-card">
-                                <div class="business-card-body">
-                                    <div class="mb-4 select-theme-portion">
-                                        <h4 class="mb-3">{{ __('Select Theme:') }}</h4>
-                                        <ul class="gap-2 nav business-tab" id="pills-tab" role="tablist">
-                                            <li class="nav-item" role="presentation">
-                                                <div class="nav-item-inner @if ($business->form_type == 'form-layout') active @endif"
-                                                    id="theme-setting-tab2" data-bs-toggle="pill"
-                                                    data-bs-target="#theme-setting2">
-                                                    <label for="radio1">
-                                                        <input type="radio" id="radio1" name="form_type"
-                                                            value="form-layout">
-                                                        <span>
-                                                            {{ __('Form Layout') }}
-                                                        </span>
-                                                    </label>
-                                                </div>
-                                            </li>
-                                            <li class="nav-item " role="presentation">
-                                                <div id="seo-setting-tab2"
-                                                    class="nav-item-inner @if ($business->form_type == 'website') active @endif"
-                                                    data-bs-toggle="pill" data-bs-target="#seo-setting2">
-                                                    <label for="radio2">
-                                                        <input type="radio" id="radio2" name="form_type"
-                                                            value="website">
-                                                        <span>
-                                                            {{ __('Website') }}
-                                                        </span>
-                                                    </label>
-                                                </div>
-                                            </li>
-                                        </ul>
-                                    </div>
-                                    <div class="tab-content" id="pills-tabContent">
-                                        <div class="tab-pane fade @if ($business->form_type == 'form-layout') active show @endif"
-                                            id="theme-setting2" role="tabpanel" aria-labelledby="pills-user-tab-1">
-                                            <div class="row row-gaps business-card-wrp">
-                                                {{ Form::hidden('layouts', null, ['id' => 'themefile1']) }}
-                                                @foreach (\App\Models\Business::forms() as $key => $v)
-                                                    @php
-                                                        $form_name = str_replace('Formlayout', 'Form Layout ', $key);
-                                                        if (preg_match('/\d+$/', $form_name, $matches)) {
-                                                            $form_name = str_replace(
-                                                                $matches[0],
-                                                                ' ' . $matches[0],
-                                                                $form_name,
-                                                            );
-                                                        }
-                                                    @endphp
-                                                    <div class="col-xxl-3 col-lg-4 col-md-6 col-sm-6 col-12 business-view-card d-flex">
-                                                        <label for="{{ $key }}">
-                                                            <input type="radio" id="{{ $key }}"
-                                                                required="" value="{{ $key }}"
-                                                                checked="">
-
-                                                            <div class="business-view-inner d-flex flex-column mb-0 h-100">
-                                                                <div class="buisness-img mb-3">
-                                                                    <img class="color_theme1 {{ $key }}_img"
-                                                                        data-id="{{ $key }}"
-                                                                        src="{{ asset(get_file('form_layouts/' . $key . '/images/form.png')) }}"
-                                                                        alt="" style="height: 100%;width: 100%;">
-                                                                </div>
-                                                                <div class=" ">
-                                                                    <h6 class="mb-0 business-card-title">{{ $form_name }}</h6>
-
-                                                                    <div class="d-flex flex-wrap align-items-center business-color-input mt-1 justify-content-center"
-                                                                        id="{{ $key }}">
-                                                                        @foreach ($v as $css => $val)
-                                                                            <label class="colorinput">
-                                                                                <input type="radio" name="theme_color"
-                                                                                    id="{{ $css }}"
-                                                                                    value="{{ $css }}"
-                                                                                    data-theme="{{ $key }}"
-                                                                                    data-imgpath="{{ $val['img_path'] }}"
-                                                                                    class="colorinput-input"
-                                                                                    @if ($css == $business->theme_color) checked @endif>
-                                                                                <span class="border-box">
-                                                                                    <span class="colorinput-color"
-                                                                                        style="background:{{ $val['color'] }}"></span>
-                                                                                </span>
-                                                                            </label>
-                                                                        @endforeach
-                                                                    </div>
-                                                                </div>
-                                                            </div>
-                                                        </label>
+                    
+                                    <div class="row row-gaps business-card-wrp">
+                                        <input type="hidden" name="layouts" value="Formlayout11" id="themefile1">
+                                        <input type="hidden" name="theme_color" value="color1-Formlayout11">
+                                        <div class="col-xxl-3 col-lg-4 col-md-6 col-sm-6 col-12 business-view-card d-flex">
+                                            <label for="Formlayout11">
+                                                <input type="radio" id="Formlayout11" name="layouts_display" value="Formlayout11" checked disabled>
+                                                <div class="business-view-inner d-flex flex-column mb-0 h-100" style="border: 2px solid #4F46E5; border-radius: 8px;">
+                                                    <div class="buisness-img mb-3">
+                                                        <img class="color_theme1 Formlayout11_img" data-id="Formlayout11" src="{{ asset(get_file('form_layouts/Formlayout11/images/form.png')) }}" alt="Form Layout 11" style="height: 100%;width: 100%;">
                                                     </div>
-                                                @endforeach
-                                            </div>
-                                        </div>
-                                        <div class="tab-pane fade @if ($business->form_type == 'website') active show @endif"
-                                            id="seo-setting2" role="tabpanel" aria-labelledby="pills-user-tab-1">
-                                            <div class="mt-4 row row-gaps business-theme-wrp">
-                                                @stack('theme_card')
-                                            </div>
+                                                    <div>
+                                                        <h6 class="mb-0 business-card-title">Form Layout 11</h6>
+                                                        <small class="text-success">● Default & Locked</small>
+                                                        <div class="d-flex flex-wrap align-items-center business-color-input mt-1 justify-content-center">
+                                                            <label class="colorinput">
+                                                                <input type="radio" name="theme_color_display" value="color1-Formlayout11" checked disabled class="colorinput-input">
+                                                                <span class="border-box"><span class="colorinput-color" style="background:#4F46E5"></span></span>
+                                                            </label>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </label>
                                         </div>
                                     </div>
                                 </div>
