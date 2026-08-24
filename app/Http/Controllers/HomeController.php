@@ -331,8 +331,9 @@ class HomeController extends Controller
 
 
 
-            $latest_appointments = Appointment::where('business_id', getActiveBusiness())
-                ->where('created_by', creatorId())
+            $latest_appointments = Appointment::query()
+                ->forClinic()
+                ->with(Appointment::$eager)
                 ->latest()
                 ->take(4)
                 ->get();

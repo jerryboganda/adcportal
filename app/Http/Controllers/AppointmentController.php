@@ -362,21 +362,27 @@ class AppointmentController extends Controller
 
     public function appointmentDuration(Request $request)
     {
+        $request->validate([
+            'service' => ['required', 'integer'],
+            'date' => ['required', 'date_format:d-m-Y'],
+            'staff' => ['nullable', 'integer'],
+        ]);
+
         $service = Service::find($request->service);
 
         if (empty($service)) {
             return response()->json(['error' => __('Service not found!')], 404);
         }
 
-        $service_data = null;
-        $flexible_data = null;
-
         if (!empty($request->service) && !empty($request->date)) {
-            // Single-clinic app: add-on module time-slot engines removed; core slot logic only.
-            return response()->json(['timeSlots' => timeSlot($request->service, $request->date, $flexible_data, $service_data), 'result' => 'success']);
-        } else {
-            return response()->json(['result' => 'error']);
+            // Cached AvailabilityService (60s slot cache + indexed booked query).
+            return response()->json([
+                'timeSlots' => timeSlot((int) $request->service, $request->date, null, null, $request->staff ? (int) $request->staff : null),
+                'result' => 'success',
+            ]);
         }
+
+        return response()->json(['result' => 'error']);
     }
 
 
@@ -478,252 +484,20 @@ class AppointmentController extends Controller
 
 
 
-    public function appointmentFormSubmit(Request $request)
+    public function appointmentFormSubmit(\App\Http\Requests\StoreBookingRequest $request)
     {
-
         $business = Business::find($request->business_id);
-        $service = Service::find($request->service);
+        $service  = Service::find($request->service);
 
-        // Single-clinic app: CompoundService / CollaborativeServices / ShoppingCart / TeamBooking /
-        // BulkAppointments add-on flows removed — core booking flow only.
+        if (empty($business) || empty($service)) {
+            $redirecturl = route('appointments.form', ['slug' => $business->slug ?? '', 'appointment' => 'failed']);
 
-        if (!empty($request->service) && !empty($request->staff) && !empty($request->appointment_date) && !empty($request->email) && !empty($request->business_id) && !empty($request->payment)) {
-            try {
-                // Log incoming request data for debugging
-                Log::info('Appointment submission received', [
-                    'service_id' => $request->service,
-                    'staff_id' => $request->staff,
-                    'location_id' => $request->location,
-                    'business_id' => $business->id,
-                    'date' => $request->appointment_date,
-                    'type' => $request->type,
-                ]);
-
-                $service = Service::find($request->service);
-
-                // Single-clinic app: RepeatAppointments / SequentialAppointment add-on flows removed.
-
-                // Validate that staff exists (log warning but allow null staff)
-                $staff = null;
-                if (!empty($request->staff)) {
-                    $staff = \App\Models\Staff::find($request->staff);
-                    if (!$staff) {
-                        Log::warning('Staff not found', ['staff_id' => $request->staff, 'business_id' => $business->id]);
-                        // Don't fail - staff might not exist but appointment can still be created
-                    }
-                }
-
-                // Validate that location exists (log warning but allow null location)
-                $location = null;
-                if (!empty($request->location)) {
-                    $location = \App\Models\Location::find($request->location);
-                    if (!$location) {
-                        Log::warning('Location not found', ['location_id' => $request->location, 'business_id' => $business->id]);
-                        // Don't fail - location might not exist but appointment can still be created
-                    }
-                }
-
-                $url = null;
-                if ($request->hasFile('attachment')) {
-                    $filenameWithExt = $request->file('attachment')->getClientOriginalName();
-                    $filename = pathinfo($filenameWithExt, PATHINFO_FILENAME);
-                    $extension = $request->file('attachment')->getClientOriginalExtension();
-                    $fileNameToStore = $filename . '_' . time() . '.' . $extension;
-
-                    $uplaod = upload_file($request, 'attachment', $fileNameToStore, 'Appointment');
-                    if ($uplaod['flag'] == 1) {
-                        $url = $uplaod['url'];
-                    } else {
-                        $redirecturl = route("appointments.form", ["slug" => $business->slug, "appointment" => 'failed']);
-                        return response()->json(['status' => 'failed', 'message' => $uplaod['msg'] ?? 'The Payment has been failed.', 'url' => $redirecturl]);
-                        // return response()->json(['status' => 'error', 'message' => 'The Payment has been added successfully.' ,'error' => $uplaod['msg']]);
-                    }
-                }
-
-                // Handle guest user - guests don't need customer records
-                // Their info will be stored directly in the appointment
-                $customer = null;
-                $customer_id = null;
-
-                if ($request->type == 'guest-user') {
-                    // Create/Update contact entry for marketing purposes
-                    $existingContact = \App\Models\ContactUs::where('email', $request->email)
-                        ->where('business_id', $business->id)
-                        ->first();
-
-                    if (!$existingContact) {
-                        // Create new contact
-                        \App\Models\ContactUs::create([
-                            'name' => $request->name,
-                            'email' => $request->email,
-                            'contact' => $request->contact,
-                            'subject' => 'Appointment Booking - Guest',
-                            'description' => 'Contact created from appointment booking',
-                            'theme' => 'default',
-                            'business_id' => $business->id,
-                        ]);
-
-                        Log::info('Contact created from guest booking', [
-                            'name' => $request->name,
-                            'email' => $request->email,
-                            'business_id' => $business->id
-                        ]);
-                    }
-                }
-
-                if ($request->type == 'new-user') {
-                    $roles = Role::where('name', 'customer')->where('created_by', $business->created_by)->first();
-                    if ($roles) {
-                        $user = User::create(
-                            [
-                                'name' => !empty($request->name) ? $request->name : null,
-                                'email' => !empty($request->email) ? $request->email : null,
-                                'mobile_no' => !empty($request->contact) ? $request->contact : null,
-                                'email_verified_at' => date('Y-m-d h:i:s'),
-                                'password' => !empty($request->password) ? Hash::make($request->password) : null,
-                                'avatar' => 'uploads/users-avatar/avatar.png',
-                                'type' => 'customer',
-                                'lang' => 'en',
-                                'business_id' => $business->id,
-                                'created_by' => $business->created_by,
-                            ]
-                        );
-                        $user->addRole($roles);
-
-                        $customer = new Customer();
-                        $customer->name = $request->name;
-                        $customer->user_id = $user->id;
-                        $customer->gender = !empty($request->gender) ? $request->gender : '';
-                        $customer->dob = !empty($request->dob) ? $request->dob : '';
-                        $customer->description = !empty($request->description) ? $request->description : '';
-                        $customer->business_id = $user->business_id;
-                        $customer->created_by = $user->created_by;
-                        $customer->save();
-                    }
-                }
-
-                if ($request->type == 'existing-user') {
-                    $email = $request->email;
-                    $user = User::where('email', $email)->where('type', 'customer')->first();
-                    if (!empty($request->password) && !empty($user)) {
-                        $check_password = Hash::check($request->password, $user->password);
-                        if ($check_password) {
-                            $customer = Customer::where('user_id', $user->id)->first();
-                        } else {
-                            return response()->json(['status' => 'error', 'message' => 'The Payment has been added successfully.', 'error' => 'Enter correct password']);
-                        }
-                    } else {
-                        return response()->json(['status' => 'error', 'message' => 'The Payment has been added successfully.', 'error' => 'Please enter valid email']);
-                    }
-                }
-
-                $default_status = company_setting('default_status', $business->created_by, getActiveBusiness());
-
-                $Appointment = new Appointment();
-                if ($request->type == 'new-user' || $request->type == 'existing-user') {
-                    $Appointment->customer_id = !empty($customer) ? $customer->user_id : null;
-                } elseif ($request->type == 'guest-user') {
-                    // For guests, use the customer ID directly (not user_id since guests have no user account)
-                    $Appointment->customer_id = !empty($customer_id) ? $customer_id : null;
-                } else {
-                    $Appointment->customer_id = !empty($request->customer) ? $request->customer : null;
-                }
-                $Appointment->location_id = $request->location;
-                $Appointment->service_id = $request->service;
-                $Appointment->staff_id = $request->staff;
-
-                if ($request->type == 'guest-user') {
-                    $Appointment->name = $request->name;
-                    $Appointment->email = $request->email;
-                    $Appointment->contact = $request->contact;
-                }
-
-                $Appointment->date = !empty($request->appointment_date) ? $request->appointment_date : '';
-                $Appointment->time = !empty($request->duration) ? $request->duration : '';
-                $Appointment->notes = !empty($request->notes) ? $request->notes : '';
-                $Appointment->referred_by = !empty($request->referred_by) ? $request->referred_by : null;
-                $Appointment->payment_type = !empty($request->payment) ? $request->payment : 'Manually';
-                $Appointment->appointment_status = !empty($default_status) ? $default_status : 'Pending';
-                $Appointment->attachment = !empty($url) ? $url : null;
-
-                $customFieldValues = [];
-                $custom_field = company_setting('custom_field_enable', $business->created_by, $business->id);
-                // Process the values from the request
-                if (!empty($custom_field) && $custom_field == 'on') {
-                    foreach ($request->values as $type => $fields) {
-                        foreach ($fields as $label => $value) {
-                            if (is_array($value)) {
-                                if ($type === 'checkbox') {
-                                    $customFieldValues[$label] = implode(',', $value);
-                                } else {
-                                    $customFieldValues[$label] = json_encode($value);
-                                }
-                            } else {
-                                $customFieldValues[$label] = $value;
-                            }
-                        }
-                    }
-                }
-                $Appointment->custom_field = !empty($customFieldValues) ? json_encode($customFieldValues) : null;
-
-                $Appointment->business_id = $business->id;
-                $Appointment->created_by = $business->created_by;
-                $Appointment->save();
-            } catch (\Exception $e) {
-                Log::error('Appointment Creation Error: ' . $e->getMessage(), ['exception' => $e]);
-                return response()->json(['status' => 'error', 'message' => 'Failed to create appointment.', 'error' => 'There was an error processing your booking. Please try again.']);
-            }
-
-            $final_amount = $service->price;
-
-            // Single-clinic app: PromoCodes / ServiceTax / FlexibleHours-pricing / Discount /
-            // AdditionalServices add-on pricing removed — the service price is the final amount.
-
-            $payment = AppointmentPayment::create([
-                'appointment_id' => $Appointment->id,
-                'payment_type' => $Appointment->payment_type,
-                'amount' => $service->price,
-                'payment_date' => now(),
-                'business_id' => $business->id,
-                'created_by' => $business->created_by,
-            ]);
-
-            event(new AppointmentPaymentData($request->all(), $payment, $service));
-
-
-            $appointment_number = Appointment::appointmentNumberFormat($Appointment->id, $business->created_by, $business->id);
-
-            $company_settings = getCompanyAllSetting($Appointment->created_by, $Appointment->business_id);
-            $customCss = isset($company_settings['custom_css']) ? $company_settings['custom_css'] : null;
-            $customJs = isset($company_settings['custom_js']) ? $company_settings['custom_js'] : null;
-
-            event(new CreateAppoinment($Appointment, $request));
-
-            //Email notification
-            if ((!empty($company_settings['Create Appointment']) && $company_settings['Create Appointment'] == true)) {
-                $trackingUrl = route('find.appointment', ['businessSlug' => $business->slug]);
-                $uArr = [
-                    'company_name' => $business->name ?? '',
-                    'service' => $Appointment->ServiceData ? $Appointment->ServiceData->name : '-',
-                    'location' => $Appointment->LocationData ? $Appointment->LocationData->name : '-',
-                    'staff' => $Appointment->StaffData->user ? $Appointment->StaffData->user->name : '-',
-                    'appointment_date' => $Appointment->date,
-                    'appointment_time' => $Appointment->time,
-                    'appointment_number' => $appointment_number,
-                    'tracking_url' => $trackingUrl,
-                ];
-                $resp = EmailTemplate::sendEmailTemplate('Create Appointment', [$Appointment->CustomerData ? $Appointment->CustomerData->customer->email : $Appointment->email], $uArr, $Appointment->created_by, $business->id);
-
-                $redirecturl = route("appointments.form", ["slug" => $business->slug, "appointment" => $Appointment->id]);
-                return response()->json(['status' => 'success', 'message' => 'The Payment has been added successfully.', 'url' => $redirecturl, 'appointment_id' => $Appointment->id, 'appointment_number' => $appointment_number]);
-            }
-
-            $redirecturl = route("appointments.form", ["slug" => $business->slug, "appointment" => $Appointment->id]);
-            return response()->json(['status' => 'success', 'message' => 'The Payment has been added successfully.', 'url' => $redirecturl, 'appointment_id' => $Appointment->id, 'appointment_number' => $appointment_number]);
-        } else {
-            $redirecturl = route("appointments.form", ["slug" => $business->slug, "appointment" => 'failed']);
-            return response()->json(['status' => 'failed', 'message' => 'The Payment has been added successfully.', 'url' => $redirecturl]);
+            return response()->json(['status' => 'failed', 'message' => __('Invalid booking request.'), 'url' => $redirecturl]);
         }
+
+        $result = app(\App\Services\BookingService::class)->book($business, $service, $request->all());
+
+        return response()->json($result);
     }
 
     public function appointmentStatusChange($id)

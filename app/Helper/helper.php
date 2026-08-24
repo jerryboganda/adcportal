@@ -1046,7 +1046,7 @@ if (!function_exists('currency_format_with_sym')) {
             $company_settings = getCompanyAllSetting();
         }
         $symbol_position = 'pre';
-        $symbol = '₨'; // Default to PKR symbol
+        $symbol = 'â‚¨'; // Default to PKR symbol
         $format = '1';
         $currency_space = null;
         $number = explode('.', $price);
@@ -1177,161 +1177,15 @@ if (!function_exists('company_Time_formate')) {
     }
 }
 if (!function_exists('timeSlot')) {
-    function timeSlot($serviceId = null, $date = null, $flexibleData = null)
+    function timeSlot($serviceId = null, $date = null, $flexibleData = null, $service_data = null, $staffId = null)
     {
-        $service = Service::find($serviceId);
-        $company_settings = getCompanyAllSetting($service->created_by, $service->business_id);
-        $maximum_slot = isset($company_settings['maximum_slot']) ? $company_settings['maximum_slot'] : '1';
-
-        if ($date && !empty($service)) {
-            $booked_appointment = Appointment::where('service_id', $serviceId)->where('date', $date)->where('business_id', $service->business_id)->where('created_by', $service->created_by)->select('time')->get()->toArray();
-
-            $selectedDate = Carbon::createFromFormat('d-m-Y', $date);
-            $dayName = $selectedDate->format('l');                              //get dayname using date
-
-            $businessday = BusinessHours::where('created_by', $service->created_by)->where('business_id', $service->business_id)->where('day_name', $dayName)->first();
-
-            $duration = $service->duration;
-            $start_time = Carbon::createFromFormat('H:i:s', isset($businessday->start_time) ? $businessday->start_time : '09:30:00');
-            $end_time = Carbon::createFromFormat('H:i:s', isset($businessday->end_time) ? $businessday->end_time : '18:00:00');
-            $break_times = isset($businessday->break_hours) ? json_decode($businessday->break_hours, true) : '';
-
-            $timeSlots = [];
-            $currentSlot = clone $start_time;
-            // $now = Carbon::now($company_settings['defult_timezone'])->format('H:i');    //get current time
-            $now = Carbon::now($company_settings['defult_timezone']);
-            $isToday = $selectedDate->isToday();
-
-            // If the selected date is today, use current time as the cutoff
-            if ($isToday) {
-                $now = $now->format('H:i');
-            } else {
-                // If the date is tomorrow or later, ignore the current time and start from business start time
-                $now = $start_time->format('H:i');
-            }
-
-            if (is_array($break_times)) {
-                foreach ($break_times as $break) {
-                    $breakStart = Carbon::createFromFormat('H:i', $break['start']);
-                    $breakEnd = Carbon::createFromFormat('H:i', $break['end']);
-                    // Add time slots before the break, excluding booked slots
-                    while ($currentSlot->addMinutes((int) $duration)->lt($breakStart)) {
-                        $slot = [
-                            'start' => $currentSlot->copy()->subMinutes((int) $duration)->format('H:i'),
-                            'end' => $currentSlot->format('H:i'),
-                            'service_id' => $service->id
-                        ];
-                        // Skip slots before the current time
-                        if ($currentSlot->lt($now)) {
-                            continue;
-                        }
-
-                        $bookedCount = isSlotBooked($slot, $booked_appointment);
-                        if ($bookedCount < $maximum_slot) {
-                            $timeSlots[] = $slot;
-                        }
-                    }
-                    // Skip time slots during the break
-                    if ($currentSlot->lte($breakEnd)) {
-                        $currentSlot = $breakEnd->copy();
-                    }
-                }
-            }
-
-
-            // Add remaining time slots after the last break, excluding booked slots
-            while ($currentSlot->addMinutes((int) $duration)->lte($end_time)) {
-                $slot = [
-                    'start' => $currentSlot->copy()->subMinutes((int) $duration)->format('H:i'),
-                    'end' => $currentSlot->format('H:i'),
-                    'service_id' => $service->id
-                ];
-
-                // Skip slots before the current time
-                if ($currentSlot->lt($now)) {
-                    continue;
-                }
-
-                $bookedCount = isSlotBooked($slot, $booked_appointment);
-                if ($bookedCount < $maximum_slot) {
-                    $timeSlots[] = $slot;
-                }
-            }
-            // Special hours (FlexibleHours is a core feature in the single-clinic app)
-            if (!is_null($flexibleData)) {
-                $selectedDate = Carbon::createFromFormat('d-m-Y', $date);
-                $dayName = $selectedDate->format('D');
-
-                $filtered_flexible_data = $flexibleData->filter(function ($flexible_day) use ($dayName) {
-                    $flexible_data = json_decode($flexible_day->days, true);
-                    return isset($flexible_data[$dayName]) && $flexible_data[$dayName] === 'on';
-                });
-                foreach ($filtered_flexible_data as $data) {
-                    $startSpecial = Carbon::createFromFormat('H:i:s', $data->start_time);
-                    $endSpecial = Carbon::createFromFormat('H:i:s', $data->end_time);
-                    $timeSlots = removeSlotsBetweenSpecialHours($timeSlots, $startSpecial, $endSpecial, $data->id);
-                }
-            }
-
-            return $timeSlots;
+        // Refactored: delegates to the cached AvailabilityService (single indexed
+        // query + 60s slot cache). Signature kept for backward compatibility.
+        if (empty($serviceId) || empty($date)) {
+            return [];
         }
-    }
-}
 
-function removeSlotsBetweenSpecialHours($slots, $startSpecial, $endSpecial, $flexible_id)
-{
-    $newSlots = [];
-    $specialSlotAdded = false;
-
-    foreach ($slots as $slot) {
-        $start = strtotime($slot['start']);
-        $end = strtotime($slot['end']);
-        $startSpecialTime = strtotime($startSpecial);
-        $endSpecialTime = strtotime($endSpecial);
-
-        if ($end <= $startSpecialTime || $start >= $endSpecialTime) {
-            // Slot does not fall between special hours, keep it
-            $newSlots[] = $slot;
-        } else {
-            // Slot falls between special hours, remove it
-            if (!$specialSlotAdded) {
-                // Add new slot only once
-                $newSlots[] = ['start' => $startSpecial->format('H:i'), 'end' => $endSpecial->format('H:i'), 'flexible_id' => $flexible_id];
-                $specialSlotAdded = true;
-            }
-        }
-    }
-
-    return $newSlots;
-}
-
-if (!function_exists('isSlotBooked')) {
-    function isSlotBooked($slot, $bookedAppointments)
-    {
-        $currentStart = Carbon::createFromFormat('H:i', $slot['start']);
-        $currentEnd = Carbon::createFromFormat('H:i', $slot['end']);
-
-        $count = 0;
-
-        foreach ($bookedAppointments as $bookedSlot) {
-            // Extract start and end times from the booked slot string
-            [$bookedStartTime, $bookedEndTime] = explode('-', $bookedSlot['time']);
-
-            $bookedStart = Carbon::createFromFormat('H:i', $bookedStartTime);
-            $bookedEnd = Carbon::createFromFormat('H:i', $bookedEndTime);
-
-            // Check if the current slot overlaps with any booked slot
-            if (($currentStart->gte($bookedStart) && $currentStart->lt($bookedEnd)) ||
-                ($currentEnd->gt($bookedStart) && $currentEnd->lte($bookedEnd))
-            ) {
-                $count++;
-
-                // return true; // Slot is booked
-            }
-        }
-        return $count;
-        // return false; // Slot is not booked
-
+        return app(\App\Services\AvailabilityService::class)->slots((int) $serviceId, $date, $staffId ? (int) $staffId : null);
     }
 }
 

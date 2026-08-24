@@ -4,10 +4,21 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Appointment extends Model
 {
-    use HasFactory;
+    use HasFactory, SoftDeletes;
+
+    /** Clinic-scoped query scope: every tenant query should pass through here. */
+    public function scopeForClinic($query, $businessId = null, $creatorId = null)
+    {
+        return $query->where('business_id', $businessId ?? getActiveBusiness())
+            ->where('created_by', $creatorId ?? creatorId());
+    }
+
+    /** Eager-load map for list/dashboard rendering (kills N+1). */
+    public static $eager = ['CustomerData', 'StaffData.user', 'ServiceData', 'LocationData', 'StatusData'];
 
     protected $fillable = [
         'customer_id',
@@ -29,6 +40,23 @@ class Appointment extends Model
         'business_id',
         'created_by'
     ];
+
+    protected static function booted()
+    {
+        // Keep the indexed, sortable mirror of `date` in sync on every write.
+        static::saving(function (Appointment $appointment) {
+            if (! empty($appointment->date)) {
+                foreach (['d-m-Y', 'Y-m-d', 'd/m/Y'] as $fmt) {
+                    try {
+                        $appointment->date_sort = \Carbon\Carbon::createFromFormat($fmt, $appointment->date)->format('Y-m-d');
+                        break;
+                    } catch (Throwable $e) {
+                        continue;
+                    }
+                }
+            }
+        });
+    }
 
 
     public static function appointmentNumberFormat($number, $Id = null, $businessId = null)

@@ -196,9 +196,9 @@ class ApiController extends Controller
 
         if(!empty($request->service_id) && $request->service_id != '0')
         {
-            $appointmentData = Appointment::where('service_id',$request->service_id)->where('business_id', $active_business)->paginate(10);
+            $appointmentData = Appointment::forClinic($active_business)->with(Appointment::$eager)->where('service_id', $request->service_id)->paginate(10);
         }else{
-            $appointmentData = Appointment::where('business_id', $active_business)->paginate(10);
+            $appointmentData = Appointment::forClinic($active_business)->with(Appointment::$eager)->paginate(10);
         }
 
         if ($appointmentData->isNotEmpty()) {
@@ -468,11 +468,11 @@ class ApiController extends Controller
         $user = Auth::user();
         $active_business = $user->active_business;
 
-        $startDate = Carbon::createFromDate($request->year, $request->month, 1)->startOfMonth()->format('d-m-Y');
-        $endDate = Carbon::createFromDate($request->year, $request->month, 1)->endOfMonth()->format('d-m-Y');
-        $appointmentData = Appointment::whereRaw("STR_TO_DATE(date, '%d-%m-%Y') >= STR_TO_DATE(?, '%d-%m-%Y')", [$startDate])
-                    ->whereRaw("STR_TO_DATE(date, '%d-%m-%Y') <= STR_TO_DATE(?, '%d-%m-%Y')", [$endDate])
-                    ->where('business_id', $active_business)
+        $startDate = Carbon::createFromDate($request->year, $request->month, 1)->startOfMonth();
+        $endDate = Carbon::createFromDate($request->year, $request->month, 1)->endOfMonth();
+        $appointmentData = Appointment::forClinic($active_business)
+                    ->with(Appointment::$eager)
+                    ->whereBetween('date_sort', [$startDate->format('Y-m-d'), $endDate->format('Y-m-d')])
                     ->get();
 
 
