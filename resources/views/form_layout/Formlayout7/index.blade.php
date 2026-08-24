@@ -22,7 +22,7 @@
                         <div class="form-box">
                             <div class="steps">
                                 <ul>
-                                    <li class="stapes_status">
+                                    <li class="steps_status">
                                         <span>
                                             <svg xmlns="http://www.w3.org/2000/svg" width="30" height="30"
                                                 viewBox="0 0 30 30" fill="none">
@@ -40,15 +40,15 @@
                                             $additional = $company_settings['additional_services'] ?? 2;
                                         @endphp
                                         @if (isset($company_settings['additional_services']) && $company_settings['additional_services'] == 0)
-                                            <li class="stapes_status" id="additionalServicesStep" style="display: none;">
+                                            <li class="steps_status" id="additionalServicesStep" style="display: none;">
                                             </li>
                                         @elseif($additional == 2)
-                                            <li class="stapes_status" id="additionalServicesStep" style="display: none;">
+                                            <li class="steps_status" id="additionalServicesStep" style="display: none;">
                                             </li>
                                         @endif
                                     @endif
 
-                                    <li class="stapes_status">
+                                    <li class="steps_status">
                                         <span>
                                             <svg class="line-svg" xmlns="http://www.w3.org/2000/svg" width="30"
                                                 height="30" viewBox="0 0 30 30" fill="none">
@@ -68,14 +68,14 @@
                                     {{-- menu for Additional Services after time step --}}
                                     @if (false)
                                         @if (isset($company_settings['additional_services']) && $company_settings['additional_services'] == 1)
-                                            <li class="stapes_status" id="additionalServicesStep" style="display: none;">
+                                            <li class="steps_status" id="additionalServicesStep" style="display: none;">
                                             </li>
                                         @endif
                                     @endif
 
                                     @if (false ||
                                             false)
-                                        <li class="stapes_status">
+                                        <li class="steps_status">
                                             @if (false)
                                                 <span>
                                                     <svg xmlns="http://www.w3.org/2000/svg" width="23" height="23"
@@ -119,7 +119,7 @@
                                         </li>
                                     @endif
                                     @if ((!empty($files) && $files->value == 'on') || (!empty($custom_field) && $custom_field == 'on'))
-                                        <li class="stapes_status">
+                                        <li class="steps_status">
                                             <span>
                                                 <svg class="white-svg" width="100" height="100" viewBox="0 0 100 100"
                                                     fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -165,7 +165,7 @@
                                             {{ __('Additional Details') }}
                                         </li>
                                     @endif
-                                    <li class="stapes_status">
+                                    <li class="steps_status">
                                         <span>
                                             <svg class="line-svg" xmlns="http://www.w3.org/2000/svg" width="30"
                                                 height="30" viewBox="0 0 30 30" fill="none">
@@ -189,14 +189,14 @@
 
                                     {{-- menu for Online Meeting step --}}
                                     @if (false || false)
-                                        <li class="stapes_status" id="onlineAppointmentStep" style="display: none;">
+                                        <li class="steps_status" id="onlineAppointmentStep" style="display: none;">
                                         </li>
                                     @endif
                                     {{-- <span class="onlineAppointmentStep" id="onlineAppointmentStep"></span> --}}
                                     {{-- end --}}
 
 
-                                    <li class="stapes_status">
+                                    <li class="steps_status">
                                         <span>
                                             <svg class="line-svg" class="vuesax-linear-cards" width="40"
                                                 height="40" viewBox="0 0 40 40" fill="none"
@@ -222,7 +222,7 @@
                                         </span>
                                         {{ __('Payment') }}
                                     </li>
-                                    <li class="stapes_status">
+                                    <li class="steps_status">
                                         <span>
                                             <svg class="white-svg" width="100" height="100" viewBox="0 0 100 100"
                                                 fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -246,7 +246,7 @@
                             @csrf
                             <div class="myContainer">
                                 <div class="step-container active" id="step-first">
-                                    <div class="appointment-wrp Shoppint-Cart-btn">
+                                    <div class="appointment-wrp Shopping-Cart-btn">
                                         <div class="appointment-form">
                                             <div class="section-title">
                                                 <h3 class="h5">{{ __('Please Select Services:') }}</h3>
@@ -329,7 +329,7 @@
                                 @endif
 
                                 <div class="step-container">
-                                    <div class="appointment-wrp Shoppint-Cart-btn">
+                                    <div class="appointment-wrp Shopping-Cart-btn">
                                         <div class="appointment-form">
                                             <div class="section-title">
                                                 <h3 class="h6">{{ __('Appointment:') }}</h3>
@@ -500,21 +500,21 @@
                                                             <div class="form-group">
                                                                 <label>{{ __('Name') }}</label>
                                                                 <input type="text" class="form-control" name="name"
-                                                                    id="name" placeholder="Your Name">
+                                                                    id="new-user-name" placeholder="Your Name">
                                                             </div>
                                                         </div>
                                                         <div class="col-12">
                                                             <div class="form-group">
                                                                 <label>{{ __('Email') }}</label>
                                                                 <input type="email" class="form-control" name="email"
-                                                                    id="email" placeholder="Your Email">
+                                                                    id="new-user-email" placeholder="Your Email">
                                                             </div>
                                                         </div>
                                                         <div class="col-md-6 col-12">
                                                             <div class="form-group">
                                                                 <label>{{ __('Password') }}</label>
                                                                 <input type="password" class="form-control"
-                                                                    name="password" id="password"
+                                                                    name="password" id="new-user-password"
                                                                     placeholder="Your Password">
                                                             </div>
                                                         </div>
@@ -523,7 +523,7 @@
                                                                 <label>{{ __('Contact') }}</label>
                                                             <small class="text-muted">(+917878787878)</small>
                                                                 <input type="text" class="form-control" name="contact"
-                                                                    id="contact" placeholder="Phone Number">
+                                                                    id="new-user-contact" placeholder="Phone Number">
                                                             </div>
                                                         </div>
                                                     </div>
@@ -536,14 +536,14 @@
                                                             <div class="form-group">
                                                                 <label>{{ __('Email') }}</label>
                                                                 <input type="email" class="form-control" name="email"
-                                                                    id="email" placeholder="Your Email">
+                                                                    id="existing-user-email" placeholder="Your Email">
                                                             </div>
                                                         </div>
                                                         <div class="col-12">
                                                             <div class="form-group">
                                                                 <label>{{ __('Password') }}</label>
                                                                 <input type="password" class="form-control"
-                                                                    name="password" id="password"
+                                                                    name="password" id="existing-user-password"
                                                                     placeholder="Your Password">
                                                             </div>
                                                         </div>
@@ -556,14 +556,14 @@
                                                             <div class="form-group">
                                                                 <label>{{ __('Name') }}</label>
                                                                 <input type="text" class="form-control" name="name"
-                                                                    id="name" placeholder="Your Name">
+                                                                    id="guest-user-name" placeholder="Your Name">
                                                             </div>
                                                         </div>
                                                         <div class="col-12">
                                                             <div class="form-group">
                                                                 <label>{{ __('Email') }}</label>
                                                                 <input type="email" class="form-control" name="email"
-                                                                    id="email" placeholder="Your Email">
+                                                                    id="guest-user-email" placeholder="Your Email">
                                                             </div>
                                                         </div>
                                                         <div class="col-12">
@@ -571,7 +571,7 @@
                                                                 <label>{{ __('Contact') }}</label>
                                                             <small class="text-muted">(+917878787878)</small>
                                                                 <input type="text" class="form-control" name="contact"
-                                                                    id="contact" placeholder="Phone Number">
+                                                                    id="guest-user-contact" placeholder="Phone Number">
                                                             </div>
                                                         </div>
                                                     </div>

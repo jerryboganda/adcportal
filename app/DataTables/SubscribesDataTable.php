@@ -24,7 +24,7 @@ class SubscribesDataTable extends DataTable
         if (\Laratrust::hasPermission('subscriber delete')) {
             $rowColumn[] = 'action';
             $dataTable->addColumn('action', function (Subscribe $Subscribe) {
-                return view('Subscribe.action', compact('Subscribe'));
+                return view('subscribe.action', compact('Subscribe'));
             });
         }
         return $dataTable->rawColumns($rowColumn);

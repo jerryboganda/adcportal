@@ -1,0 +1,9 @@
+/* ADC Vite entry — Bootstrap 5.3 + Tokens + Utilities */
+@import 'bootstrap/dist/css/bootstrap.min.css';
+@import './tokens.css';
+
+/* Future: migrate public/assets/css/style.css, custome.css, module_assets/*.css here */
+/* @import '../../public/assets/css/style.css';  — deferred to Phase 2 to avoid flash */
+
+/* Minimal app overrides */
+body { font-family: var(--adc-font); background: var(--adc-bg); color: var(--adc-text); }

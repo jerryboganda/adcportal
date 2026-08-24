@@ -51,7 +51,7 @@
     <!-- vendor css -->
     <link rel="stylesheet" href="{{ asset('assets/css/customizer.css') }}">
     <!-- custom css -->
-    <link rel="stylesheet" href="{{ asset('css/custome.css') }}">
+    <link rel="stylesheet" href="{{ asset('css/custom.css') }}">
 
     @if ($rtl == 'on')
         <link rel="stylesheet" href="{{ asset('assets/css/style-rtl.css') }}">

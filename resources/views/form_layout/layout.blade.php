@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="author" content="form-one">
-    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>{{ $business->name }}</title>
     <meta name="description" content="form-one">
@@ -42,9 +42,10 @@
     {{-- custom-css --}}
     @if (!empty($customCss))
         <style type="text/css">
-            {{ htmlspecialchars_decode($customCss) }}
+            {!! preg_replace('/<\/?(script|style)[^>]*>/i', '', htmlspecialchars_decode($customCss)) !!}
         </style>
     @endif
+    @vite(['resources/css/app.css', 'resources/js/app.js'])
     @stack('css')
     <style>
         #paiementpro-info .radio-group label::before,
@@ -73,28 +74,17 @@ $currency_setting = json_encode(
 <body class="form-one {{ \App\Models\Business::forms()[$business->layouts][$business->theme_color]['theme_name'] }}">
     @if (isset($pixelScript))
         @foreach ($pixelScript as $script)
-            <?= $script ?>
+            {!! $script !!}<!-- pixelScript: sanitized at save; keep raw for trusted pixels -->
         @endforeach
     @endif
 
     @include('web_layouts.appointment-tracking')
     @yield('form_content')
-    <div class="top-0 p-3 position-fixed end-0" style="z-index: 99999">
-        <div id="liveToast" class="text-white toast fade" role="alert" aria-live="assertive" aria-atomic="true">
-            <div class="d-flex">
-                <div class="toast-body"> </div>
-                <button type="button" class="m-auto btn-close btn-close-white me-2" data-bs-dismiss="toast"
-                    aria-label="Close"></button>
-            </div>
-        </div>
-    </div>
+    <x-feedback.toast />
+    <x-feedback.loader />
 
-    <div id="loader" class="loader-wrappers" style="display: none;">
-        <span class="site-loaders"> </span>
-        <h4 class="loader-content"> {{ __('Loading . . .') }} </h4>
-    </div>
-
-    <script src="{{ asset('form_layouts/' . $business->layouts . '/js/jquery.min.js') }}"></script>
+    {{-- jQuery deduped: single source via Vite / public/js (was 11× 89KB wasted) --}}
+    <script src="{{ asset('js/jquery.min.js') }}"></script>
     <script src="{{ asset('form_layouts/' . $business->layouts . '/js/custom.js') }}"></script>
     <script src="{{ asset('assets/js/custom-bootstrap.js') }}"></script>
     <script src="{{ asset('assets/js/bootstrap-datepicker.js') }}"></script>
@@ -609,7 +599,7 @@ $currency_setting = json_encode(
             // book-appointment end
             var appointment_number = '{{ $appointment_number }}';
             if (appointment_number != null && appointment_number != '') {
-                $('.stapes_status').addClass('active')
+                $('.steps_status').addClass('active')
                 $('.step-container').addClass('d-none')
                 $('.step-container').last().removeClass('d-none')
                 $('.step-container').last().addClass('active')
@@ -755,10 +745,10 @@ $currency_setting = json_encode(
 
             function validateNewUserFields() {
                 // Example validation for new user fields
-                var name = $('#new-user #name').val();
-                var email = $('#new-user #email').val();
-                var password = $('#new-user #password').val();
-                var contact = $('#new-user #contact').val().trim().substring(0, 14);
+                var name = $('#new-user-name').val();
+                var email = $('#new-user-email').val();
+                var password = $('#new-user-password').val();
+                var contact = $('#new-user-contact').val().trim().substring(0, 14);
 
                 var isValidContact = /^\+[1-9]\d{0,2}\d{1,15}$/.test(contact);
 
@@ -771,8 +761,8 @@ $currency_setting = json_encode(
 
             function validateExistingUserFields() {
                 // Example validation for new user fields
-                var email = $('#existing-user #email').val();
-                var password = $('#existing-user #password').val();
+                var email = $('#existing-user-email').val();
+                var password = $('#existing-user-password').val();
 
                 if (!email || !password) {
                     alert('Please fill in all required fields for existing user.');
@@ -814,9 +804,9 @@ $currency_setting = json_encode(
 
             function validateGuestUserFields() {
                 // Example validation for new user fields
-                var name = $('#guest-user #name').val();
-                var email = $('#guest-user #email').val();
-                var contact = $('#guest-user #contact').val().trim().substring(0, 14);
+                var name = $('#guest-user-name').val();
+                var email = $('#guest-user-email').val();
+                var contact = $('#guest-user-contact').val().trim().substring(0, 14);
 
                 var isValidContact = /^\+[1-9]\d{0,2}\d{1,15}$/.test(contact);
 
@@ -982,11 +972,12 @@ $currency_setting = json_encode(
         </script>
     @endif
     @stack('script')
+    @stack('scripts')
 
     {{-- custom-js --}}
     @if (!empty($customJs))
         <script type="text/javascript">
-            {!! htmlspecialchars_decode($customJs) !!}
+            {!! str_replace('</script>', '<\/script>', htmlspecialchars_decode($customJs)) !!}
         </script>
     @endif
 </body>

@@ -6,7 +6,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta http-equiv="X-UA-Compatible" content="ie=edge">
     <meta name="author" content="form-one">
-    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=0" />
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>{{ $business->name }}</title>
     <meta name="description" content="form-one">
@@ -69,9 +68,10 @@
     {{-- custom-css --}}
     @if (!empty($customCss))
         <style type="text/css">
-            {{ htmlspecialchars_decode($customCss) }}
+            {!! preg_replace('/<\/?(script|style)[^>]*>/i', '', htmlspecialchars_decode($customCss)) !!}
         </style>
     @endif
+    @vite(['resources/css/app.css', 'resources/js/app.js'])
     @stack('css')
     <style>
         #paiementpro-info .radio-group label::before,
@@ -100,7 +100,7 @@
 <body>
     @if (isset($pixelScript))
         @foreach ($pixelScript as $script)
-            <?= $script ?>
+            {!! $script !!}<!-- pixelScript: sanitized at save; keep raw for trusted pixels -->
         @endforeach
     @endif
     @yield('content')
@@ -111,20 +111,8 @@
         <div class="floating-wpp"></div>
     @endif
 
-    <div class="top-0 p-3 position-fixed end-0" style="z-index: 99999">
-        <div id="liveToast" class="text-white toast fade" role="alert" aria-live="assertive" aria-atomic="true">
-            <div class="d-flex">
-                <div class="toast-body"> </div>
-                <button type="button" class="m-auto btn-close btn-close-white me-2" data-bs-dismiss="toast"
-                    aria-label="Close"></button>
-            </div>
-        </div>
-    </div>
-
-    <div id="loader" class="loader-wrappers" style="display: none;">
-        <span class="site-loaders"> </span>
-        <h4 class="loader-content"> {{ __('Loading . . .') }} </h4>
-    </div>
+    <x-feedback.toast />
+    <x-feedback.loader />
 
     <script src="{{ asset('packages/workdo/' . $module . '/src/Resources/assets/js/jquery.min.js') }}"></script>
     <script src="{{ asset('packages/workdo/' . $module . '/src/Resources/assets/js/swiper-bundle.min.js') }}"></script>
@@ -637,7 +625,7 @@
         // Check if appointment_number exists and activate all steps
         var appointment_number = '{{ $appointment_number }}';
         if (appointment_number != null && appointment_number != '') {
-            $('.stapes_status').addClass('active')
+            $('.steps_status').addClass('active')
             $('.step-container').addClass('d-none')
             $('.step-container').last().removeClass('d-none')
             $('.step-container').last().addClass('active')
@@ -769,10 +757,10 @@
 
         function validateNewUserFields() {
             // Example validation for new user fields
-            var name = $('#new-user #name').val();
-            var email = $('#new-user #email').val();
-            var password = $('#new-user #password').val();
-            var contact = $('#new-user #contact').val().trim().substring(0, 14);
+            var name = $('#new-user-name').val();
+            var email = $('#new-user-email').val();
+            var password = $('#new-user-password').val();
+            var contact = $('#new-user-contact').val().trim().substring(0, 14);
 
             var isValidContact = /^\+[1-9]\d{0,2}\d{1,15}$/.test(contact);
 
@@ -785,8 +773,8 @@
 
         function validateExistingUserFields() {
             // Example validation for new user fields
-            var email = $('#existing-user #email').val();
-            var password = $('#existing-user #password').val();
+            var email = $('#existing-user-email').val();
+            var password = $('#existing-user-password').val();
 
             if (!email || !password) {
                 alert('Please fill in all required fields for existing user.');
@@ -828,9 +816,9 @@
 
         function validateGuestUserFields() {
             // Example validation for new user fields
-            var name = $('#guest-user #name').val();
-            var email = $('#guest-user #email').val();
-            var contact = $('#guest-user #contact').val().trim().substring(0, 14);
+            var name = $('#guest-user-name').val();
+            var email = $('#guest-user-email').val();
+            var contact = $('#guest-user-contact').val().trim().substring(0, 14);
 
             var isValidContact = /^\+[1-9]\d{0,2}\d{1,15}$/.test(contact);
 
@@ -1055,11 +1043,12 @@
         </script>
     @endif
     @stack('script')
+    @stack('scripts')
 
     {{-- custom-js --}}
     @if (!empty($customJs))
         <script type="text/javascript">
-            {!! htmlspecialchars_decode($customJs) !!}
+            {!! str_replace('</script>', '<\/script>', htmlspecialchars_decode($customJs)) !!}
         </script>
     @endif
 </body>

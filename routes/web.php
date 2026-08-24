@@ -262,11 +262,14 @@ Route::middleware(['web'])->group(function () {
 // cookie consent page
 Route::get('cookie/consent', [CompanySettingsController::class, 'CookieConsent'])->name('cookie.consent');
 
-// cache
-Route::get('/config-cache', function () {
+// cache — secured: admin only, POST via CSRF
+Route::post('/config-cache', function () {
     Artisan::call('cache:clear');
     Artisan::call('route:clear');
     Artisan::call('view:clear');
     Artisan::call('optimize:clear');
     return redirect()->back()->with('success', 'Cache Clear Successfully');
-})->name('config.cache');
+})->middleware(['auth', 'verified'])->name('config.cache');
+Route::get('/config-cache', function () {
+    abort(403, 'Use POST /config-cache as admin.');
+})->middleware(['auth', 'verified'])->name('config.cache.get');

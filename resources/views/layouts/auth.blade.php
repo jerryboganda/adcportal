@@ -79,7 +79,7 @@
     </style>
     <link rel="stylesheet" href="{{ asset('css/custom-color.css') }}">
 
-    <link rel="stylesheet" href="{{ asset('css/custome.css') }}">
+    <link rel="stylesheet" href="{{ asset('css/custom.css') }}">
 
     @if ( $rtl == 'on')
         <link rel="stylesheet" href="{{ asset('assets/css/style-rtl.css') }}">
@@ -158,11 +158,13 @@
     @if((isset($admin_settings['enable_cookie']) ? $admin_settings['enable_cookie'] : 'off') == 'on')
         @include('layouts.cookie_consent')
     @endif
-@stack('custom-scripts')
+    @vite(['resources/css/app.css', 'resources/js/app.js'])
+    @stack('custom-scripts')
 <script src="{{ asset('js/jquery.js') }}"></script>
 <script src="{{ asset('js/custom.js') }}"></script>
 <script src="{{ asset('assets/js/plugins/bootstrap.js') }}"></script>
 @stack('script')
+@stack('scripts')
 @if((isset($admin_settings['cust_darklayout']) ? $admin_settings['cust_darklayout'] : 'off') == 'on')
 <script>
         "use strict";

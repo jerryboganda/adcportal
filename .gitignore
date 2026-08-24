@@ -45,11 +45,14 @@
  *.log
  *.pid
  
- # Misc
- Thumbs.db
- *.swp
- *.swo
- *.tmp
+# Misc
+Thumbs.db
+*.swp
+*.swo
+*.tmp
+*.bak
+*.backup
+*.corrupt
 /.idea
 /.vscode
 .env

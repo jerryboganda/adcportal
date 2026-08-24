@@ -14,8 +14,7 @@
 
 @endphp
 <!DOCTYPE html>
-<html lang="{{ str_replace('_', '-', app()->getLocale()) }}" dir="{{ isset($company_settings['site_rtl']) && $company_settings['site_rtl'] == 'on' ? 'rtl' : '' }}">
-<html lang="en">
+<html lang="{{ str_replace('_', '-', app()->getLocale()) }}" dir="{{ isset($company_settings['site_rtl']) && $company_settings['site_rtl'] == 'on' ? 'rtl' : 'ltr' }}">
 
 @include('partials.head')
 
@@ -73,3 +72,5 @@
     </section>
 
 @include('partials.footer')
+</body>
+</html>

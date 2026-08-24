@@ -21,7 +21,7 @@
                             <div class="form-right">
                                 <div class="steps">
                                     <ul>
-                                        <li class="stapes_status active">
+                                        <li class="steps_status active">
                                             <div class="steps-icon">
                                                 <span class="arrow">
                                                     <svg class="vector" width="24" height="17" viewBox="0 0 24 17"
@@ -50,17 +50,17 @@
                                                 $additional = $company_settings['additional_services'] ?? 2;
                                             @endphp
                                             @if (isset($company_settings['additional_services']) && $company_settings['additional_services'] == 0)
-                                                <li class="stapes_status" id="additionalServicesStep"
+                                                <li class="steps_status" id="additionalServicesStep"
                                                     style="display: none;">
                                                 </li>
                                             @elseif($additional == 2)
-                                                <li class="stapes_status" id="additionalServicesStep"
+                                                <li class="steps_status" id="additionalServicesStep"
                                                     style="display: none;">
                                                 </li>
                                             @endif
                                         @endif
 
-                                        <li class="stapes_status">
+                                        <li class="steps_status">
                                             <div class="steps-icon">
                                                 <span class="arrow">
                                                     <svg class="vector" width="24" height="17" viewBox="0 0 24 17"
@@ -86,7 +86,7 @@
                                         {{-- menu for Additional Services after time step --}}
                                         @if (false)
                                             @if (isset($company_settings['additional_services']) && $company_settings['additional_services'] == 1)
-                                                <li class="stapes_status" id="additionalServicesStep"
+                                                <li class="steps_status" id="additionalServicesStep"
                                                     style="display: none;">
                                                 </li>
                                             @endif
@@ -94,7 +94,7 @@
 
                                         @if (false ||
                                                 false)
-                                            <li class="stapes_status">
+                                            <li class="steps_status">
                                                 @if (false)
                                                     <div class="steps-icon">
                                                         <span class="arrow">
@@ -162,7 +162,7 @@
                                             </li>
                                         @endif
                                         @if ((!empty($files) && $files->value == 'on') || (!empty($custom_field) && $custom_field == 'on'))
-                                            <li class="stapes_status">
+                                            <li class="steps_status">
                                                 <div class="steps-icon">
                                                     <span class="arrow">
                                                         <svg class="vector" width="24" height="17"
@@ -187,7 +187,7 @@
                                             </li>
                                         @endif
 
-                                        <li class="stapes_status">
+                                        <li class="steps_status">
                                             <div class="steps-icon">
                                                 <span class="arrow">
                                                     <svg class="vector" width="24" height="17"
@@ -213,13 +213,13 @@
 
                                         {{-- menu for Online Meeting step --}}
                                         @if (false || false)
-                                            <li class="stapes_status" id="onlineAppointmentStep" style="display: none;">
+                                            <li class="steps_status" id="onlineAppointmentStep" style="display: none;">
                                             </li>
                                         @endif
                                         {{-- <span class="onlineAppointmentStep" id="onlineAppointmentStep"></span> --}}
                                         {{-- end --}}
 
-                                        <li class="stapes_status">
+                                        <li class="steps_status">
                                             <div class="steps-icon">
                                                 <span class="arrow">
                                                     <svg class="vector" width="24" height="17"
@@ -258,7 +258,7 @@
                                             </div>
                                             {{ __('Payment') }}
                                         </li>
-                                        <li class="stapes_status">
+                                        <li class="steps_status">
                                             <div class="steps-icon">
                                                 <span class="arrow">
                                                     <svg class="vector" width="24" height="17"
@@ -296,7 +296,7 @@
                                 @csrf
                                 <div class="myContainer">
                                     <div class="step-container active" id="step-first">
-                                        <div class="appointment-wrp Shoppint-Cart-btn">
+                                        <div class="appointment-wrp Shopping-Cart-btn">
                                             <div class="appointment-form">
                                                 <h3>{{ __('Please Select Services:') }}</h3>
                                                 <div class="row">
@@ -377,7 +377,7 @@
                                     @endif
 
                                     <div class="step-container">
-                                        <div class="appointment-wrp Shoppint-Cart-btn">
+                                        <div class="appointment-wrp Shopping-Cart-btn">
                                             <div class="appointment-form">
                                                 <h3>{{ __('Appointment:') }}</h3>
                                                 <div class="row">
@@ -549,28 +549,28 @@
                                                                 <div class="col-md-6 col-12">
                                                                     <div class="form-group">
                                                                         <input type="text" class="form-control"
-                                                                            name="name" id="name"
+                                                                            name="name" id="new-user-name"
                                                                             placeholder="Your Name">
                                                                     </div>
                                                                 </div>
                                                                 <div class="col-md-6 col-12">
                                                                     <div class="form-group">
                                                                         <input type="email" class="form-control"
-                                                                            name="email" id="email"
+                                                                            name="email" id="new-user-email"
                                                                             placeholder="Your Email">
                                                                     </div>
                                                                 </div>
                                                                 <div class="col-md-6 col-12">
                                                                     <div class="form-group">
                                                                         <input type="password" class="form-control"
-                                                                            name="password" id="password"
+                                                                            name="password" id="new-user-password"
                                                                             placeholder="Your Password">
                                                                     </div>
                                                                 </div>
                                                                 <div class="col-md-6 col-12">
                                                                     <div class="form-group">
                                                                         <input type="text" class="form-control"
-                                                                            name="contact" id="contact"
+                                                                            name="contact" id="new-user-contact"
                                                                             placeholder="Phone Number">
                                                                     </div>
                                                                 </div>
@@ -585,14 +585,14 @@
                                                                 <div class="col-md-6 col-12">
                                                                     <div class="form-group">
                                                                         <input type="email" class="form-control"
-                                                                            name="email" id="email"
+                                                                            name="email" id="existing-user-email"
                                                                             placeholder="Your Email">
                                                                     </div>
                                                                 </div>
                                                                 <div class="col-md-6 col-12">
                                                                     <div class="form-group">
                                                                         <input type="password" class="form-control"
-                                                                            name="password" id="password"
+                                                                            name="password" id="existing-user-password"
                                                                             placeholder="Your Password">
                                                                     </div>
                                                                 </div>
@@ -606,21 +606,21 @@
                                                                 <div class="col-md-6 col-12">
                                                                     <div class="form-group">
                                                                         <input type="text" class="form-control"
-                                                                            name="name" id="name"
+                                                                            name="name" id="guest-user-name"
                                                                             placeholder="Your Name">
                                                                     </div>
                                                                 </div>
                                                                 <div class="col-md-6 col-12">
                                                                     <div class="form-group">
                                                                         <input type="email" class="form-control"
-                                                                            name="email" id="email"
+                                                                            name="email" id="guest-user-email"
                                                                             placeholder="Your Email">
                                                                     </div>
                                                                 </div>
                                                                 <div class="col-md-6 col-12">
                                                                     <div class="form-group">
                                                                         <input type="text" class="form-control"
-                                                                            name="contact" id="contact"
+                                                                            name="contact" id="guest-user-contact"
                                                                             placeholder="Phone Number">
                                                                     </div>
                                                                 </div>

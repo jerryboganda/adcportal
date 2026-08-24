@@ -32,7 +32,7 @@
     <meta name="author" content="{{  env('APP_NAME')  }}">
 
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=0, minimal-ui" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta http-equiv="X-UA-Compatible" content="IE=edge" />
 
     <meta name="csrf-token" content="{{ csrf_token() }}">
@@ -69,7 +69,7 @@
     </style>
     <link rel="stylesheet" href="{{ asset('css/custom-color.css') }}">
 
-    <link rel="stylesheet" href="{{ asset('css/custome.css') }}">
+    <link rel="stylesheet" href="{{ asset('css/custom.css') }}">
 
     @if ((isset($company_settings['site_rtl']) ? $company_settings['site_rtl'] : 'off')== 'on')
         <link rel="stylesheet" href="{{ asset('assets/css/style-rtl.css') }}">
@@ -87,11 +87,12 @@
     {{-- custom-css --}}
     @if(isset($admin_settings['custom_css']))
         <style type="text/css">
-            {{ htmlspecialchars_decode($admin_settings['custom_css']) }}
+            {!! preg_replace('/<\/?(script|style)[^>]*>/i', '', htmlspecialchars_decode($admin_settings['custom_css'])) !!}
         </style>
     @endif
 
 
+    @vite(['resources/css/app.css', 'resources/js/app.js'])
     @stack('css')
     @stack('availabilitylink')
     <script src="{{ asset('js/jquery.min.js') }}"></script>
