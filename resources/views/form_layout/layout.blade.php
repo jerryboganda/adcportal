@@ -35,7 +35,7 @@
     @endif
     @if (false)
         <link rel="stylesheet"
-            href="{{ asset('packages/workdo/AdditionalCustomField/src/Resources/assets/custom.css') }}">
+            href="{{ asset('packages/adc/AdditionalCustomField/src/Resources/assets/custom.css') }}">
     @endif
     {{-- end pwa customer app --}}
 
@@ -101,7 +101,7 @@ $currency_setting = json_encode(
             if ("serviceWorker" in navigator) {
                 window.addEventListener("load", function() {
                     navigator.serviceWorker
-                        .register("{{ asset('packages/workdo/PWA/src/Resources/assets/js/serviceWorker.js') }}")
+                        .register("{{ asset('packages/adc/PWA/src/Resources/assets/js/serviceWorker.js') }}")
                         .then(res => console.log("service worker registered"))
                         .catch(err => console.log("service worker not registered", err))
 
@@ -980,6 +980,10 @@ $currency_setting = json_encode(
             {!! str_replace('</script>', '<\/script>', htmlspecialchars_decode($customJs)) !!}
         </script>
     @endif
+
+    <footer style="text-align:center; padding: 15px; font-size: 13px; color: #6b7280; background: #f9fafb; border-top: 1px solid #e5e7eb; margin-top: 30px;">
+        &copy; {{ date('Y') }} {{ $business->name ?? 'ADC - Amad Diagnostic Centre' }} | Powered By PolytronX - Business Digitalized
+    </footer>
 </body>
 
 </html>

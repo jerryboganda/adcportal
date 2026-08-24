@@ -31,17 +31,17 @@
 
 @push('css')
     @if (false)
-        <link rel="stylesheet" href="{{ asset('packages/workdo/PWA/src/Resources/assets/css/pwa.css') }}">
+        <link rel="stylesheet" href="{{ asset('packages/adc/PWA/src/Resources/assets/css/pwa.css') }}">
     @endif
     <link rel="stylesheet" href="{{ asset('assets/css/main.css') }}">
     @if (false)
-        <link rel="stylesheet" href="{{ asset('packages/workdo/FlexibleHours/src/Resources/assets/custom.css') }}">
+        <link rel="stylesheet" href="{{ asset('packages/adc/FlexibleHours/src/Resources/assets/custom.css') }}">
     @endif
     @if (false)
-        <link rel="stylesheet" href="{{ asset('packages/workdo/FlexibleDays/src/Resources/assets/custom.css') }}">
+        <link rel="stylesheet" href="{{ asset('packages/adc/FlexibleDays/src/Resources/assets/custom.css') }}">
     @endif
     @if (false)
-        <link rel="stylesheet" href="{{ asset('packages/workdo/AdditionalCustomField/src/Resources/assets/custom.css') }}">
+        <link rel="stylesheet" href="{{ asset('packages/adc/AdditionalCustomField/src/Resources/assets/custom.css') }}">
     @endif
 
 

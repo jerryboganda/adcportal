@@ -10,7 +10,7 @@
     <title>{{ $business->name }}</title>
     <meta name="description" content="form-one">
     <meta name="keywords" content="form-one">
-    <link rel="icon" href="{{ asset('packages/workdo/' . $module . '/favicon.png') }}">
+    <link rel="icon" href="{{ asset('packages/adc/' . $module . '/favicon.png') }}">
     @stack('font-link')
     <link
         href="https://fonts.googleapis.com/css2?family=Kaisei+Tokumin&family=Mulish:ital,wght@0,200..1000;1,200..1000&display=swap"
@@ -19,11 +19,11 @@
     {{-- WhatsAppMessenger --}}
     @if (false)
         <link rel="stylesheet"
-            href=" {{ asset('packages/workdo/WhatsAppMessenger/src/Resources/assets/css/floating-wpp.min.css') }}">
+            href=" {{ asset('packages/adc/WhatsAppMessenger/src/Resources/assets/css/floating-wpp.min.css') }}">
     @endif
     @if (false)
         <link rel="stylesheet"
-            href="{{ asset('packages/workdo/AdditionalCustomField/src/Resources/assets/custom.css') }}">
+            href="{{ asset('packages/adc/AdditionalCustomField/src/Resources/assets/custom.css') }}">
     @endif
     @php
         $rtl = Cookie::get('THEME_RTL');
@@ -31,18 +31,18 @@
 
     <link rel="stylesheet" href="{{ asset('assets/fonts/fontawesome.css') }}">
     <link rel="stylesheet"
-        href="{{ asset('packages/workdo/' . $module . '/src/Resources/assets/css/swiper-bundle.min.css') }}">
+        href="{{ asset('packages/adc/' . $module . '/src/Resources/assets/css/swiper-bundle.min.css') }}">
     @if (isset($rtl) && $rtl == '1')
         <link rel="stylesheet"
-            href="{{ asset('packages/workdo/' . $module . '/src/Resources/assets/css/rtl-main-style.css') }}">
+            href="{{ asset('packages/adc/' . $module . '/src/Resources/assets/css/rtl-main-style.css') }}">
         <link rel="stylesheet"
-            href="{{ asset('packages/workdo/' . $module . '/src/Resources/assets/css/rtl-responsive.css') }}">
+            href="{{ asset('packages/adc/' . $module . '/src/Resources/assets/css/rtl-responsive.css') }}">
         <link rel="stylesheet" href="{{ asset('module_assets/rtl-custom.css') }}">
     @else
         <link rel="stylesheet"
-            href="{{ asset('packages/workdo/' . $module . '/src/Resources/assets/css/main-style.css') }}">
+            href="{{ asset('packages/adc/' . $module . '/src/Resources/assets/css/main-style.css') }}">
         <link rel="stylesheet"
-            href="{{ asset('packages/workdo/' . $module . '/src/Resources/assets/css/responsive.css') }}">
+            href="{{ asset('packages/adc/' . $module . '/src/Resources/assets/css/responsive.css') }}">
         <link rel="stylesheet" href="{{ asset('module_assets/ltr-custom.css') }}">
     @endif
     @stack('page-style')
@@ -114,14 +114,14 @@
     <x-feedback.toast />
     <x-feedback.loader />
 
-    <script src="{{ asset('packages/workdo/' . $module . '/src/Resources/assets/js/jquery.min.js') }}"></script>
-    <script src="{{ asset('packages/workdo/' . $module . '/src/Resources/assets/js/swiper-bundle.min.js') }}"></script>
+    <script src="{{ asset('packages/adc/' . $module . '/src/Resources/assets/js/jquery.min.js') }}"></script>
+    <script src="{{ asset('packages/adc/' . $module . '/src/Resources/assets/js/swiper-bundle.min.js') }}"></script>
     <script src="{{ asset('assets/js/custom-bootstrap.js') }}"></script>
     <script src="{{ asset('assets/js/bootstrap-datepicker.js') }}"></script>
     @if (isset($rtl) && $rtl == '1')
-        <script src="{{ asset('packages/workdo/' . $module . '/src/Resources/assets/js/rtl-custom.js') }}"></script>
+        <script src="{{ asset('packages/adc/' . $module . '/src/Resources/assets/js/rtl-custom.js') }}"></script>
     @else
-        <script src="{{ asset('packages/workdo/' . $module . '/src/Resources/assets/js/custom.js') }}"></script>
+        <script src="{{ asset('packages/adc/' . $module . '/src/Resources/assets/js/custom.js') }}"></script>
     @endif
     <script src="{{ asset('assets/js/plugins/bootstrap.min.js') }}"></script>
     <script src="{{ asset('module_assets/loader.js') }}"></script>
@@ -147,7 +147,7 @@
     {{-- WhatsAppMessenger --}}
     @if (false &&
             isset($company_settings['whatsappmessenger_number']))
-        <script src="{{ asset('packages/workdo/WhatsAppMessenger/src/Resources/assets/js/floating-wpp.min.js') }}"></script>
+        <script src="{{ asset('packages/adc/WhatsAppMessenger/src/Resources/assets/js/floating-wpp.min.js') }}"></script>
         <script type="text/javascript">
             $(function() {
                 $('.floating-wpp').floatingWhatsApp({
@@ -1003,12 +1003,12 @@
     <div class="vertical-btns">
         @if (false)
             {!! $company_settings['TawktoMessenger'] ?? '' !!}
-            <script src="{{ asset('packages/workdo/TawktoMessenger/src/Resources/assets/js/tawkto.js') }}"></script>
+            <script src="{{ asset('packages/adc/TawktoMessenger/src/Resources/assets/js/tawkto.js') }}"></script>
         @endif
 
         @if (false)
             {!! $company_settings['wizzchat'] ?? '' !!}
-            <script src="{{ asset('packages/workdo/WizzChat/src/Resources/assets/js/wizzchat.js') }}"></script>
+            <script src="{{ asset('packages/adc/WizzChat/src/Resources/assets/js/wizzchat.js') }}"></script>
         @endif
 
         @if (false)
@@ -1051,6 +1051,10 @@
             {!! str_replace('</script>', '<\/script>', htmlspecialchars_decode($customJs)) !!}
         </script>
     @endif
+
+    <footer style="text-align:center; padding: 15px; font-size: 13px; color: #6b7280; background: #f9fafb; border-top: 1px solid #e5e7eb; margin-top: 30px;">
+        &copy; {{ date('Y') }} {{ $business->name ?? 'ADC - Amad Diagnostic Centre' }} | Powered By PolytronX - Business Digitalized
+    </footer>
 </body>
 
 </html>

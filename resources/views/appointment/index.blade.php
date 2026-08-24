@@ -226,7 +226,7 @@
 @endpush
 @if (false)
     @push('css')
-        <link rel="stylesheet" href="{{ asset('packages/workdo/OutlookCalendar/src/Resources/assets/custom.css') }}">
+        <link rel="stylesheet" href="{{ asset('packages/adc/OutlookCalendar/src/Resources/assets/custom.css') }}">
     @endpush
 @endif
 @section('content')

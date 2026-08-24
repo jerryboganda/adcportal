@@ -21,7 +21,8 @@
 {{-- Footer --}}
 <x-slot:footer>
 <x-mail::footer>
-© {{ date('Y') }} {{ config('app.name') }}. {{ __('All rights reserved.') }}
+© {{ date('Y') }} {{ config('app.name', 'ADC - Amad Diagnostic Centre') }}. {{ __('All rights reserved.') }}<br>
+<span style="font-size: 12px; color: #6b7280;">Powered By PolytronX - Business Digitalized</span>
 </x-mail::footer>
 </x-slot:footer>
 </x-mail::layout>

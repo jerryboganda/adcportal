@@ -129,7 +129,16 @@
             @yield('content')
             <div class="auth-footer">
                 <div class="container-fluid">
-                    <p class="">@if (isset($company_settings['footer_text'])) {{$company_settings['footer_text']}} @elseif (isset($admin_settings['footer_text'])) {{ $admin_settings['footer_text'] }} @else{{__('Copyright')}} &copy; {{ config('app.name', 'AMAD Diagnostic Centre') }}@endif{{date('Y')}}</p>
+                    @php
+                        $loginFooter = $company_settings['footer_text'] ?? $admin_settings['footer_text'] ?? null;
+                    @endphp
+                    <p class="">
+                        @if (!empty($loginFooter))
+                            {{ $loginFooter }} {{ date('Y') }}@if (!str_contains($loginFooter, 'PolytronX')) <span class="mx-1">|</span> Powered By PolytronX - Business Digitalized @endif
+                        @else
+                            {{ __('Copyright') }} &copy; {{ config('app.name', 'ADC - Amad Diagnostic Centre') }} {{ date('Y') }} <span class="mx-1">|</span> Powered By PolytronX - Business Digitalized
+                        @endif
+                    </p>
                 </div>
             </div>
         </div>

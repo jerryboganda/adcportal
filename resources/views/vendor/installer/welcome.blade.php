@@ -5,7 +5,7 @@
 @endsection
 
 @section('title')
-    {{ __('BookingGo SaaS') }}
+    {{ __('ADC - Amad Diagnostic Centre') }}
 @endsection
 
 @section('container')

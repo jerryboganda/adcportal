@@ -33,3 +33,4 @@ uploads/*
 
 # Keep only essential files
 !packages/workdo/**/composer.json
+!packages/adc/**/composer.json

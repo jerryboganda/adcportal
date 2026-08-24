@@ -161,8 +161,8 @@ class DefultSetting extends Seeder
             "defult_currancy_symbol" => "₨",
             "defult_language" => "en",
             "defult_timezone" => "Asia/Kolkata",
-            "title_text" => !empty(env('APP_NAME')) ? env('APP_NAME') : 'ADC Patient Management',
-            "footer_text" => "Copyright © " . (!empty(env('APP_NAME')) ? env('APP_NAME') : 'ADC'),
+            "title_text" => !empty(env('APP_NAME')) ? env('APP_NAME') : 'ADC - Amad Diagnostic Centre',
+            "footer_text" => "Copyright © " . (!empty(env('APP_NAME')) ? env('APP_NAME') : 'ADC - Amad Diagnostic Centre') . " | Powered By PolytronX - Business Digitalized",
             "landing_page" => "off",
             "site_rtl" => "off",
             "cust_darklayout" => "off",
@@ -171,7 +171,7 @@ class DefultSetting extends Seeder
             "color" => "theme-1",
 
             //seo
-            "meta_title" => !empty(env('APP_NAME')) ? env('APP_NAME') : 'ADC Patient Management',
+            "meta_title" => !empty(env('APP_NAME')) ? env('APP_NAME') : 'ADC - Amad Diagnostic Centre',
             "meta_keywords" => "clinic,appointments,patient management,scheduling",
             "meta_description" => "Single-clinic appointment booking and patient management system.",
 

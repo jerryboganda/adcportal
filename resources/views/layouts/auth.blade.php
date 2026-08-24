@@ -23,7 +23,7 @@
 
 <head>
 
-    <title>@yield('page-title') | {{ !empty($admin_settings['title_text']) ? $admin_settings['title_text'] : config('app.name', 'WorkDo') }}</title>
+    <title>@yield('page-title') | {{ !empty($admin_settings['title_text']) ? $admin_settings['title_text'] : config('app.name', 'ADC - Amad Diagnostic Centre') }}</title>
 
     <meta name="title" content="{{ !empty($admin_settings['meta_title']) ? $admin_settings['meta_title'] : 'AMAD Diagnostic Centre' }}">
     <meta name="keywords" content="{{ !empty($admin_settings['meta_keywords']) ? $admin_settings['meta_keywords'] : 'Multi Business Appointment Booking and Scheduling' }}">
@@ -117,7 +117,7 @@
                     <div class="container">
                         <div class="navbar-brand">
                             <a class="navbar-brand" href="{{ url('/') }}">
-                                <img src="{{ get_file(sidebar_logo()) }}{{'?'.time()}}" alt="{{ config('app.name', 'WorkDo') }}" class="navbar-brand-img auth-navbar-brand">
+                                <img src="{{ get_file(sidebar_logo()) }}{{'?'.time()}}" alt="{{ config('app.name', 'ADC - Amad Diagnostic Centre') }}" class="navbar-brand-img auth-navbar-brand">
                             </a>
                         </div>
                         <button class="navbar-toggler" type="button" data-bs-toggle="collapse"
@@ -146,7 +146,12 @@
                         <div class="row">
                             <div class="col-12">
                                 <span>
-                                    @if (!empty($admin_settings['footer_text'])) {{$admin_settings['footer_text']}} @else{{__('Copyright')}} &copy; {{ config('app.name', 'WorkDo') }}@endif{{date('Y')}}
+                                    @php $authFooter = $admin_settings['footer_text'] ?? null; @endphp
+                                    @if (!empty($authFooter))
+                                        {{ $authFooter }} {{ date('Y') }}@if (!str_contains($authFooter, 'PolytronX')) <span class="mx-1">|</span> Powered By PolytronX - Business Digitalized @endif
+                                    @else
+                                        {{ __('Copyright') }} &copy; {{ config('app.name', 'ADC - Amad Diagnostic Centre') }} {{ date('Y') }} <span class="mx-1">|</span> Powered By PolytronX - Business Digitalized
+                                    @endif
                                 </span>
                             </div>
                         </div>

@@ -18,7 +18,7 @@ if ($business->form_type == 'form-layout') {
 } else {
     echo "Using module package view\n";
     echo "Module: {$business->layouts}\n";
-    $modulePath = "packages/workdo/{$business->layouts}/src/Resources/views/form_layout/index.blade.php";
+    $modulePath = "packages/adc/{$business->layouts}/src/Resources/views/form_layout/index.blade.php";
     echo "File location: {$modulePath}\n";
     
     if (file_exists(base_path($modulePath))) {

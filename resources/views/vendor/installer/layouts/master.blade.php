@@ -125,5 +125,8 @@
         };
     </script>
 @endif
+<footer style="text-align:center; padding: 12px; font-size: 12px; color: #6b7280; margin-top: 20px;">
+    &copy; {{ date('Y') }} ADC - Amad Diagnostic Centre | Powered By PolytronX - Business Digitalized
+</footer>
 </body>
 </html>

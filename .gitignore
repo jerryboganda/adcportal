@@ -66,4 +66,5 @@ Thumbs.db
 /bootstrap/cache/*
 /uploads/*
 !packages/workdo/**/composer.json
+!packages/adc/**/composer.json
 .qodo

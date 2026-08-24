@@ -969,7 +969,7 @@
 @endsection
 
 @push('script')
-<script src="{{ asset('packages/workdo/LandingPage/src/Resources/assets/js/jquery.qrcode.js') }}"></script>
+<script src="{{ asset('packages/adc/LandingPage/src/Resources/assets/js/jquery.qrcode.js') }}"></script>
 <script>
     // Formlayout11 specific JavaScript
     (function() {

@@ -86,7 +86,7 @@
 
                 onChange: function(cookie, changed_preferences) {},
                 onAccept: function(cookie) {
-                    if (!getCookie('bookinggo_cookie_status'))
+                    if (!getCookie('adc_cookie_status'))
                     {
                         var cookie = cookie.level;
                         $.ajax({
@@ -96,7 +96,7 @@
                                 cookie: cookie,
                             },
                         })
-                        setCookie('bookinggo_cookie_status', '1', 182, '/');
+                        setCookie('adc_cookie_status', '1', 182, '/');
                     }
                 },
 

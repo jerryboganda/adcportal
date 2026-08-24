@@ -2,14 +2,14 @@
     <div class="footer-wrapper">
         <div class="py-1">
             <span class="text-muted">
-                @if (isset($company_settings['footer_text']))
-                    {{ $company_settings['footer_text'] }}
-                @elseif(isset($admin_settings['footer_text']))
-                    {{ $admin_settings['footer_text'] }}
+                @php
+                    $footerContent = $company_settings['footer_text'] ?? $admin_settings['footer_text'] ?? null;
+                @endphp
+                @if (!empty($footerContent))
+                    {{ $footerContent }} {{ date('Y') }}@if (!str_contains($footerContent, 'PolytronX')) <span class="mx-1">|</span> Powered By PolytronX - Business Digitalized @endif
                 @else
-                    {{ __('Copyright') }} &copy; {{ config('app.name', 'AMAD Diagnostic Centre') }}
+                    {{ __('Copyright') }} &copy; {{ config('app.name', 'ADC - Amad Diagnostic Centre') }} {{ date('Y') }} <span class="mx-1">|</span> Powered By PolytronX - Business Digitalized
                 @endif
-                {{ date('Y') }}
             </span>
         </div>
     </div>
