@@ -16,10 +16,9 @@ use Illuminate\Support\Facades\Cache;
 use Laravel\Sanctum\HasApiTokens;
 use Laratrust\Contracts\LaratrustUser;
 use Laratrust\Traits\HasRolesAndPermissions;
-use PHPOpenSourceSaver\JWTAuth\Contracts\JWTSubject;
 
 
-class User extends Authenticatable implements LaratrustUser,MustVerifyEmail,JWTSubject
+class User extends Authenticatable implements LaratrustUser,MustVerifyEmail
 {
     use HasApiTokens, HasFactory, Notifiable, HasRolesAndPermissions;
 
@@ -28,15 +27,6 @@ class User extends Authenticatable implements LaratrustUser,MustVerifyEmail,JWTS
      *
      * @var array<int, string>
      */
-
-    public function getJWTIdentifier()
-    {
-        return $this->getKey();
-    }
-    public function getJWTCustomClaims()
-    {
-        return [];
-    }
 
     protected $fillable = [
         'name',
