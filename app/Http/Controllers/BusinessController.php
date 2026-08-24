@@ -65,10 +65,12 @@ class BusinessController extends Controller
     /**
      * Show the form for editing the specified resource.
      */
-    public function edit($id)
+    public function edit($id = null)
     {
+        $id = $id ?? getActiveBusiness();
+
         if (Auth::user()->isAbleTo('business edit')) {
-            $business = Business::find($id);
+            $business = Business::find($id) ?? Business::first();
             return view('business.edit', compact('business'));
         } else {
             return response()->json(['error' => __('Permission denied.')], 401);
@@ -78,10 +80,12 @@ class BusinessController extends Controller
     /**
      * Update the specified resource in storage.
      */
-    public function update(Request $request, $id)
+    public function update(Request $request, $id = null)
     {
+        $id = $id ?? getActiveBusiness();
+
         if (Auth::user()->isAbleTo('business edit')) {
-            $business = Business::find($id);
+            $business = Business::find($id) ?? Business::first();
 
             $validator = \Validator::make(
                 $request->all(),
@@ -165,10 +169,17 @@ class BusinessController extends Controller
         return redirect()->route('appointment.dashboard');
     }
 
-    public function businessManage($id)
+    public function businessManage($id = null)
     {
+        $id = $id ?? getActiveBusiness();
+
         if (Auth::user()->isAbleTo('business update')) {
-            $business = Business::find($id);
+            $business = Business::find($id) ?? Business::first();
+
+            if (!$business) {
+                return redirect()->route('dashboard')->with('error', __('No clinic record found.'));
+            }
+
             $company_settings = getCompanyAllSetting($business->created_by, $id);
             $business_url = route('appointments.form', $business->slug);
 

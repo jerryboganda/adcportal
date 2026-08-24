@@ -206,9 +206,15 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::resource('business-holiday', BusinessHolidayController::class);
 
     // clinic (formerly "business") settings — single clinic record
-    Route::get('clinic/edit', [BusinessController::class, 'edit'])->name('business.edit');
-    Route::match(['put', 'patch'], 'clinic/update', [BusinessController::class, 'update'])->name('business.update');
-    Route::get('clinic/manage', [BusinessController::class, 'businessManage'])->name('business.manage');
+    // Keep legacy route names working while the UI runs in single-clinic mode.
+    Route::get('business', [BusinessController::class, 'index'])->name('business.index');
+    Route::get('business/create', [BusinessController::class, 'create'])->name('business.create');
+    Route::post('business', [BusinessController::class, 'store'])->name('business.store');
+    Route::get('business/{id}', [BusinessController::class, 'show'])->name('business.show');
+    Route::get('clinic/edit/{id?}', [BusinessController::class, 'edit'])->name('business.edit');
+    Route::match(['put', 'patch'], 'clinic/update/{id?}', [BusinessController::class, 'update'])->name('business.update');
+    Route::get('clinic/manage/{id?}', [BusinessController::class, 'businessManage'])->name('business.manage');
+    Route::delete('business/{id}', [BusinessController::class, 'destroy'])->name('business.destroy');
     Route::post('business/theme/update', [BusinessController::class, 'BusinessThemeUpdate'])->name('business.theme.update');
     Route::post('business/check', [BusinessController::class, 'businessCheck'])->name('business.check');
     Route::post('business/domain-setting/{id}', [BusinessController::class, 'domainsetting'])->name('business.domain-setting');

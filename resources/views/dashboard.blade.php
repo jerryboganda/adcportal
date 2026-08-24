@@ -107,7 +107,8 @@
                                         <i class="fas fa-briefcase text-danger"></i>
 
                                     </div>
-                                    <a href="{{ route('business.index') }}">
+                                    {{-- Single-clinic app: business list removed; link to clinic settings. --}}
+                                    <a href="{{ route('business.manage', getActiveBusiness()) }}">
                                         <h3 class="mt-3 mb-0 text-danger">{{ __('Total Business') }}</h3>
                                     </a>
                                 </div>

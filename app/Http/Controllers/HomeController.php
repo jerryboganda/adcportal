@@ -102,7 +102,7 @@ class HomeController extends Controller
                 $appointment_number = '';
             }
 
-            return view('form_layout.' . $business->layouts . '.index', compact('slug', 'business', 'services', 'locations', 'staffs', 'customCss', 'customJs', 'combinedArray', 'files', 'custom_field', 'custom_fields', 'businesholiday', 'pixelScript', 'appointment_number', 'company_settings', 'bookingModes'));
+            return view('form_layout.' . $business->layouts . '.index', compact('slug', 'business', 'services', 'locations', 'staffs', 'categories', 'customCss', 'customJs', 'combinedArray', 'files', 'custom_field', 'custom_fields', 'businesholiday', 'pixelScript', 'appointment_number', 'company_settings', 'bookingModes'));
         }
     }
 
