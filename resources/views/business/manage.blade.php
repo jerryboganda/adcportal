@@ -120,7 +120,18 @@
         <div class="col-sm-12">
             <div class="row">
                 <div class="col-lg-12">
-                    
+                    <div class="tab-content" id="pills-tabContent">
+                        <div class="tab-pane fade @if (!session('tab') or session('tab') and session('tab') == 12) active show @endif"
+                            id="theme-setting" role="tabpanel" aria-labelledby="pills-user-tab-12">
+                            {{ Form::open(['route' => ['business.theme.update', 'business_id' => $business->id], 'enctype' => 'multipart/form-data']) }}
+                            @csrf
+                            <div class="card business-card">
+                                <div class="business-card-body">
+                                    <div class="mb-4">
+                                        <h4 class="mb-3">Theme — Form Layout 11 (Default & Locked)</h4>
+                                        <p class="text-muted">Clinic is locked to Form Layout 11. No theme selection needed.</p>
+                                        <input type="hidden" name="form_type" value="form-layout">
+                                    </div>
                                     <div class="row row-gaps business-card-wrp">
                                         <input type="hidden" name="layouts" value="Formlayout11" id="themefile1">
                                         <input type="hidden" name="theme_color" value="color1-Formlayout11">
