@@ -53,48 +53,8 @@
     <div class="pt-3 page-header">
         <div class="page-block">
             <div class="row mt-md-4 row-gaps align-items-center bookinggo-dash-row manage-business-sec">
-                <div class="col-xl-2 col-md-3 bookinggo-row-inner">
-                    <div class="dropdown dash-h-item drp-language">
-                        <a class="dash-head-link dropdown-toggle arrow-none m-0 cust-btn" data-bs-toggle="dropdown"
-                            href="#" role="button" aria-haspopup="false" aria-expanded="false"
-                            data-bs-placement="top" data-bs-original-title="Select your bussiness">
-                            <i class="ti ti-apps"></i>
-                            <span class="hide-mob">{{ $business->name }}</span>
-                            <i class="ti ti-chevron-down drp-arrow"></i>
-                        </a>
-                        <div class="dropdown-menu dash-h-dropdown dropdown-menu-end" style="max-height: 190px;overflow: hidden; overflow-y: auto;">
-                            @foreach (getBusiness() as $businesses)
-                                @if ($businesses->id == $business->id)
-                                    <div class="d-flex justify-content-between bd-highlight">
-                                        <a href=" # " class="dropdown-item ">
-                                            <i class="ti ti-checks text-primary"></i>
-                                            <span class="text-primary">{{ $businesses->name }}</span>
-                                        </a>
-                                    </div>
-                                @else
-                                    @php
-                                        $route =
-                                            $businesses->is_disable == 1
-                                                ? route('business.manage', $businesses->id)
-                                                : '#';
-                                    @endphp
-                                    <div class="d-flex justify-content-between bd-highlight">
-
-                                        <a href="{{ $route }}" class="dropdown-item">
-                                            <span>{{ $businesses->name }}</span>
-                                        </a>
-                                        @if ($businesses->is_disable == 0)
-                                            <div class="mt-2 action-btn">
-                                                <i class="ti ti-lock"></i>
-                                            </div>
-                                        @endif
-                                    </div>
-                                @endif
-                            @endforeach
-                        </div>
-                    </div>
-                </div>
-                <div class="col-xl-10 col-md-9">
+                {{-- Business switcher removed — single-clinic English-only --}}
+                <div class="col-12">
                     <ul class="nav nav-pills nav-fill information-tab" id="pills-tab" role="tablist">
                         <li class="nav-item" role="presentation">
                             <button class="nav-link @if (!session('tab') or session('tab') and session('tab') == 12) active @endif" id="theme-setting-tab"

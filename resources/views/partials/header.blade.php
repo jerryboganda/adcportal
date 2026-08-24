@@ -53,50 +53,7 @@
         </div>
         <div class="ms-auto">
             <ul class="list-unstyled gap-2">
-                {{-- Single-clinic app: impersonation exit, Create Business button and
-                     business-switcher dropdown removed. --}}
-                @permission('business manage')
-                <li class="dash-h-item">
-                    <a href="{{ route('business.manage', getActiveBusiness()) }}"
-                       class="dash-head-link dropdown-toggle arrow-none m-0 cust-btn"
-                       data-bs-placement="bottom" data-bs-original-title="Clinic Settings">
-                        <i class="ti ti-apps"></i>
-                        <span class="hide-mob">{{ Auth::check() ? Auth::user()->ActiveBusinessName() : '' }}</span>
-                    </a>
-                </li>
-                @endpermission
-
-                <li class="dropdown dash-h-item drp-language">
-                    <a class="dash-head-link dropdown-toggle arrow-none me-0" data-bs-toggle="dropdown" href="#"
-                        role="button" aria-haspopup="false" aria-expanded="false">
-                        <i class="ti ti-world"></i>
-                        <span class="drp-text hide-mob">{{ Str::upper(getActiveLanguage()) }}</span>
-                        <i class="ti ti-chevron-down drp-arrow"></i>
-                    </a>
-                    <div class="dropdown-menu dash-h-dropdown dropdown-menu-end">
-
-                        @foreach (languages() as $key => $language)
-                            <a href="{{ route('lang.change', $key) }}"
-                                class="dropdown-item @if ($key == getActiveLanguage()) text-danger @endif">
-                                <span>{{ Str::ucfirst($language) }}</span>
-                            </a>
-                        @endforeach
-                        {{-- Single-clinic app: language management always available. --}}
-                        @permission('language create')
-                            <a href="#" data-url="{{ route('create.language') }}"
-                                class="dropdown-item border-top pt-3 text-primary" data-ajax-popup="true"
-                                data-title="{{ __('Create New Language') }}">
-                                <span>{{ __('Create Language') }}</span>
-                            </a>
-                        @endpermission
-                        @permission('language manage')
-                            <a href="{{ route('lang.index', [Auth::user()->lang]) }}"
-                                class="dropdown-item  pt-3 text-primary">
-                                <span>{{ __('Manage Languages') }}</span>
-                            </a>
-                        @endpermission
-                    </div>
-                </li>
+                {{-- Buttons removed: Clinic Settings (WorkDo) and Language (EN) — single-clinic English-only --}}
             </ul>
         </div>
     </div>

@@ -102,9 +102,6 @@
                         @endphp
                         <img src="{{ $logo }}{{'?'.time()}}" alt="{{ config('app.name', 'AMAD Diagnostic Centre') }}" class="navbar-brand-img auth-navbar-brand">
                     </a>
-                    <div class="lang-dropdown-only-mobile ">
-                        @yield('language-bar')
-                    </div>
                     <button class="navbar-toggler collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#navbarTogglerDemo01" aria-controls="navbarTogglerDemo01" aria-expanded="false" aria-label="Toggle navigation">
                         <span class="navbar-toggler-icon"></span>
                     </button>
@@ -119,9 +116,6 @@
                             <li class="nav-item">
                                 <a class="nav-link" href="#">{{ __('Privacy')}}</a>
                             </li>
-                            <div class="lang-dropdown-only-desk">
-                                @yield('language-bar')
-                            </div>
                         </ul>
                     </div>
                 </div>

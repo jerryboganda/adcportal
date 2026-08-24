@@ -126,8 +126,7 @@
                         </button>
                         <div class="collapse navbar-collapse" id="navbarlogin">
                             <ul class="navbar-nav align-items-center ms-auto mb-2 mb-lg-0">
-                            @stack('authcustombutton')
-                                @yield('language-bar')
+                                {{-- WorkDo and Language buttons removed — English only --}}
                             </ul>
                         </div>
                     </div>

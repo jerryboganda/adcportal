@@ -2,24 +2,7 @@
 @section('page-title')
     {{ __('Verify Email') }}
 @endsection
-@section('language-bar')
-    <div class="lang-dropdown-only-desk">
-        <li class="dropdown dash-h-item drp-language">
-            <a class="dash-head-link dropdown-toggle btn" href="#" data-bs-toggle="dropdown" aria-expanded="false">
-                <span class="drp-text"> {{ Str::upper($lang) }}
-                </span>
-            </a>
-            <div class="dropdown-menu dash-h-dropdown dropdown-menu-end">
-                @foreach (languages() as $key => $language)
-                    <a href="{{ route('verification.notice', $key) }}"
-                        class="dropdown-item @if ($lang == $key) text-primary @endif">
-                        <span>{{ Str::ucfirst($language) }}</span>
-                    </a>
-                @endforeach
-            </div>
-        </li>
-    </div>
-@endsection
+{{-- Language selector removed — English only --}}
 @section('content')
     <div class="card">
         <div class="card-body">
