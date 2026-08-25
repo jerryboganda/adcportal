@@ -43,7 +43,9 @@ COPY . /var/www
 # Set permissions
 RUN chown -R www-data:www-data /var/www \
     && chmod -R 755 /var/www/storage \
-    && chmod -R 755 /var/www/bootstrap/cache
+    && chmod -R 755 /var/www/bootstrap/cache \
+    && mkdir -p storage/framework/cache/data storage/framework/sessions storage/framework/testing storage/framework/views storage/logs bootstrap/cache \
+    && chown -R www-data:www-data storage bootstrap/cache
 
 # Create supervisor config for Laravel scheduler
 RUN echo '[program:laravel-scheduler]\nprocess_name=%(program_name)s_%(process_num)02d\ncommand=/bin/bash -c "while [ true ]; do (php /var/www/artisan schedule:run --verbose --no-interaction &); sleep 60; done"\nautostart=true\nautorestart=true\nuser=www-data\nnumprocs=1\nredirect_stderr=true\nstdout_logfile=/var/www/storage/logs/scheduler.log' > /etc/supervisor/conf.d/laravel-scheduler.conf
