@@ -35,10 +35,10 @@ services:
         restart: unless-stopped
         command: --default-authentication-plugin=mysql_native_password
         environment:
-            MYSQL_DATABASE: adc_portal
-            MYSQL_USER: adc_user
-            MYSQL_PASSWORD: adc_strong_password_change_me
-            MYSQL_ROOT_PASSWORD: adc_root_password_change_me
+            MYSQL_DATABASE: ${DB_DATABASE:-adc_portal}
+            MYSQL_USER: ${DB_USERNAME:-adc_user}
+            MYSQL_PASSWORD: ${DB_PASSWORD}
+            MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
         volumes:
             - /opt/adc-portal-data/mysql:/var/lib/mysql
         networks:
