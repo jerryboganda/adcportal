@@ -68,3 +68,7 @@ Thumbs.db
 !packages/workdo/**/composer.json
 !packages/adc/**/composer.json
 .qodo
+
+# Local dev runtime logs (never commit)
+/serve.err
+/serve.log

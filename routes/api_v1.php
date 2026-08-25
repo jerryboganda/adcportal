@@ -7,8 +7,7 @@ use Illuminate\Support\Facades\Route;
 |--------------------------------------------------------------------------
 | API v1  (/api/v1)
 |--------------------------------------------------------------------------
-| Versioned, resource-based contract. Legacy /api/* endpoints keep working
-| as shims and send a Sunset header (see DeprecateLegacyApi).
+| Versioned, resource-based contract for mobile/third-party clients.
 */
 
 Route::get('/health', function () {

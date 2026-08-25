@@ -10,6 +10,7 @@
     "require": {
         "php": "^8.1",
         "aws/aws-sdk-php": "^3.322",
+        "barryvdh/laravel-dompdf": "^3.1",
         "guzzlehttp/guzzle": "^7.9",
         "konekt/html": "^6.5",
         "laravel/breeze": "^2.1",

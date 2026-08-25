@@ -41,10 +41,10 @@ class V1Controller extends Controller
         }
 
         $user = Auth::user();
-        if ($user->type !== 'company') {
+        if (! in_array($user->type, ['admin', 'manager', 'staff'], true)) {
             Auth::logout();
 
-            return response()->json(['error' => ['code' => 'forbidden', 'message' => __('Only the clinic admin can use this API')]], 403);
+            return response()->json(['error' => ['code' => 'forbidden', 'message' => __('Only clinic staff can use this API')]], 403);
         }
 
         $user->tokens()->delete();

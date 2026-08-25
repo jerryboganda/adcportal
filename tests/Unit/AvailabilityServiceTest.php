@@ -23,6 +23,10 @@ class AvailabilityServiceTest extends TestCase
     {
         parent::setUp();
 
+        // Freeze the clock inside the seeded business window so slot math
+        // is deterministic regardless of when the suite runs.
+        \Carbon\Carbon::setTestNow(now()->startOfDay()->setTime(8, 0));
+
         $admin = User::create([
             'name' => 'Admin',
             'email' => 'admin@test.local',
@@ -72,6 +76,12 @@ class AvailabilityServiceTest extends TestCase
         ]);
 
         \Cache::flush();
+    }
+
+    protected function tearDown(): void
+    {
+        \Carbon\Carbon::setTestNow();
+        parent::tearDown();
     }
 
     public function test_generates_slots_based_on_business_hours_and_duration(): void

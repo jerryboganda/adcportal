@@ -23,5 +23,6 @@ class DatabaseSeeder extends Seeder
         $this->call(UserSeeder::class);
         $this->call(DefultSetting::class);
         $this->call(LanguageTableSeeder::class);
+        $this->call(RadiologySetupSeeder::class);
     }
 }

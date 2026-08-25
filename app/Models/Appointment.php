@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\StudyState;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
@@ -18,7 +19,7 @@ class Appointment extends Model
     }
 
     /** Eager-load map for list/dashboard rendering (kills N+1). */
-    public static $eager = ['CustomerData', 'StaffData.user', 'ServiceData', 'LocationData', 'StatusData'];
+    public static $eager = ['CustomerData.customer', 'StaffData.user', 'ServiceData', 'LocationData', 'StatusData'];
 
     protected $fillable = [
         'customer_id',
@@ -38,7 +39,32 @@ class Appointment extends Model
         'attachment',
         'custom_field',
         'business_id',
-        'created_by'
+        'created_by',
+        // Radiology study lifecycle
+        'workflow_state',
+        'priority',
+        'assigned_radiologist_id',
+        'performed_by_staff_id',
+        'screening_required',
+        'screening_cleared',
+        'cancel_reason',
+        'checked_in_at',
+        'preparing_at',
+        'in_progress_at',
+        'acquired_at',
+        'reported_at',
+        'delivered_at',
+    ];
+
+    protected $casts = [
+        'screening_required' => 'boolean',
+        'screening_cleared' => 'boolean',
+        'checked_in_at' => 'datetime',
+        'preparing_at' => 'datetime',
+        'in_progress_at' => 'datetime',
+        'acquired_at' => 'datetime',
+        'reported_at' => 'datetime',
+        'delivered_at' => 'datetime',
     ];
 
     protected static function booted()
@@ -54,6 +80,10 @@ class Appointment extends Model
                         continue;
                     }
                 }
+            }
+
+            if (empty($appointment->workflow_state)) {
+                $appointment->workflow_state = StudyState::Booked->value;
             }
         });
     }
@@ -132,6 +162,91 @@ class Appointment extends Model
     public function reports()
     {
         return $this->hasMany(AppointmentReport::class, 'appointment_id', 'id');
+    }
+
+    // ==================== Radiology study relations ====================
+
+    public function state(): StudyState
+    {
+        return StudyState::fromAppointment($this);
+    }
+
+    /** Display name for worklists (registered patients + walk-in guests). */
+    public function patientDisplayName(): string
+    {
+        return $this->CustomerData?->name
+            ?? $this->CustomerData?->customer?->name
+            ?? $this->name
+            ?? __('Guest');
+    }
+
+    public function patientContact(): ?string
+    {
+        return $this->CustomerData?->customer?->mobile_no
+            ?? $this->contact;
+    }
+
+    public function procedures()
+    {
+        return $this->hasMany(AppointmentProcedure::class);
+    }
+
+    public function assignedRadiologist()
+    {
+        return $this->belongsTo(User::class, 'assigned_radiologist_id');
+    }
+
+    public function performedBy()
+    {
+        return $this->belongsTo(Staff::class, 'performed_by_staff_id', 'user_id');
+    }
+
+    public function screeningAnswers()
+    {
+        return $this->hasMany(StudyScreeningAnswer::class);
+    }
+
+    public function doseLog()
+    {
+        return $this->hasOne(DoseLog::class);
+    }
+
+    /** Structured radiology report versions (newest first). */
+    public function radiologyReports()
+    {
+        return $this->hasMany(RadiologyReport::class)->orderByDesc('version');
+    }
+
+    public function latestReport()
+    {
+        return $this->hasOne(RadiologyReport::class)->orderByDesc('version')->limit(1);
+    }
+
+    public function hasUnresolvedScreeningRisk(): bool
+    {
+        if (! $this->screening_required) {
+            return false;
+        }
+
+        return ! $this->screening_cleared
+            || $this->screeningAnswers()
+                ->where('is_risk', true)
+                ->whereNull('override_reason')
+                ->exists();
+    }
+
+    /** Total TAT so far from acquisition (or check-in) to now/report. */
+    public function turnaroundHours(): ?float
+    {
+        $from = $this->acquired_at ?? $this->checked_in_at;
+
+        if (! $from) {
+            return null;
+        }
+
+        $to = $this->reported_at ?? now();
+
+        return round($from->diffInHours($to), 1);
     }
 
     public static function ColorCode()

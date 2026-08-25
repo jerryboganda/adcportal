@@ -25,7 +25,7 @@ class ApiV1Test extends TestCase
             'name' => 'Admin',
             'email' => 'admin@test.local',
             'password' => bcrypt('secret123'),
-            'type' => 'company',
+            'type' => 'admin',
             'lang' => 'en',
         ]);
 
@@ -35,7 +35,7 @@ class ApiV1Test extends TestCase
         ])->assertOk()->assertJsonStructure(['data' => ['token', 'token_type', 'user' => ['id', 'email']]]);
     }
 
-    public function test_login_rejects_non_company_users(): void
+    public function test_login_rejects_non_staff_users(): void
     {
         User::create([
             'name' => 'Customer',
@@ -67,9 +67,10 @@ class ApiV1Test extends TestCase
         $this->getJson('/api/v1/dashboard')->assertStatus(401);
     }
 
-    public function test_legacy_api_sends_deprecation_headers(): void
+    public function test_legacy_api_is_retired(): void
     {
+        // Legacy /api/* was removed during the radiology overhaul.
         $this->postJson('/api/login', ['email' => 'x@y.z', 'password' => 'x'])
-            ->assertHeader('Deprecation', 'true');
+            ->assertNotFound();
     }
 }

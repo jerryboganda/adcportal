@@ -38,8 +38,9 @@ class UserSeeder extends Seeder
             $business->name = 'ADC Clinic';
             $business->slug = 'adc-clinic';
             $business->form_type = 'form-layout';
-            $business->layouts = 'Formlayout1';
-            $business->theme_color = 'color1-Formlayout1';
+            // Formlayout11 is the fully-featured radiology booking wizard.
+            $business->layouts = 'Formlayout11';
+            $business->theme_color = 'color1-Formlayout11';
             $business->created_by = $admin->id;
             $business->is_disable = 1;
             $business->save();

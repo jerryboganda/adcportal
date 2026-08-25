@@ -57,15 +57,25 @@ class Business extends Model
 
         public static function forms()
     {
-        return [
-            'Formlayout11' => [
-                'color1-Formlayout11' => [
-                    'img_path' => get_file('form_layouts/Formlayout11/images/form.png'),
-                    'color' => '#4F46E5',
-                    'theme_name' => 'Formlayout11-v1'
+        // Register every public booking layout with its theme variant so
+        // forms()[layouts][theme_color] always resolves. Formlayout11 is the
+        // fully-featured layout; the rest share the standard wizard shell.
+        $forms = [];
+        foreach ([
+            'Formlayout1', 'Formlayout2', 'Formlayout3', 'Formlayout4', 'Formlayout5',
+            'Formlayout6', 'Formlayout7', 'Formlayout8', 'Formlayout9', 'Formlayout10',
+            'Formlayout11',
+        ] as $layout) {
+            $forms[$layout] = [
+                "color1-{$layout}" => [
+                    'img_path' => get_file("form_layouts/{$layout}/images/form.png"),
+                    'color' => $layout === 'Formlayout11' ? '#4F46E5' : '#0F4C81',
+                    'theme_name' => "{$layout}-v1",
                 ],
-            ],
-        ];
+            ];
+        }
+
+        return $forms;
     }
 
 

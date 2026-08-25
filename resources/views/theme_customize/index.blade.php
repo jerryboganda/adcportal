@@ -58,48 +58,8 @@
                 </div>
             </div>
         </div>
-        <div class="card">
-            <div class="card-body">
-                <div class="row row-gap">
-                    <div class="col-xl-6 col-12 large-card blog-testi-card mb-0">
-                        <div class="card">
-                            <div class="card-icon text-white bg-primary">
-                                <i class="ti ti-vocabulary"></i>
-                        </div>
-                                <div class="card-body p-3">
-                                <h4 class="mb-2">{{ __('Blog Section') }}</h4>
-                                <p class="mb-2">{{ __('Blog section settings such as, banner, product display, content and so on.') }}</p>
-                                @permission('blog manage')
-                                    <div>
-                                        <a href="{{ route('blog.manage',[$id,  $businessID]) }}"
-                                            class="card-btn text-primary d-flex align-items-center gap-2">{{ __('Change Setting') }} <i class="fas fa-chevron-right"></i></a>
-                                    </div>
-                                @endpermission
-                            </div>
-                        </div>
-                    </div>
-                    <div class="col-xl-6 col-12 large-card blog-testi-card mb-0">
-                        <div class="card">
-                                <div class="card-icon text-white bg-primary">
-                                        <i class="ti ti-stars"></i>
-                                </div>
-                                <div class="card-body p-3">
-                                <h4 class="mb-2">{{ __('Testimonial Section') }}</h4>
-                                <p class="mb-2">{{ __('Testimonial section settings such as, banner, product display, content and so on.') }}</p>
-                                @permission('testimonial manage')
-                                    <div>
-                                        <a href="{{ route('testimonial.manage',[$id,$businessID]) }}"
-                                            class="card-btn text-primary d-flex align-items-center gap-2">{{ __('Change Setting') }} <i class="fas fa-chevron-right"></i></a>
-                                    </div>
-                                @endpermission
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
     </div>
- </div>
+</div>
 @endsection
 
 @push('scripts')

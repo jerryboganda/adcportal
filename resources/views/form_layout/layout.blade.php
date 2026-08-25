@@ -71,7 +71,7 @@ $currency_setting = json_encode(
     );
 @endphp
 
-<body class="form-one {{ \App\Models\Business::forms()[$business->layouts][$business->theme_color]['theme_name'] }}">
+<body class="form-one {{ data_get(\App\Models\Business::forms(), $business->layouts.'.'.$business->theme_color.'.theme_name', 'theme-default') }}">
     @if (isset($pixelScript))
         @foreach ($pixelScript as $script)
             {!! $script !!}<!-- pixelScript: sanitized at save; keep raw for trusted pixels -->
@@ -161,26 +161,79 @@ $currency_setting = json_encode(
             // Store service prices in a global object to avoid data attribute issues with niceSelect
             window.servicePrices = {};
 
+            // Radiology metadata per procedure (prep instructions, screening, modality)
+            window.serviceMeta = {};
+
+            function ensureServiceInfoPanel() {
+                var $panel = $('#radiology-service-info');
+                if ($panel.length === 0) {
+                    $panel = $('<div id="radiology-service-info" class="radiology-service-info" style="display:none;margin-top:14px;padding:12px 16px;border-radius:10px;background:#f0f7ff;border-left:4px solid #0080b6;font-size:14px;line-height:1.55;"></div>');
+                    $('#serviceSelect').closest('.form-group').after($panel);
+                }
+                return $panel;
+            }
+
+            function escapeHtml(text) {
+                return $('<div/>').text(text == null ? '' : String(text)).html();
+            }
+
+            function updateServiceInfoPanel(serviceId) {
+                var $panel = ensureServiceInfoPanel();
+                var meta = window.serviceMeta[serviceId];
+
+                if (!meta) { $panel.hide(); return; }
+
+                var html = '';
+
+                if (meta.modality_name) {
+                    html += '<div style="font-weight:700;color:#005b80;margin-bottom:6px;">' + escapeHtml(meta.modality_name) + '</div>';
+                }
+                if (meta.duration_minutes > 0) {
+                    html += '<div style="margin-bottom:6px;">&#9202; ' + escapeHtml(meta.duration_minutes) + ' min &nbsp;·&nbsp; &#9878; ' + escapeHtml(meta.price || '') + '</div>';
+                }
+                if (meta.preparation_instructions) {
+                    html += '<div style="margin-top:6px;"><strong style="color:#b45309;">&#9888; Preparation:</strong> ' + escapeHtml(meta.preparation_instructions) + '</div>';
+                }
+                if (meta.requires_screening) {
+                    html += '<div style="margin-top:8px;padding:10px 12px;border-radius:8px;background:#fff7ed;border:1px solid #fdba74;"><strong>&#128737; Safety screening required:</strong> a short questionnaire will be completed at the clinic before your scan. Please arrive 15 minutes early.</div>';
+                }
+                if (meta.contrast_type && meta.contrast_type !== 'none') {
+                    html += '<div style="margin-top:6px;"><strong>Contrast:</strong> this study may use ' + escapeHtml(meta.contrast_type.replace('_', ' ')) + ' contrast.</div>';
+                }
+
+                if (html === '') { $panel.hide(); } else { $panel.html(html).show(); }
+            }
+
             function updateServiceDropdown(services) {
                 var serviceSelect = $('#serviceSelect');
                 serviceSelect.empty().prop('disabled', false);
-                
+
                 serviceSelect.append('<option value="" disabled selected>{{ __("Select services") }}</option>');
-                
+
                 // Clear previous prices and populate with new services
                 window.servicePrices = {};
-                
+                window.serviceMeta = {};
+
                 $.each(services, function(index, service) {
+                    // Rich radiology-aware label: name + modality + duration + price
+                    var bits = [];
+                    if (service.modality_name) bits.push(service.modality_name);
+                    var mins = parseInt(service.duration_minutes || service.duration || 0, 10);
+                    if (mins > 0) bits.push(mins + ' min');
+                    if (service.price !== null && service.price !== '' && service.price !== undefined) bits.push(service.price);
+                    var label = service.name + (bits.length ? '  (' + bits.join(' · ') + ')' : '');
+
                     var option = $('<option></option>')
                         .attr('value', service.id)
                         .attr('data-price', service.price)
                         .attr('class', 'service')
-                        .text(service.name);
+                        .text(label);
                     serviceSelect.append(option);
-                    
+
                     // Store price in global object as backup
                     window.servicePrices[service.id] = service.price;
-                    
+                    window.serviceMeta[service.id] = service;
+
                     // Debug: Log first service to verify price attribute
                     if (index === 0) {
                         console.log('Layout: First service appended -', {
@@ -192,16 +245,16 @@ $currency_setting = json_encode(
                         });
                     }
                 });
-                
+
                 console.log('Layout: Total services added:', services.length);
                 console.log('Layout: servicePrices object:', window.servicePrices);
-                
+
                 serviceSelect.niceSelect('update');
-                
+
                 // Clear staff dropdown when services change (but don't disable - let the existing logic handle it)
                 $('#staffSelect').empty().append('<option value="" disabled selected>{{ __("Select staff") }}</option>');
                 $('#staffSelect').niceSelect('update');
-                
+
                 // Use timeout to ensure niceSelect is fully rendered before triggering change
                 setTimeout(function() {
                     console.log('Layout: Triggering service select change event');
@@ -215,6 +268,9 @@ $currency_setting = json_encode(
             $('#serviceSelect, #locationSelect').change(function() {
                 var serviceValue = $('#serviceSelect').val();
                 var locationValue = $('#locationSelect').val();
+
+                // Radiology: refresh the prep/screening info panel
+                updateServiceInfoPanel(serviceValue);
 
                 // Check if both service and location are selected
                 if (serviceValue && locationValue) {

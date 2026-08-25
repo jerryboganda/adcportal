@@ -13,11 +13,6 @@
 @section('page-action')
     <div class="d-flex col-auto gap-2">
         @stack('addButtonHook')
-        @if (false)
-            @permission('appointment export')
-            @include('import-export::export.button', ['module' => 'appointment'])
-            @endpermission
-        @endif
         @permission('appointment create')
         <a href="#" class="btn btn-sm btn-primary" data-ajax-popup="true" data-size="lg"
             data-title="{{ __('Create New Appointment') }}" data-url="{{ route('appointment.create') }}"

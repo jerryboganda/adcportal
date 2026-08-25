@@ -28,6 +28,29 @@ class Staff extends Model
         return $this->hasOne(User::class, 'id', 'user_id');
     }
 
+    // ==================== Radiology pivots ====================
+
+    public function locations()
+    {
+        return $this->belongsToMany(Location::class, 'staff_location', 'staff_id', 'location_id');
+    }
+
+    public function services()
+    {
+        return $this->belongsToMany(Service::class, 'staff_service', 'staff_id', 'service_id');
+    }
+
+    public function syncLocations(array $ids): void
+    {
+        $this->locations()->sync($ids);
+        $this->forceFill(['location_id' => implode(',', $ids)])->saveQuietly();
+    }
+
+    public function syncServices(array $ids): void
+    {
+        $this->services()->sync($ids);
+        $this->forceFill(['service_id' => implode(',', $ids)])->saveQuietly();
+    }
 
     // In Staff.php
     // public function location()

@@ -42,13 +42,43 @@
                 <div class="col-md-8">
                     <div class="card">
                         <div class="card-body">
-                            <div class="d-flex align-items-center gap-3 justify-content-center flex-column">
+                                <div class="d-flex align-items-center gap-3 justify-content-center flex-column">
                                 <div class="alert-success">
                                     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><path d="M438.6 105.4c12.5 12.5 12.5 32.8 0 45.3l-256 256c-12.5 12.5-32.8 12.5-45.3 0l-128-128c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0L160 338.7 393.4 105.4c12.5-12.5 32.8-12.5 45.3 0z"/></svg>
                                 </div>
-                                {{ __('Appointment booked successfully! Your appointment number is') }} {{ $appointment_number }}
+                                {{ __('Study booked successfully! Your study number is') }} {{ $appointment_number }}
+                            </div>
+
+                            @if(!empty($study_prep) || !empty($study_screening))
+                                <hr>
+                                <div class="radiology-instructions" style="text-align:left;">
+                                    @if(!empty($study_screening))
+                                        <div style="background:#fff7ed;border:1px solid #fdba74;border-radius:8px;padding:12px 16px;margin-bottom:10px;">
+                                            <strong>&#128737; {{ __('Safety screening required') }}</strong> —
+                                            {{ __('a short questionnaire will be completed at the clinic before your scan. Please arrive 15 minutes early.') }}
+                                        </div>
+                                    @endif
+                                    @if(!empty($study_prep))
+                                        <div style="background:#f0f7ff;border-left:4px solid #0080b6;border-radius:8px;padding:12px 16px;margin-bottom:10px;">
+                                            <strong>&#9888; {{ __('Preparation instructions') }}:</strong><br>{{ $study_prep }}
+                                        </div>
+                                    @endif
+                                    @if(!empty($study_contrast) && $study_contrast !== 'none')
+                                        <div style="font-size:.95em;color:#334155;">
+                                            <strong>{{ __('Contrast') }}:</strong> {{ __('this study may use :type contrast.', ['type' => str_replace('_', ' ', $study_contrast)]) }}
+                                        </div>
+                                    @endif
+                                    @if(!empty($study_tat))
+                                        <div style="font-size:.95em;color:#334155;margin-top:6px;">
+                                            &#9202; {{ __('Report usually ready within approximately :hours hours.', ['hours' => $study_tat]) }}
+                                        </div>
+                                    @endif
+                                </div>
+                            @endif
+
+                            <div class="text-center mt-3">
                                 <a href="{{ route('appointments.form') }}" class="btn btn-primary">{{ __('Return To Appointment') }}</a>
-                             </div>
+                            </div>
                         </div>  
                     </div>
                 </div>

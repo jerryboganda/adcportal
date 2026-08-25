@@ -27,11 +27,16 @@ use App\Http\Controllers\FileController;
 use App\Http\Controllers\CustomFieldController;
 use App\Http\Controllers\ThemeSettingController;
 use App\Http\Controllers\ContactUsController;
-use App\Http\Controllers\BlogController;
 use App\Http\Controllers\NotificationController;
-use App\Http\Controllers\TestimonialController;
-use App\Http\Controllers\SubscribeController;
 use App\Http\Controllers\ReferrerController;
+use App\Http\Controllers\ModalityController;
+use App\Http\Controllers\RoomController;
+use App\Http\Controllers\StudyWorkflowController;
+use App\Http\Controllers\ScreeningController;
+use App\Http\Controllers\RadiologyReportController;
+use App\Http\Controllers\ReportTemplateController;
+use App\Http\Controllers\InvoiceController;
+use App\Http\Controllers\PatientPortalController;
 
 /*
 |--------------------------------------------------------------------------
@@ -55,7 +60,6 @@ Route::post('check-user-data', [AppointmentController::class, 'checkUser'])->nam
 
 Route::resource('contacts', ContactUsController::class);
 Route::get('/contacts/{id}/description', [ContactUsController::class, 'description'])->name('contact.description');
-Route::resource('subscribes', SubscribeController::class);
 
 // for checking online appointment for theme
 Route::get('check-service-online-meeting', [ServiceController::class, 'checkServiceOnlineMeeting'])->name('check.service.online.meeting');
@@ -72,6 +76,10 @@ Route::get('/verify-email/{lang?}', [EmailVerificationPromptController::class, '
 Route::get('/', [HomeController::class, 'index'])->name('start');
 
 Route::middleware(['auth', 'verified'])->group(function () {
+
+    // Patient self-service portal
+    Route::get('my/studies', [PatientPortalController::class, 'index'])->name('portal.studies');
+    Route::get('my/studies/{appointment}/report', [PatientPortalController::class, 'downloadReport'])->name('portal.report.download');
 
     // Role & Permission
     Route::resource('roles', RoleController::class);
@@ -181,6 +189,52 @@ Route::middleware(['auth', 'verified'])->group(function () {
     // Print Token
     Route::get('appointment/{id}/print-token', [AppointmentController::class, 'printToken'])->name('appointment.print-token');
 
+    // ==================== Radiology workflow ====================
+
+    // Masters: modalities & rooms
+    Route::resource('modality', ModalityController::class)->only(['index', 'store', 'update', 'destroy']);
+    Route::resource('room', RoomController::class)->only(['index', 'store', 'update', 'destroy']);
+    Route::post('room-downtime', [RoomController::class, 'storeDowntime'])->name('room.downtime.store');
+    Route::delete('room-downtime/{downtime}', [RoomController::class, 'destroyDowntime'])->name('room.downtime.destroy');
+
+    // Reception check-in desk
+    Route::get('study/checkin', [StudyWorkflowController::class, 'checkinBoard'])->name('study.checkin');
+    Route::post('study/{appointment}/checkin', [StudyWorkflowController::class, 'checkIn'])->name('study.checkin.do');
+    Route::post('study/{appointment}/no-show', [StudyWorkflowController::class, 'markNoShow'])->name('study.no-show');
+    Route::post('study/{appointment}/transition', [StudyWorkflowController::class, 'transition'])->name('study.transition');
+
+    // Technologist worklist + live queue board
+    Route::get('study/technologist', [StudyWorkflowController::class, 'technologistBoard'])->name('study.technologist');
+    Route::get('display/queue-board', [StudyWorkflowController::class, 'queueBoard'])->name('study.queue-board')->withoutMiddleware(['auth', 'verified']);
+
+    // Safety screening
+    Route::get('study/{appointment}/screening', [ScreeningController::class, 'answer'])->name('screening.answer');
+    Route::post('study/{appointment}/screening', [ScreeningController::class, 'submitAnswers'])->name('screening.submit');
+    Route::resource('screening-forms', ScreeningController::class)->only(['index', 'store']);
+    Route::post('screening-forms/{form}/toggle', [ScreeningController::class, 'toggle'])->name('screening.forms.toggle');
+    Route::delete('screening-forms/{form}', [ScreeningController::class, 'destroy'])->name('screening.forms.destroy');
+
+    // Radiology reporting
+    Route::get('reports/worklist', [RadiologyReportController::class, 'worklist'])->name('reports.worklist');
+    Route::get('studies/{appointment}/report/create', [RadiologyReportController::class, 'create'])->name('reports.create');
+    Route::post('studies/{appointment}/report', [RadiologyReportController::class, 'store'])->name('reports.store');
+    Route::get('radiology-reports/{report}/edit', [RadiologyReportController::class, 'edit'])->name('reports.edit');
+    Route::put('radiology-reports/{report}', [RadiologyReportController::class, 'update'])->name('reports.update');
+    Route::post('radiology-reports/{report}/sign', [RadiologyReportController::class, 'sign'])->name('reports.sign');
+    Route::get('radiology-reports/{report}/pdf', [RadiologyReportController::class, 'downloadPdf'])->name('reports.pdf');
+    Route::post('radiology-reports/{report}/release', [RadiologyReportController::class, 'release'])->name('reports.release');
+    Route::resource('report-templates', ReportTemplateController::class)->only(['index', 'store', 'update', 'destroy']);
+
+    // Invoicing
+    Route::get('invoices', [InvoiceController::class, 'index'])->name('invoices.index');
+    Route::get('invoices/{invoice}', [InvoiceController::class, 'show'])->whereNumber('invoice')->name('invoices.show');
+    Route::get('studies/{appointment}/invoice/create', [InvoiceController::class, 'createForStudy'])->name('invoices.create-for-study');
+    Route::post('studies/{appointment}/invoice', [InvoiceController::class, 'store'])->name('invoices.store-from-study');
+    Route::post('invoices/{invoice}/payments', [InvoiceController::class, 'addPayment'])->name('invoices.payments.store');
+    Route::post('invoices/{invoice}/issue', [InvoiceController::class, 'issue'])->name('invoices.issue');
+    Route::post('invoices/{invoice}/void', [InvoiceController::class, 'void'])->name('invoices.void');
+    Route::get('invoices/{invoice}/pdf', [InvoiceController::class, 'downloadPdf'])->name('invoices.pdf');
+
     // Referring Doctors
     Route::resource('referrer', ReferrerController::class);
     Route::post('referrer/{referrer}/toggle-status', [ReferrerController::class, 'toggleStatus'])->name('referrer.toggle-status');
@@ -226,16 +280,6 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('themes/{id}/customize/{slug}/{sub_slug}/{business}', [ThemeSettingController::class, 'customize_theme'])->name('customize.edit');
     Route::post('themes/{business}/{id}/customize', [ThemeSettingController::class, 'customize_theme_update'])->name('customize.update');
     Route::post('file-get', [ThemeSettingController::class, 'imageFileGet'])->name('file.get');
-
-    // blog
-    Route::get('themes/{id}/manage-blog/{business}', [BlogController::class, 'blogManage'])->name('blog.manage');
-    Route::get('themes/{id}/blog/{business}', [BlogController::class, 'blogCreate'])->name('blog.create');
-    Route::resource('blogs', BlogController::class);
-
-    // testimonial
-    Route::get('themes/{id}/manage-testimonial/{business}', [TestimonialController::class, 'testimonialManage'])->name('testimonial.manage');
-    Route::get('themes/{id}/testimonial/{business}', [TestimonialController::class, 'testimonialCreate'])->name('testimonial.create');
-    Route::resource('testimonials', TestimonialController::class);
 
     // Email Templates
     Route::resource('email-templates', EmailTemplateController::class);

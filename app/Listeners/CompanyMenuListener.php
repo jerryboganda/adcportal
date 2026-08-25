@@ -7,12 +7,14 @@ use App\Events\CompanyMenuEvent;
 class CompanyMenuListener
 {
     /**
-     * Handle the event.
+     * Radiology clinic navigation.
      */
     public function handle(CompanyMenuEvent $event): void
     {
         $module = 'Base';
         $menu = $event->menu;
+
+        // ---------- Base ----------
         $menu->add([
             'title' => __('Dashboard'),
             'icon' => 'home',
@@ -27,7 +29,7 @@ class CompanyMenuListener
             'group' => 'base'
         ]);
         $menu->add([
-            'title' => __('Appointment Dashboard'),
+            'title' => __('Study Dashboard'),
             'icon' => '',
             'name' => 'appointment-dashboard',
             'parent' => 'dashboard',
@@ -92,7 +94,7 @@ class CompanyMenuListener
             'group' => 'base'
         ]);
         $menu->add([
-            'title' => __('Business'),
+            'title' => __('Clinic'),
             'icon' => 'credit-card',
             'name' => 'business',
             'parent' => null,
@@ -101,7 +103,7 @@ class CompanyMenuListener
             'depend_on' => [],
             'route' => '',
             'module' => $module,
-            'permission' => 'business manage',
+            'permission' => 'clinic manage',
             'group' => 'base'
         ]);
         $menu->add([
@@ -114,26 +116,54 @@ class CompanyMenuListener
             'depend_on' => [],
             'route' => 'business.manage',
             'module' => $module,
-            'permission' => 'business update',
+            'permission' => 'clinic edit',
             'group' => 'base'
         ]);
 
+        // ---------- Radiology workflow ----------
         $menu->add([
-            'title' => __('Customers'),
-            'icon' => 'user',
-            'name' => 'customers',
+            'title' => __('Check-in Desk'),
+            'icon' => 'login custom-icon appointments',
+            'name' => 'study-checkin',
             'parent' => null,
-            'order' => 150,
+            'order' => 120,
             'ignore_if' => [],
             'depend_on' => [],
-            'route' => 'customer.index',
+            'route' => 'study.checkin',
             'module' => $module,
-            'permission' => 'customer manage',
-            'group' => 'base'
+            'permission' => 'study checkin',
+            'group' => 'radiology workflow'
         ]);
-        // Single-clinic app: TeamBooking add-on removed; core appointments menu only.
         $menu->add([
-            'title' => __('Appointments'),
+            'title' => __('Technologist Worklist'),
+            'icon' => 'scan',
+            'name' => 'study-technologist',
+            'parent' => null,
+            'order' => 130,
+            'ignore_if' => [],
+            'depend_on' => [],
+            'route' => 'study.technologist',
+            'module' => $module,
+            'permission' => 'study acquire',
+            'group' => 'radiology workflow'
+        ]);
+        $menu->add([
+            'title' => __('Reading Worklist'),
+            'icon' => 'file-text',
+            'name' => 'reports-worklist',
+            'parent' => null,
+            'order' => 140,
+            'ignore_if' => [],
+            'depend_on' => [],
+            'route' => 'reports.worklist',
+            'module' => $module,
+            'permission' => 'report manage',
+            'group' => 'radiology workflow'
+        ]);
+
+        // ---------- Studies & patients ----------
+        $menu->add([
+            'title' => __('Studies'),
             'icon' => 'credit-card custom-icon appointments',
             'name' => 'appointments',
             'parent' => null,
@@ -143,47 +173,118 @@ class CompanyMenuListener
             'route' => 'appointment.index',
             'module' => $module,
             'permission' => 'appointment manage',
-            'group' => 'appointments'
+            'group' => 'studies'
         ]);
         $menu->add([
-            'title' => __('Appointment Calendar'),
+            'title' => __('Study Calendar'),
             'icon' => 'calendar custom-icon calender',
             'name' => 'appointment-calendar',
             'parent' => null,
-            'order' => 200,
+            'order' => 180,
             'ignore_if' => [],
             'depend_on' => [],
             'route' => 'appointment.calendar',
             'module' => $module,
             'permission' => 'appointment manage',
-            'group' => 'appointments'
+            'group' => 'studies'
         ]);
         $menu->add([
-            'title' => __('Custom Status'),
-            'icon' => 'tag',
-            'name' => 'custom-status',
+            'title' => __('Patients'),
+            'icon' => 'user',
+            'name' => 'customers',
             'parent' => null,
-            'order' => 210,
+            'order' => 150,
             'ignore_if' => [],
             'depend_on' => [],
-            'route' => 'custom-status.index',
+            'route' => 'customer.index',
             'module' => $module,
-            'permission' => 'status manage',
-            'group' => 'appointments'
+            'permission' => 'customer manage',
+            'group' => 'studies'
         ]);
         $menu->add([
             'title' => __('Referring Doctors'),
             'icon' => 'stethoscope',
             'name' => 'referrers',
             'parent' => null,
-            'order' => 215,
+            'order' => 190,
             'ignore_if' => [],
             'depend_on' => [],
             'route' => 'referrer.index',
             'module' => $module,
             'permission' => 'referrer manage',
-            'group' => 'appointments'
+            'group' => 'studies'
         ]);
+
+        // ---------- Billing ----------
+        $menu->add([
+            'title' => __('Invoices'),
+            'icon' => 'receipt',
+            'name' => 'invoices',
+            'parent' => null,
+            'order' => 220,
+            'ignore_if' => [],
+            'depend_on' => [],
+            'route' => 'invoices.index',
+            'module' => $module,
+            'permission' => 'invoice manage',
+            'group' => 'billing'
+        ]);
+
+        // ---------- Masters ----------
+        $menu->add([
+            'title' => __('Modalities & Rooms'),
+            'icon' => 'box',
+            'name' => 'modalities',
+            'parent' => null,
+            'order' => 300,
+            'ignore_if' => [],
+            'depend_on' => [],
+            'route' => 'modality.index',
+            'module' => $module,
+            'permission' => 'modality manage',
+            'group' => 'masters'
+        ]);
+        $menu->add([
+            'title' => __('Procedures'),
+            'icon' => 'list-details',
+            'name' => 'procedures',
+            'parent' => null,
+            'order' => 310,
+            'ignore_if' => [],
+            'depend_on' => [],
+            'route' => 'service.index',
+            'module' => $module,
+            'permission' => 'service create',
+            'group' => 'masters'
+        ]);
+        $menu->add([
+            'title' => __('Safety Screening'),
+            'icon' => 'shield-check',
+            'name' => 'screening-forms',
+            'parent' => null,
+            'order' => 320,
+            'ignore_if' => [],
+            'depend_on' => [],
+            'route' => 'screening-forms.index',
+            'module' => $module,
+            'permission' => 'report template manage',
+            'group' => 'masters'
+        ]);
+        $menu->add([
+            'title' => __('Report Templates'),
+            'icon' => 'template',
+            'name' => 'report-templates',
+            'parent' => null,
+            'order' => 330,
+            'ignore_if' => [],
+            'depend_on' => [],
+            'route' => 'report-templates.index',
+            'module' => $module,
+            'permission' => 'report template manage',
+            'group' => 'masters'
+        ]);
+
+        // ---------- Others ----------
         $menu->add([
             'title' => __('Contacts'),
             'icon' => 'phone',
@@ -195,20 +296,7 @@ class CompanyMenuListener
             'route' => 'contacts.index',
             'module' => $module,
             'permission' => 'contact manage',
-            'group' => 'contacts & reports'
-        ]);
-        $menu->add([
-            'title' => __('Subscribers'),
-            'icon' => 'mail',
-            'name' => 'subscribers',
-            'parent' => null,
-            'order' => 280,
-            'ignore_if' => [],
-            'depend_on' => [],
-            'route' => 'subscribes.index',
-            'module' => $module,
-            'permission' => 'subscriber manage',
-            'group' => 'contacts & reports'
+            'group' => 'others'
         ]);
         $menu->add([
             'title' => __('Settings'),
@@ -236,6 +324,5 @@ class CompanyMenuListener
             'permission' => 'setting manage',
             'group' => 'others'
         ]);
-        // Single-clinic app: subscription plan / order menu items removed.
     }
 }

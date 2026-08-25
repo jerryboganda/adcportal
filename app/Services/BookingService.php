@@ -139,7 +139,19 @@ class BookingService
         $appointment->custom_field = $this->encodeCustomFields($business, $data);
         $appointment->business_id = $business->id;
         $appointment->created_by = $business->created_by;
+        // Radiology study defaults
+        $appointment->workflow_state = \App\Enums\StudyState::Booked->value;
+        $appointment->screening_required = (bool) ($service->requires_screening ?? false);
         $appointment->save();
+
+        // Billable line item for invoice generation later.
+        \App\Models\AppointmentProcedure::create([
+            'appointment_id' => $appointment->id,
+            'service_id' => $service->id,
+            'description' => $service->name,
+            'quantity' => 1,
+            'unit_price' => (float) ($service->price ?? 0),
+        ]);
 
         return $appointment;
     }

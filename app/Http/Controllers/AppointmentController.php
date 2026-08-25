@@ -27,8 +27,6 @@ use App\Models\EmailTemplate;
 use App\Models\CustomStatus;
 use App\Models\Category;
 use App\Models\ThemeSetting;
-use App\Models\Testimonial;
-use App\Models\Blog;
 use App\Models\Referrer;
 use Exception;
 use Illuminate\Http\Request;
@@ -555,6 +553,13 @@ class AppointmentController extends Controller
 
             $appointment_number = Appointment::appointmentNumberFormat($appointment->id, $appointment->created_by, $appointment->business_id);
 
+            // Radiology prep/screening context for the confirmation page.
+            $service = $appointment->ServiceData;
+            $study_prep = $service->preparation_instructions ?? null;
+            $study_screening = ($service && ($service->requires_screening || $appointment->screening_required)) ? true : null;
+            $study_contrast = $service->contrast_type ?? 'none';
+            $study_tat = $service->tat_target_hours ?? null;
+
             //Email notification
             if ((!empty($company_settings['Create Appointment']) && $company_settings['Create Appointment'] == true)) {
                 $trackingUrl = route('find.appointment', ['businessSlug' => $appointment->business->slug]);
@@ -566,12 +571,12 @@ class AppointmentController extends Controller
                     'appointment_date' => $appointment->date,
                     'appointment_time' => $appointment->time,
                     'appointment_number' => $appointment_number,
-                    `'tracking_url' => $trackingUrl,`
+                    'tracking_url' => $trackingUrl,
                 ];
                 $resp = EmailTemplate::sendEmailTemplate('Create Appointment', [$appointment->CustomerData ? $appointment->CustomerData->customer->email : $appointment->email], $uArr, $appointment->created_by, $appointment->business_id);
-                return view('embeded_appointment.appointment', compact('appointment_number', 'slug', 'customCss', 'customJs'))->with('success', __('Appointment successfully created.') . ((!empty($resp) && $resp['is_success'] == false && !empty($resp['error'])) ? '<br> <span class="text-danger">' . $resp['error'] . '</span>' : ''));
+                return view('embeded_appointment.appointment', compact('appointment_number', 'slug', 'customCss', 'customJs', 'study_prep', 'study_screening', 'study_contrast', 'study_tat'))->with('success', __('Appointment successfully created.') . ((!empty($resp) && $resp['is_success'] == false && !empty($resp['error'])) ? '<br> <span class="text-danger">' . $resp['error'] . '</span>' : ''));
             }
-            return view('embeded_appointment.appointment', compact('appointment_number', 'slug', 'customCss', 'customJs'));
+            return view('embeded_appointment.appointment', compact('appointment_number', 'slug', 'customCss', 'customJs', 'study_prep', 'study_screening', 'study_contrast', 'study_tat'));
         }
     }
 
@@ -673,10 +678,19 @@ class AppointmentController extends Controller
                 return response()->json(['error' => __('Business not found!')], 404);
             }
 
-            $services = Service::where('business_id', $business->id)
-                ->where('category_id', $request->category_id)
-                ->orderBy('name', 'asc')
-                ->get(['id', 'name', 'price', 'duration']);
+            // Radiology-aware payload: modality label, slot length, price,
+            // prep instructions and screening requirement for each procedure.
+            $services = Service::where('services.business_id', $business->id)
+                ->where('services.category_id', $request->category_id)
+                ->where('services.is_bookable_online', true)
+                ->leftJoin('modalities', 'modalities.id', '=', 'services.modality_id')
+                ->orderBy('services.name', 'asc')
+                ->get([
+                    'services.id', 'services.name', 'services.price',
+                    'services.duration', 'services.duration_minutes',
+                    'services.preparation_instructions', 'services.requires_screening',
+                    'services.contrast_type', 'modalities.name as modality_name',
+                ]);
 
             return response()->json([
                 'success' => true,

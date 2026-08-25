@@ -204,5 +204,23 @@ class DefultSetting extends Seeder
         }
         // admin settings End
 
+        // Radiology clinic settings — must live on the business row so that
+        // company_setting()/getCompanyAllSetting() can see them.
+        $business = \App\Models\Business::first();
+        if ($business) {
+            $clinic_settings = [
+                'appointment_prefix' => '#STU',
+                'invoice_tax_rate' => '0',
+                'release_reports_to_patients' => 'on',
+                'queue_board_key' => 'adc-queue-'.strtolower(\Illuminate\Support\Str::random(8)),
+            ];
+            foreach ($clinic_settings as $key => $value) {
+                Setting::updateOrInsert(
+                    ['key' => $key, 'business' => $business->id, 'created_by' => $admin->id],
+                    ['value' => (string) $value, 'created_at' => now(), 'updated_at' => now()]
+                );
+            }
+        }
+
     }
 }
