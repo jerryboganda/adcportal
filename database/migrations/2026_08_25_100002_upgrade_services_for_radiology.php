@@ -24,13 +24,15 @@ return new class extends Migration
         // soft deletes already added by the 2026_08_25_000001 performance migration.
 
         // Backfill numeric durations from the legacy free-text column.
+        // Portable: parse in PHP so this works on both SQLite and MySQL.
         if (Schema::hasColumn('services', 'duration')) {
-            DB::statement("
-                UPDATE services
-                SET duration_minutes = CAST(duration AS INTEGER)
-                WHERE duration GLOB '*[0-9]*'
-                  AND duration NOT GLOB '*[^0-9]*'
-            ");
+            $rows = DB::table('services')->whereNotNull('duration')->get(['id', 'duration']);
+            foreach ($rows as $row) {
+                $val = trim((string) $row->duration);
+                if (ctype_digit($val)) {
+                    DB::table('services')->where('id', $row->id)->update(['duration_minutes' => (int) $val]);
+                }
+            }
         }
     }
 

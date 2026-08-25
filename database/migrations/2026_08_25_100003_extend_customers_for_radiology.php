@@ -17,10 +17,13 @@ return new class extends Migration
             $table->string('emergency_contact', 30)->nullable();
         });
 
-        // Issue sequential MRNs to any pre-existing patient rows.
-        \Illuminate\Support\Facades\DB::statement(
-            "UPDATE customers SET mrn = 'MRN-' || printf('%06d', id) WHERE mrn IS NULL"
-        );
+        // Issue sequential MRNs to any pre-existing patient rows (portable).
+        $rows = \Illuminate\Support\Facades\DB::table('customers')->whereNull('mrn')->get(['id']);
+        foreach ($rows as $row) {
+            \Illuminate\Support\Facades\DB::table('customers')
+                ->where('id', $row->id)
+                ->update(['mrn' => 'MRN-' . str_pad($row->id, 6, '0', STR_PAD_LEFT)]);
+        }
     }
 
     public function down(): void
