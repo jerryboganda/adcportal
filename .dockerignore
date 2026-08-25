@@ -4,9 +4,6 @@
 .env.docker
 /node_modules
 /vendor
-/storage
-/public/storage
-/public/uploads
 /serve.*
 /backups
 /uploads
