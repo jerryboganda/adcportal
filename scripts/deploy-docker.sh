@@ -13,8 +13,9 @@ echo "== [1/5] Pull latest code =="
 git fetch origin main
 git reset --hard origin/main
 
-echo "== [2/5] Pull prebuilt image from GHCR (builds run in GitHub Actions) =="
-docker compose pull
+echo "== [2/5] Image is delivered by GitHub Actions (transfer only; loaded locally) =="
+echo "Skipping docker compose pull — the image ghcr.io/jerryboganda/adcportal:latest is"
+echo "already present on this host from the CI delivery step."
 
 echo "== [3/5] Start containers =="
 docker compose up -d
