@@ -17,7 +17,6 @@ services:
         image: ghcr.io/jerryboganda/adcportal:latest
         container_name: adc-portal-app
         restart: unless-stopped
-        env_file: .env
         ports:
             - "127.0.0.1:8090:80"
         volumes:
