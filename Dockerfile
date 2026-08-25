@@ -18,8 +18,10 @@ RUN composer install --no-dev --prefer-dist --no-interaction --optimize-autoload
 
 FROM php:8.3-apache AS runtime
 RUN apt-get update && apt-get install -y --no-install-recommends \
-        libpng-dev libonig-dev libxml2-dev zip unzip git \
+        libpng-dev libjpeg-dev libfreetype6-dev libwebp-dev \
+        libicu-dev libzip-dev libonig-dev libxml2-dev zip unzip git \
     && rm -rf /var/lib/apt/lists/* \
+    && docker-php-ext-configure gd --with-freetype --with-jpeg --with-webp \
     && docker-php-ext-install pdo_mysql mysqli gd bcmath intl exif zip opcache pcntl \
     && a2enmod rewrite
 

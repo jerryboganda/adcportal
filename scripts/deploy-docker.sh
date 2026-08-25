@@ -13,8 +13,8 @@ echo "== [1/5] Pull latest code =="
 git fetch origin main
 git reset --hard origin/main
 
-echo "== [2/5] Build image =="
-docker compose build --no-cache
+echo "== [2/5] Pull prebuilt image from GHCR (builds run in GitHub Actions) =="
+docker compose pull
 
 echo "== [3/5] Start containers =="
 docker compose up -d

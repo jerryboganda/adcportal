@@ -14,7 +14,7 @@
 # ============================================================
 services:
     app:
-        build: .
+        image: ghcr.io/jerryboganda/adcportal:latest
         container_name: adc-portal-app
         restart: unless-stopped
         env_file: .env

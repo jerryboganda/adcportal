@@ -1,30 +1,66 @@
-name: CI
+name: CI — Build, Test & Push Image
 
 on:
   push:
     branches: [main]
-  pull_request:
+  workflow_dispatch:
+
+# Builds and tests run HERE (GitHub Actions), never on the production VPS.
+permissions:
+  contents: read
+  packages: write
 
 jobs:
-  tests:
+  test:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
-      - name: Setup PHP
+      - name: Setup PHP 8.3
         uses: shivammathur/setup-php@v2
         with:
           php-version: '8.3'
+          extensions: pdo_sqlite, sqlite3, gd, intl, bcmath, zip, exif, mbstring, xml, curl, pcntl, dom, fileinfo
+          tools: composer
           coverage: none
 
-      - name: Install dependencies
-        run: composer install --prefer-dist --no-interaction --no-progress
+      - name: Install dependencies (dev)
+        run: composer install --no-interaction --prefer-dist
 
-      - name: Copy env
-        run: cp .env.example .env && php artisan key:generate
+      - name: Prepare environment
+        run: |
+          cp .env.example .env
+          php artisan key:generate
 
-      - name: Lint (Pint - dirty only)
-        run: vendor/bin/pint --test --dirty || true
+      - name: Run test suite
+        run: php artisan test --no-coverage
 
-      - name: Run tests
-        run: php artisan test --compact
+  build:
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: |
+            ghcr.io/jerryboganda/adcportal:latest
+            ghcr.io/jerryboganda/adcportal:${{ github.sha }}
+
+      - name: Make image public (so the VPS can pull without auth)
+        run: gh api -X PATCH /user/packages/container/adcportal/visibility -f visibility=public
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
