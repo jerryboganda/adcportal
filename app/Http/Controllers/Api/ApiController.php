@@ -453,8 +453,11 @@ class ApiController extends Controller
         $appointment = Appointment::find($request->appointment_id);
         if($appointment)
         {
+            $oldStatus = $appointment->appointment_status;
             $appointment->appointment_status =  $request->status;
             $appointment->save();
+            \App\Models\AuditLog::record('status_changed', $appointment, ['old' => $oldStatus, 'new' => $request->status]);
+
             return $this->success(['message' => 'Appointment Status updated successfully.']);
         }
         else

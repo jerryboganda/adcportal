@@ -11,6 +11,10 @@ return new class extends Migration
      */
     public function up(): void
     {
+        // PERF_GUARD: dump-only tables may not exist on fresh installs.
+        foreach (['plans', 'add_ons', 'bank_transfer_payments', 'businesses', 'users', 'services', 'locations', 'staff', 'customers', 'appointments', 'appointment_payments', 'settings', 'categories', 'business_hours'] as $__t) {
+            if (!Schema::hasTable($__t)) { return; }
+        }
         if(Schema::hasColumn('login_details', 'business'))
         {
             Schema::table('login_details', function (Blueprint $table) {

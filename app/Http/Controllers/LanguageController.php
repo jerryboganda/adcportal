@@ -286,6 +286,7 @@ class LanguageController extends Controller
         AdminSettingCacheForget();
         comapnySettingCacheForget();
         sideMenuCacheForget();
+        \Cache::forget('active_languages');
         $user = \Auth::user();
         $user->lang = $lang;
         $user->save();

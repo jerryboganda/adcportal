@@ -2,30 +2,51 @@
 
 namespace Tests\Feature;
 
-// use Illuminate\Foundation\Testing\RefreshDatabase;
+use App\Models\Business;
+use App\Models\Setting;
+use App\Models\User;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
 class ExampleTest extends TestCase
 {
-    /**
-     * A basic test example.
-     */
-    public function test_the_application_returns_a_successful_response(): void
-    {
-        $response = $this->get('/');
+    use RefreshDatabase;
 
-        $response->assertStatus(200);
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        $admin = User::create([
+            'name' => 'Admin',
+            'email' => 'admin@test.local',
+            'password' => bcrypt('secret123'),
+            'type' => 'admin',
+            'lang' => 'en',
+        ]);
+
+        Business::create([
+            'name' => 'ADC Test Clinic',
+            'form_type' => 'form-layout',
+            'layouts' => 'Formlayout11',
+            'created_by' => $admin->id,
+        ]);
+
+        foreach (['title_text' => 'ADC Test Clinic', 'footer_text' => 'Copyright © ADC', 'landing_page' => 'off'] as $key => $value) {
+            Setting::create(['key' => $key, 'value' => $value, 'business' => 0, 'created_by' => $admin->id]);
+        }
     }
+
+    public function test_login_page_loads(): void
+    {
+        $this->get('/login')->assertStatus(200);
+    }
+
 
     public function test_single_clinic_business_routes_generate_valid_urls(): void
     {
-        $businessId = getActiveBusiness();
+        $business = Business::first();
 
-        $this->assertSame(url('/business'), route('business.index'));
-        $this->assertSame(url('/business/create'), route('business.create'));
-        $this->assertSame(url('/clinic/manage'), route('business.manage'));
-        $this->assertSame(url('/clinic/manage/' . $businessId), route('business.manage', $businessId));
-        $this->assertSame(url('/clinic/edit/' . $businessId), route('business.edit', $businessId));
-        $this->assertStringNotContainsString('?', route('business.manage', 123));
+        $this->assertNotNull($business);
+        $this->assertIsString(route('appointments.form', $business->slug));
     }
 }

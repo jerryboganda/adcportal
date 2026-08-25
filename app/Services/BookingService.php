@@ -57,6 +57,7 @@ class BookingService
                 return $appointment;
             });
 
+            \App\Models\AuditLog::record('created', $appointment, ['via' => 'public_form']);
             event(new CreateAppoinment($appointment, new \Illuminate\Http\Request($data)));
 
             // Invalidate the cached slot list for this date immediately.

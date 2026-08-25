@@ -337,7 +337,7 @@ if (!function_exists('languages')) {
     {
 
         try {
-            $arrLang = Language::where('status', 1)->get()->pluck('name', 'code')->toArray();
+            $arrLang = \Cache::rememberForever('active_languages', fn () => Language::where('status', 1)->get()->pluck('name', 'code')->toArray());
         } catch (\Throwable $th) {
             $arrLang = [
                 "ar" => "Arabic",

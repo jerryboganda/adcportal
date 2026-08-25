@@ -18,6 +18,12 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->alias([
             'APILog' => \App\Http\Middleware\APILog::class,
         ]);
+
+        // Legacy /api/* responses advertise deprecation (v1 is the contract now).
+        $middleware->group('api', [
+            \App\Http\Middleware\DeprecateLegacyApi::class,
+        ]);
+
         // Append middleware to the 'web' group
         $middleware->appendToGroup('web', SetLang::class);
         $middleware->appendToGroup('web', AllowIframeEmbedding::class);

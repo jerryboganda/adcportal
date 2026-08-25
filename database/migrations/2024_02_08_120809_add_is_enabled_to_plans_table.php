@@ -11,6 +11,7 @@ return new class extends Migration
      */
     public function up(): void
     {
+        if (!Schema::hasTable('plans')) { return; } // dump-only table
         if(!Schema::hasColumn('plans', 'is_enabled'))
         {
             Schema::table('plans', function (Blueprint $table) {

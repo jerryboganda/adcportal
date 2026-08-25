@@ -45,7 +45,7 @@ use App\Http\Controllers\ReferrerController;
 
 // ======================= Public Booking (single clinic, no slug) =======================
 Route::get('booking', [AppointmentController::class, 'appointmentForm'])->name('appointments.form');
-Route::post('booking', [AppointmentController::class, 'appointmentFormSubmit'])->name('appointment.form.submit');
+Route::post('booking', [AppointmentController::class, 'appointmentFormSubmit'])->middleware('throttle:booking')->name('appointment.form.submit');
 Route::get('booking/done/{id}', [AppointmentController::class, 'appointmentDone'])->name('appointments.done');
 Route::post('appointment-duration', [AppointmentController::class, 'appointmentDuration'])->name('appointment.duration');
 Route::get('get-staff-data', [StaffController::class, 'getStaffData'])->name('get.staff.data');

@@ -11,6 +11,7 @@ return new class extends Migration
      */
     public function up(): void
     {
+        if (!Schema::hasTable('add_ons')) { return; } // dump-only table
         if(!Schema::hasColumn('add_ons', 'image','is_enable','package_name'))
         {
             Schema::table('add_ons', function (Blueprint $table) {

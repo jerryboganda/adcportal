@@ -267,14 +267,18 @@ class HomeController extends Controller
             }
         }
 
-        $orders = Appointment::select(
-            DB::raw('DATE(created_at) as date'),
-            DB::raw('count(*) as total')
-        )
-            ->where('business_id', getActiveBusiness())
-            ->whereIn(DB::raw('DATE(created_at)'), $dates)
-            ->groupBy(DB::raw('DATE(created_at)'))
-            ->get();
+        $orders = \Cache::remember(
+            'chart:appointments:'.getActiveBusiness().':'.$arrParam['duration'],
+            300,
+            fn () => Appointment::select(
+                DB::raw('DATE(created_at) as date'),
+                DB::raw('count(*) as total')
+            )
+                ->where('business_id', getActiveBusiness())
+                ->whereIn(DB::raw('DATE(created_at)'), $dates)
+                ->groupBy(DB::raw('DATE(created_at)'))
+                ->get()
+        );
 
         $revenue = AppointmentPayment::select(
             DB::raw('DATE(payment_date) as date'),
@@ -442,14 +446,18 @@ class HomeController extends Controller
         // Create an array of dates from your $arrDuration array
         $dates = array_keys($arrDuration);
 
-        $orders = Appointment::select(
-            DB::raw('DATE(created_at) as date'),
-            DB::raw('count(*) as total')
-        )
-            ->where('business_id', getActiveBusiness())
-            ->whereIn(DB::raw('DATE(created_at)'), $dates)
-            ->groupBy(DB::raw('DATE(created_at)'))
-            ->get();
+        $orders = \Cache::remember(
+            'chart:appointments:'.getActiveBusiness().':'.$arrParam['duration'],
+            300,
+            fn () => Appointment::select(
+                DB::raw('DATE(created_at) as date'),
+                DB::raw('count(*) as total')
+            )
+                ->where('business_id', getActiveBusiness())
+                ->whereIn(DB::raw('DATE(created_at)'), $dates)
+                ->groupBy(DB::raw('DATE(created_at)'))
+                ->get()
+        );
         // Initialize an empty $arrTask array
         $arrTask = ['label' => [], 'data' => []];
 

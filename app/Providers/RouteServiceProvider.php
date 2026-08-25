@@ -32,6 +32,10 @@ class RouteServiceProvider extends ServiceProvider
 
         $this->routes(function () {
             Route::middleware('api')
+                ->prefix('api/v1')
+                ->group(base_path('routes/api_v1.php'));
+
+            Route::middleware('api')
                 ->prefix('api')
                 ->group(base_path('routes/api.php'));
 
@@ -50,6 +54,21 @@ class RouteServiceProvider extends ServiceProvider
     {
         RateLimiter::for('api', function (Request $request) {
             return Limit::perMinute(60)->by($request->user()?->id ?: $request->ip());
+        });
+
+        RateLimiter::for('login', function (Request $request) {
+            return [
+                Limit::perMinute(5)->by($request->input('email', '').'|'.$request->ip()),
+                Limit::perHour(30)->by($request->input('email', '').'|'.$request->ip()),
+            ];
+        });
+
+        RateLimiter::for('availability', function (Request $request) {
+            return Limit::perMinute(120)->by($request->user()?->id ?: $request->ip());
+        });
+
+        RateLimiter::for('booking', function (Request $request) {
+            return Limit::perMinute(10)->by($request->ip());
         });
     }
 }

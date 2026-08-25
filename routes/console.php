@@ -1,19 +1,25 @@
 <?php
 
-use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\Schedule;
 
 /*
 |--------------------------------------------------------------------------
-| Console Routes
+| Console / Scheduler
 |--------------------------------------------------------------------------
-|
-| This file is where you may define all of your Closure based console
-| commands. Each Closure is bound to a command instance allowing a
-| simple approach to interacting with each command's IO methods.
-|
 */
 
+// Housekeeping (runs via `php artisan schedule:run` every minute in prod cron)
+Schedule::command('sanctum:prune-expired --hours=24')->hourly();
+Schedule::command('model:prune')->daily()->when(fn () => config('queue.default') !== 'sync');
+Schedule::call(function () {
+    // Trim API log files to last 30 days
+    $log = storage_path('logs/api.log');
+    if (is_file($log) && filemtime($log) < now()->subDays(30)->getTimestamp()) {
+        @unlink($log);
+    }
+})->daily();
+
 Artisan::command('inspire', function () {
-    $this->comment(Inspiring::quote());
+    $this->comment(Illuminate\Foundation\Inspiring::quote());
 })->purpose('Display an inspiring quote');

@@ -513,8 +513,10 @@ class AppointmentController extends Controller
     {
 
         $appointment = Appointment::find($request->appointment_id);
+        $oldStatus = $appointment->appointment_status;
         $appointment->appointment_status = $request->status;
         $appointment->save();
+        \App\Models\AuditLog::record('status_changed', $appointment, ['old' => $oldStatus, 'new' => $request->status]);
 
         $appointment_number = Appointment::appointmentNumberFormat($appointment->id, $appointment->created_by, $appointment->business_id);
         //Email notification
