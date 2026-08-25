@@ -46,7 +46,7 @@ return new class extends Migration
             $table->unsignedBigInteger('answered_by')->nullable();
             $table->timestamps();
 
-            $table->unique(['appointment_id', 'screening_question_id']);
+            $table->unique(['appointment_id', 'screening_question_id'], 'ssa_appointment_question_unique');
         });
     }
 
