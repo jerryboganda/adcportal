@@ -1,55 +1,40 @@
-FROM php:8.3-fpm
+# ============================================================
+# ADC Portal — multi-stage build (assets + vendor + runtime)
+# Runtime: php:8.3-apache. Persistent data is supplied at runtime
+# via host bind-mounts (NEVER baked into the image), so container
+# rebuilds can never destroy patient data.
+# ============================================================
+FROM node:20-alpine AS assets
+WORKDIR /app
+COPY package.json package-lock.json ./
+RUN npm ci
+COPY . .
+RUN npm run build
 
-# Set working directory
-WORKDIR /var/www
+FROM composer:2 AS vendor
+WORKDIR /app
+COPY composer.json composer.lock ./
+RUN composer install --no-dev --prefer-dist --no-interaction --optimize-autoloader
+COPY . .
+RUN composer dump-autoload --optimize
 
-# Install system dependencies
-RUN apt-get update && apt-get install -y \
-    git \
-    curl \
-    libpng-dev \
-    libonig-dev \
-    libxml2-dev \
-    libzip-dev \
-    zip \
-    unzip \
-    libfreetype6-dev \
-    libjpeg62-turbo-dev \
-    libwebp-dev \
-    libxpm-dev \
-    libicu-dev \
-    libpq-dev \
-    libmagickwand-dev \
-    supervisor \
-    cron \
-    && docker-php-ext-configure gd --with-freetype --with-jpeg --with-webp \
-    && docker-php-ext-install pdo_mysql mbstring exif pcntl bcmath gd zip intl \
-    && pecl install redis imagick \
-    && docker-php-ext-enable redis imagick
+FROM php:8.3-apache AS runtime
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        libpng-dev libonig-dev libxml2-dev zip unzip git \
+    && rm -rf /var/lib/apt/lists/* \
+    && docker-php-ext-install pdo_mysql mysqli gd bcmath intl exif zip opcache pcntl \
+    && a2enmod rewrite
 
-# Clear cache
-RUN apt-get clean && rm -rf /var/lib/apt/lists/*
+COPY docker/apache.conf /etc/apache2/sites-available/000-default.conf
+COPY docker/entrypoint.sh /usr/local/bin/entrypoint.sh
+RUN chmod +x /usr/local/bin/entrypoint.sh
 
-# Install Composer
-COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
+WORKDIR /var/www/html
+COPY . .
+COPY --from=vendor /app/vendor ./vendor
+COPY --from=assets /app/public/build ./public/build
 
-# Install Node.js and npm
-RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
-    && apt-get install -y nodejs
+RUN chown -R www-data:www-data /var/www/html \
+    && chmod -R 755 /var/www/html/storage /var/www/html/bootstrap/cache
 
-# Copy application files
-COPY . /var/www
-
-# Set permissions
-RUN chown -R www-data:www-data /var/www \
-    && chmod -R 755 /var/www/storage \
-    && chmod -R 755 /var/www/bootstrap/cache \
-    && mkdir -p storage/framework/cache/data storage/framework/sessions storage/framework/testing storage/framework/views storage/logs bootstrap/cache \
-    && chown -R www-data:www-data storage bootstrap/cache
-
-# Create supervisor config for Laravel scheduler
-RUN echo '[program:laravel-scheduler]\nprocess_name=%(program_name)s_%(process_num)02d\ncommand=/bin/bash -c "while [ true ]; do (php /var/www/artisan schedule:run --verbose --no-interaction &); sleep 60; done"\nautostart=true\nautorestart=true\nuser=www-data\nnumprocs=1\nredirect_stderr=true\nstdout_logfile=/var/www/storage/logs/scheduler.log' > /etc/supervisor/conf.d/laravel-scheduler.conf
-
-EXPOSE 9000
-
-CMD ["bash", "-c", "composer install --no-interaction --optimize-autoloader --no-dev && php-fpm"]
+ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]

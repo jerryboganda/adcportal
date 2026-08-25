@@ -1,31 +1,51 @@
+# ============================================================
+# ADC Portal — production compose (shared VPS Docker)
+#
+# DATA SAFETY (critical):
+#   - NO docker named volumes are used. Every piece of live data is a
+#     HOST BIND-MOUNT rooted at /opt/adc-portal-data, which lives
+#     OUTSIDE the code/repo directory (/opt/docker/adc-portal).
+#   - Therefore `rm -rf /opt/docker/adc-portal`, `git clean -fdx`,
+#     `docker compose down`, rebuilds, and any CI/coding agent operating
+#     on the repository CANNOT touch patient data, invoices, or uploads.
+#   - NEVER run `docker compose down -v` (the -v would remove volumes;
+#     we use bind-mounts, so it is harmless, but do not `rm -rf` the
+#     data path). Backups live at /opt/adc-portal-backups (chattr +i).
+# ============================================================
 services:
-  app:
-    image: php:8.3-apache
-    restart: unless-stopped
-    ports:
-      - '8082:80'
-    volumes:
-      - .:/var/www/html
-    environment:
-      - DB_CONNECTION=mysql
-      - DB_HOST=db
-      - DB_PORT=3306
-      - DB_DATABASE=bookinggodb
-      - DB_USERNAME=bookinggouser
-      - DB_PASSWORD=AUafJeHesfS32NzYn9y7
-    depends_on:
-      - db
-    entrypoint: ["/bin/sh", "-c", "apt-get update && apt-get install -y libpng-dev libzip-dev zip unzip && docker-php-ext-install pdo_mysql bcmath gd zip && grep -q 'DocumentRoot /var/www/html/public' /etc/apache2/sites-available/000-default.conf || sed -i 's!/var/www/html!/var/www/html/public!g' /etc/apache2/sites-available/000-default.conf && a2enmod rewrite && docker-php-entrypoint apache2-foreground"]            
-  db:
-    image: mariadb:10.11
-    restart: unless-stopped
-    environment:
-      - MYSQL_DATABASE=laravel
-      - MYSQL_USER=laravel
-      - MYSQL_PASSWORD=laravel
-      - MYSQL_ROOT_PASSWORD=laravel_root_password
-    volumes:
-      - db_data:/var/lib/mysql
+    app:
+        build: .
+        container_name: adc-portal-app
+        restart: unless-stopped
+        env_file: .env
+        ports:
+            - "127.0.0.1:8090:80"
+        volumes:
+            - /opt/adc-portal-data/storage:/var/www/html/storage
+            - /opt/adc-portal-data/uploads:/var/www/html/public/uploads
+            - /opt/adc-portal-data/.env:/var/www/html/.env
+        networks:
+            - adc
+            - nginx-proxy-manager_default
+        depends_on:
+            - db
 
-volumes:
-  db_data:
+    db:
+        image: mysql:8.0
+        container_name: adc-portal-mysql
+        restart: unless-stopped
+        command: --default-authentication-plugin=mysql_native_password
+        environment:
+            MYSQL_DATABASE: adc_portal
+            MYSQL_USER: adc_user
+            MYSQL_PASSWORD: adc_strong_password_change_me
+            MYSQL_ROOT_PASSWORD: adc_root_password_change_me
+        volumes:
+            - /opt/adc-portal-data/mysql:/var/lib/mysql
+        networks:
+            - adc
+
+networks:
+    adc:
+    nginx-proxy-manager_default:
+        external: true

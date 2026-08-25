@@ -1,36 +1,14 @@
-# Docker build files
-Dockerfile
-docker-compose.yml
-
-# SSL certificates
-*.pem
-docker/nginx/ssl/*.pem
-
-# Node modules
-node_modules/
-
-# Composer vendor
-vendor/
-
-# Git
-.git/
-
-# Environment files
+.git
 .env
-
-# Logs
-storage/logs/*
-storage/framework/cache/*
-storage/framework/sessions/*
-storage/framework/views/*
+.env.*
+.env.docker
+/node_modules
+/vendor
+/storage
+/public/storage
+/public/uploads
+/serve.*
+/backups
+/uploads
 bootstrap/cache/*
-uploads/*
-
-# IDEs
-.idea/
-.vscode/
-*.log
-
-# Keep only essential files
-!packages/workdo/**/composer.json
-!packages/adc/**/composer.json
+docker-compose.override.yml
