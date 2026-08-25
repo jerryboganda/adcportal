@@ -19,71 +19,82 @@ return new class extends Migration
     {
         // ---- Appointments: hot paths (lists, slot availability, dashboard) ----
         Schema::table('appointments', function (Blueprint $table) {
-            $indexExists = collect(DB::select("PRAGMA index_list('appointments')"))->pluck('name')->toArray();
-            $names = method_exists($table, 'getIndexConfig') ? [] : $indexExists;
+            $existing = collect(Schema::getIndexes('appointments'))->pluck('name')->toArray();
 
-            if (! in_array('appointments_business_created_date_index', $names)) {
+            if (! in_array('appointments_business_created_date_index', $existing)) {
                 $table->index(['business_id', 'created_by', 'date'], 'appointments_business_created_date_index');
             }
-            if (! in_array('appointments_staff_date_index', $names)) {
+            if (! in_array('appointments_staff_date_index', $existing)) {
                 $table->index(['staff_id', 'date', 'time'], 'appointments_staff_date_index');
             }
-            if (! in_array('appointments_service_date_index', $names)) {
+            if (! in_array('appointments_service_date_index', $existing)) {
                 $table->index(['service_id', 'date'], 'appointments_service_date_index');
             }
-            if (! in_array('appointments_customer_index', $names)) {
+            if (! in_array('appointments_customer_index', $existing)) {
                 $table->index('customer_id', 'appointments_customer_index');
             }
-            if (! in_array('appointments_status_index', $names)) {
+            if (! in_array('appointments_status_index', $existing)) {
                 $table->index('appointment_status', 'appointments_status_index');
+            }
+            if (! Schema::hasColumn('appointments', 'deleted_at')) {
+                $table->softDeletes()->after('updated_at');
             }
         });
 
         // ---- Services / Locations / Staff / Users: clinic-scoped lookups ----
         Schema::table('services', function (Blueprint $table) {
-            $table->index(['business_id', 'created_by'], 'services_business_created_index');
+            if (! in_array('services_business_created_index', collect(Schema::getIndexes('services'))->pluck('name')->toArray())) {
+                $table->index(['business_id', 'created_by'], 'services_business_created_index');
+            }
+            if (! Schema::hasColumn('services', 'deleted_at')) {
+                $table->softDeletes()->after('updated_at');
+            }
         });
         Schema::table('locations', function (Blueprint $table) {
-            $table->index(['business_id', 'created_by'], 'locations_business_created_index');
+            if (! in_array('locations_business_created_index', collect(Schema::getIndexes('locations'))->pluck('name')->toArray())) {
+                $table->index(['business_id', 'created_by'], 'locations_business_created_index');
+            }
         });
         Schema::table('staff', function (Blueprint $table) {
-            $table->index(['business_id', 'created_by'], 'staff_business_created_index');
+            if (! in_array('staff_business_created_index', collect(Schema::getIndexes('staff'))->pluck('name')->toArray())) {
+                $table->index(['business_id', 'created_by'], 'staff_business_created_index');
+            }
         });
         Schema::table('users', function (Blueprint $table) {
-            $table->index(['type', 'business_id', 'created_by'], 'users_type_business_created_index');
+            if (! in_array('users_type_business_created_index', collect(Schema::getIndexes('users'))->pluck('name')->toArray())) {
+                $table->index(['type', 'business_id', 'created_by'], 'users_type_business_created_index');
+            }
         });
 
         // ---- Unique business slugs ----
-        try {
-            Schema::table('businesses', function (Blueprint $table) {
-                $table->unique('slug', 'businesses_slug_unique');
-            });
-        } catch (Throwable $e) {
-            // Duplicate slugs may pre-exist; de-duplicate first.
-            $rows = DB::table('businesses')->select('id', 'slug')->orderBy('id')->get();
-            $seen = [];
-            foreach ($rows as $row) {
-                if (isset($seen[$row->slug])) {
-                    DB::table('businesses')->where('id', $row->id)->update([
-                        'slug' => $row->slug.'-'.$row->id,
-                    ]);
+        if (! in_array('businesses_slug_unique', collect(Schema::getIndexes('businesses'))->pluck('name')->toArray())) {
+            try {
+                Schema::table('businesses', function (Blueprint $table) {
+                    $table->unique('slug', 'businesses_slug_unique');
+                });
+            } catch (Throwable $e) {
+                // Duplicate slugs may pre-exist; de-duplicate first.
+                $rows = DB::table('businesses')->select('id', 'slug')->orderBy('id')->get();
+                $seen = [];
+                foreach ($rows as $row) {
+                    if (isset($seen[$row->slug])) {
+                        DB::table('businesses')->where('id', $row->id)->update([
+                            'slug' => $row->slug.'-'.$row->id,
+                        ]);
+                    }
+                    $seen[$row->slug] = true;
                 }
-                $seen[$row->slug] = true;
+                Schema::table('businesses', function (Blueprint $table) {
+                    $table->unique('slug', 'businesses_slug_unique');
+                });
             }
-            Schema::table('businesses', function (Blueprint $table) {
-                $table->unique('slug', 'businesses_slug_unique');
-            });
         }
 
-        // ---- Soft deletes ----
-        Schema::table('appointments', function (Blueprint $table) {
-            $table->softDeletes()->after('updated_at');
-        });
+        // ---- Soft deletes (customers) ----
         Schema::table('customers', function (Blueprint $table) {
-            $table->softDeletes()->after('updated_at');
-        });
-        Schema::table('services', function (Blueprint $table) {
-            $table->softDeletes()->after('updated_at');
+            if (! Schema::hasColumn('customers', 'deleted_at')) {
+                $table->softDeletes()->after('updated_at');
+            }
         });
 
         // ---- Audit log ----
