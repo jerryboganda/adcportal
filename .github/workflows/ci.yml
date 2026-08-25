@@ -64,6 +64,6 @@ jobs:
             ghcr.io/jerryboganda/adcportal:${{ github.sha }}
 
       - name: Make image public (so the VPS can pull without auth)
-        run: gh api -X PATCH /user/packages/container/adcportal/visibility -f visibility=public
+        run: gh api -X PATCH /repos/jerryboganda/adcportal/packages/container/adcportal/visibility -f visibility=public
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
