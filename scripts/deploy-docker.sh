@@ -20,6 +20,8 @@ echo "== [3/5] Start containers =="
 docker compose up -d
 
 echo "== [4/5] Migrate + optimize =="
+docker exec adc-portal-app php artisan key:generate || true
+docker exec adc-portal-app php artisan package:discover || true
 docker exec adc-portal-app php artisan migrate --force
 docker exec adc-portal-app php artisan config:clear
 docker exec adc-portal-app php artisan route:clear

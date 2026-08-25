@@ -14,7 +14,7 @@ RUN npm run build
 FROM composer:2 AS vendor
 WORKDIR /app
 COPY . .
-RUN composer install --no-dev --prefer-dist --no-interaction --optimize-autoloader --ignore-platform-reqs
+RUN composer install --no-dev --prefer-dist --no-interaction --optimize-autoloader --ignore-platform-reqs --no-scripts
 
 FROM php:8.3-apache AS runtime
 RUN apt-get update && apt-get install -y --no-install-recommends \
