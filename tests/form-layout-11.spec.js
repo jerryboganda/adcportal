@@ -173,6 +173,14 @@ test.describe('Form Layout 11 - Booking Flow with Error Capture', () => {
       console.log('\n--- STEP 5: Confirm Booking ---');
       const confirmBtn = await page.$('#fl11SubmitBtn');
       if (confirmBtn) {
+        // Capture validation errors from a 422 response for diagnosis
+        page.on('response', async (response) => {
+          try {
+            if (response.url().includes('/booking') && response.status() === 422) {
+              console.log('[DEBUG 422 BODY]', await response.text());
+            }
+          } catch (e) {}
+        });
         console.log('Clicking Confirm Booking button...');
         await confirmBtn.click();
         console.log('Button clicked, waiting for response...');

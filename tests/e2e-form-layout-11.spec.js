@@ -248,6 +248,15 @@ test.describe('Form Layout 11 - Complete Booking Flow', () => {
                 { timeout: 15000 }
             ).catch(() => null);
             
+            // Capture validation errors from a 422 response for diagnosis
+            page.on('response', async (response) => {
+                try {
+                    if (response.url().includes('/booking') && response.status() === 422) {
+                        console.log('[DEBUG 422 BODY]', await response.text());
+                    }
+                } catch (e) {}
+            });
+
             await submitBtn.click();
             
             const response = await responsePromise;

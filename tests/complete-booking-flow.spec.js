@@ -182,6 +182,15 @@ test.describe('Form Layout 11 - Complete End-to-End Booking', () => {
                 throw err;
             });
             
+            // Capture validation errors from a 422 response for diagnosis
+            page.on('response', async (response) => {
+                try {
+                    if (response.url().includes('/booking') && response.status() === 422) {
+                        console.log('[DEBUG 422 BODY]', await response.text());
+                    }
+                } catch (e) {}
+            });
+
             // Click submit
             await submitBtn.click();
             console.log('[STEP 6] Form submitted');
