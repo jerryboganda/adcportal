@@ -144,13 +144,14 @@ test.describe('Form Layout 11 - Booking Flow with Error Capture', () => {
 
       // Step 3/4: Handle user details
       console.log('\n--- STEP 3/4: Fill User Details ---');
-      const guestNameField = await page.$('#guest_name');
-      if (guestNameField) {
-        await page.fill('#guest_name', 'Test User');
-        await page.fill('#guest_email', 'test@example.com');
-        await page.fill('#guest_contact', '+923001234567');
-        console.log('✓ Guest details filled');
-      }
+       const newNameField = await page.$('#new_name');
+       if (newNameField) {
+         await page.fill('#new_name', 'Test User');
+         await page.fill('#new_email', 'test@example.com');
+         await page.fill('#new_contact', '+923001234567');
+         await page.fill('#new_password', 'Password@123');
+         console.log('✓ New user details filled');
+       }
 
       // Step 3: Continue to next
       const continueStep3 = await page.$('#fl11ContinueStep3');

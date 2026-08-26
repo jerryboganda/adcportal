@@ -221,6 +221,13 @@ test.describe('Form Layout 11 - Complete Booking Flow', () => {
                     await page.fill('#new_password', 'Password@123');
                     console.log('[TEST] ✓ New user form filled');
                 }
+            } else {
+                // Default active tab is new-user
+                await page.fill('#new_name', 'New Test User');
+                await page.fill('#new_email', 'newuser@example.com');
+                await page.fill('#new_contact', '+923001234567');
+                await page.fill('#new_password', 'Password@123');
+                console.log('[TEST] ✓ New user form filled');
             }
             
             // Click Continue to move to Step 5
