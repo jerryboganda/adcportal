@@ -38,10 +38,17 @@ class E2eSeeder extends Seeder
             return;
         }
 
-        $business->is_disable = 0;
+        $business->is_disable = 1;
         $business->layouts = 'Formlayout11';
         $business->theme_color = 'color1-Formlayout11';
         $business->save();
+
+        // HomeController::index redirects to the installer when storage/installed
+        // is absent. The e2e flow already migrates + seeds, so flag the app as
+        // installed so the public booking wizard renders on '/'.
+        if (! file_exists(storage_path('installed'))) {
+            @touch(storage_path('installed'));
+        }
 
         $category = Category::firstOrCreate(
             ['business_id' => $business->id, 'name' => 'Radiology'],
