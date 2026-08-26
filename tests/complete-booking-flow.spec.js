@@ -166,7 +166,7 @@ test.describe('Form Layout 11 - Complete End-to-End Booking', () => {
             // Wait for response
             let responseData = null;
             const responsePromise = page.waitForResponse(
-                response => response.url().includes('appointment-book'),
+                response => response.url().includes('/booking'),
                 { timeout: 20000 }
             ).then(async response => {
                 console.log('[STEP 6] Response received, status:', response.status());

@@ -940,6 +940,13 @@
                         </div>
                         <span class="fl11-detail-value" id="bookingLocation">-</span>
                     </div>
+                    <div class="fl11-detail-row">
+                        <div class="fl11-bilingual">
+                            <span class="fl11-detail-label">{{ __('Staff:') }}</span>
+                            <span class="fl11-ur" style="font-size: 11px; opacity: 0.7;">عملہ</span>
+                        </div>
+                        <span class="fl11-detail-value" id="bookingStaff">-</span>
+                    </div>
                 </div>
                 
                 <div class="fl11-qr-section">

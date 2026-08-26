@@ -244,7 +244,7 @@ test.describe('Form Layout 11 - Complete Booking Flow', () => {
             
             // Wait for submission to complete
             const responsePromise = page.waitForResponse(
-                response => response.url().includes('appointment-book') && response.status() === 200,
+                response => response.url().includes('/booking') && response.status() === 200,
                 { timeout: 15000 }
             ).catch(() => null);
             
