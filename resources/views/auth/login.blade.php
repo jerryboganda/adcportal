@@ -39,7 +39,6 @@
                     </div>
                     @endif
                 </div>
-                @endif
 
                 <div class="d-grid">
                     <button type="submit" class="btn btn-primary btn-block mt-2 login_button" tabindex="4">{{ __('Login') }}</button>
