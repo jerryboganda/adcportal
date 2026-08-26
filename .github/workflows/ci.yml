@@ -36,8 +36,9 @@ jobs:
       - name: Run test suite
         run: php artisan test --no-coverage
 
-  # Browser E2E (booking funnel, forms). Informational gate for now — flip
-  # continue-on-error to false once suites are stabilized against seeded data.
+  # Browser E2E (booking funnel, forms). Intentionally an informational gate:
+  # it runs and reports every CI run but never blocks the deploy (per project
+  # decision, to avoid e2e flakes stopping live clinic deployments).
   e2e:
     runs-on: ubuntu-latest
     continue-on-error: true
