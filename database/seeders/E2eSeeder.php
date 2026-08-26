@@ -20,16 +20,22 @@ class E2eSeeder extends Seeder
 {
     public function run(): void
     {
-        $admin = User::where('type', 'admin')->first();
-        if (! $admin) {
+        if (! User::where('type', 'admin')->exists()) {
+            // Base chain — MakeRole() grants permissions, so they must exist first.
+            $this->call(PermissionTableSeeder::class);
             $this->call(UserSeeder::class);
-            $admin = User::where('type', 'admin')->first();
+            $this->call(DefultSetting::class);
         }
+
+        $admin = User::where('type', 'admin')->first();
 
         $business = Business::first();
         if (! $business) {
             $this->call(UserSeeder::class);
             $business = Business::first();
+        }
+        if (! $business || ! $admin) {
+            return;
         }
 
         $business->is_disable = 0;
