@@ -25,11 +25,9 @@
                         <table class="table mb-0 pc-dt-simple" id="assets">
                             <thead>
                                 <tr>
-                                <tr>
                                     <th> {{ __('Role') }}</th>
                                     <th> {{ __('Permissions') }}</th>
                                     <th class="text-end" width="200px"> {{ __('Action') }}</th>
-                                </tr>
                                 </tr>
                             </thead>
                             <tbody>
@@ -40,12 +38,12 @@
                                     <tr>
                                         <td width="150px">{{ $role->name }}</td>
                                         <td class="permission" style="min-width: 320px;">
-                                            @foreach ($permissions as $permission)
-                                                @if (false || $permission->module == 'General')
-                                                    <span class="badge p-2 m-1 px-3 bg-primary">
-                                                        {{ $permission->name }}</span>
-                                                @endif
-                                            @endforeach
+                                            @forelse ($permissions as $permission)
+                                                <span class="badge p-2 m-1 px-3 bg-primary">
+                                                    {{ $permission->name }}</span>
+                                            @empty
+                                                <span class="text-muted">—</span>
+                                            @endforelse
                                         </td>
                                         <td>
                                             <div class="d-flex justify-content-end">

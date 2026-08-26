@@ -65,7 +65,7 @@
                     {{Form::label('gender',__('Gender'),['class'=>'form-label'])}}
                     {!! Form::select('gender', ['male' => 'Male', 'female' => 'Female'], null, ['class' => 'form-control']) !!}
                     @error('gender')
-                    <small class="invalid-mobile" role="alert">
+                    <small class="invalid-gender" role="alert">
                         <strong class="text-danger">{{ $message }}</strong>
                     </small>
                     @enderror
@@ -76,7 +76,7 @@
                     {{Form::label('dob',__('Date of Birth'),['class'=>'form-label'])}}
                     {{Form::date('dob',null,array('class'=>'form-control','placeholder'=>__('Select Date'),'required'=>'required'))}}
                     @error('dob')
-                    <small class="invalid-mobile" role="alert">
+                    <small class="invalid-dob" role="alert">
                         <strong class="text-danger">{{ $message }}</strong>
                     </small>
                     @enderror

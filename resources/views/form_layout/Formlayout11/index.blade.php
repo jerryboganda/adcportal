@@ -1544,10 +1544,10 @@
             }
             
             function showToast(message, type) {
-                if (typeof toastr !== 'undefined') {
+                if (window.adcToast) {
+                    window.adcToast(type === 'error' ? 'error' : 'success', message);
+                } else if (typeof toastr !== 'undefined' && toastr[type]) {
                     toastr[type](message);
-                } else {
-                    alert(message);
                 }
             }
             

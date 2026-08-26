@@ -21,23 +21,20 @@
                         <div class="p-3 card m-0 mb-3">
                             <ul class="nav nav-pills nav-fill common-scroll" id="pills-tab" role="tablist" style="max-height: 250px; overflow: auto;">
                                 @foreach ($modules as $module)
-                                    @if (false || $module == 'General')
-                                        <li class="nav-item" role="presentation">
-                                            <button
-                                                class="nav-link text-capitalize {{ $loop->index == 0 ? 'active' : '' }}"
-                                                id="pills-{{ strtolower($module) }}-tab" data-bs-toggle="pill"
-                                                data-bs-target="#pills-{{ strtolower($module) }}"
-                                                type="button">{{ Module_Alias_Name($module) }}</button>
-                                        </li>
-                                    @endif
+                                    <li class="nav-item" role="presentation">
+                                        <button
+                                            class="nav-link text-capitalize {{ $loop->index == 0 ? 'active' : '' }}"
+                                            id="pills-{{ strtolower($module) }}-tab" data-bs-toggle="pill"
+                                            data-bs-target="#pills-{{ strtolower($module) }}"
+                                            type="button">{{ Module_Alias_Name($module) }}</button>
+                                    </li>
                                 @endforeach
                             </ul>
                         </div>
                             <div class="px-0 pb-0 card-body">
                                 <div class="tab-content" id="pills-tabContent">
                                     @foreach ($modules as $module)
-                                        @if (false || $module == 'General')
-                                            <div class="tab-pane text-capitalize fade show {{ $loop->index == 0 ? 'active' : '' }}"
+                                        <div class="tab-pane text-capitalize fade show {{ $loop->index == 0 ? 'active' : '' }}"
                                                 id="pills-{{ strtolower($module) }}" role="tabpanel"
                                                 aria-labelledby="pills-{{ strtolower($module) }}-tab">
                                                 <input type="checkbox" class="form-check-input pointer"
@@ -95,7 +92,6 @@
                                                 </div>
 
                                             </div>
-                                        @endif
                                     @endforeach
                                 </div>
                             </div>

@@ -82,13 +82,19 @@ $singular_name =__('User');
             <div class="col-xxl-3 col-xl-4 col-md-6 mb-4 subscriber-user-card">
                 <div class="card user-card">
                     <div class="card-header border border-bottom p-3">
+                        @permission('user manage')
+                        @if ($user->is_disable != 1)
                             <div class="d-flex align-items-center">
                                 <span class="badge bg-primary p-2">{{ ucfirst($user->type) }}</span>
                             </div>
                             <div class="card-header-right">
-                                                aria-haspopup="true" aria-expanded="true">
-                                                <i class="feather icon-more-vertical"></i>
-                                            </button>
+                                            @if ($user->is_enable_login == 1)
+                                                <button type="button" class="btn btn-sm border-0 p-1 text-secondary"
+                                                    data-bs-toggle="dropdown" data-bs-auto-close="true"
+                                                    aria-haspopup="true" aria-expanded="false"
+                                                    aria-label="{{ __('User actions') }}">
+                                                    <i class="ti ti-dots-vertical"></i>
+                                                </button>
                                         @else
                                             <a class="btn btn-sm border" data-title="{{ __('Lock') }}"
                                             data-bs-original-title="{{ __('User Is Disable') }}" data-bs-toggle="tooltip">
@@ -364,7 +370,6 @@ $singular_name =__('User');
                             @endif
                             <span class="badge bg-primary p-2">{{ ucfirst($user->type) }}</span>
                             </div>
-                        @endif
                     </div>
                 </div>
             </div>

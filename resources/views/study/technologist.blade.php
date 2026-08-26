@@ -79,14 +79,18 @@
                                                 @csrf
                                                 <input type="hidden" name="action" value="{{ $state === \App\Enums\StudyState::CheckedIn ? 'prepare' : 'start' }}">
                                                 <button class="btn btn-sm btn-warning"
-                                                    {{ $riskBlocked ? 'disabled title="'.__('Blocked: resolve screening risk').'"' : '' }}>
+                                                    {{ $riskBlocked ? 'disabled' : '' }}>
                                                     {{ $state === \App\Enums\StudyState::CheckedIn ? __('Prepare') : __('Start Scan') }}
                                                 </button>
+                                                @if($riskBlocked)
+                                                    <div class="small text-danger mt-1" style="max-width:160px">
+                                                        <i class="ti ti-shield-x me-1" aria-hidden="true"></i>{{ __('Blocked: resolve screening risk') }}
+                                                    </div>
+                                                @endif
                                             </form>
                                         @elseif($state === \App\Enums\StudyState::InProgress)
                                             <button class="btn btn-sm btn-success" data-bs-toggle="modal" data-bs-target="#complete-modal-{{ $study->id }}">{{ __('Complete + Dose') }}</button>
                                         @elseif($state === \App\Enums\StudyState::Acquired)
-                                            <span class="badge bg-purple text-white align-self-center">{{ __('Sent to reading') }}</span>
                                             <form method="POST" action="{{ route('study.transition', $study->id) }}">
                                                 @csrf
                                                 <input type="hidden" name="action" value="to_reading">

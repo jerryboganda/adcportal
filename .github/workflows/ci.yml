@@ -36,8 +36,60 @@ jobs:
       - name: Run test suite
         run: php artisan test --no-coverage
 
+  # Browser E2E (booking funnel, forms). Informational gate for now — flip
+  # continue-on-error to false once suites are stabilized against seeded data.
+  e2e:
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup PHP 8.3
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: pdo_sqlite, sqlite3, gd, intl, bcmath, zip, exif, mbstring, xml, curl, pcntl, dom, fileinfo
+          tools: composer
+          coverage: none
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      - name: Install dependencies
+        run: |
+          composer install --no-interaction --prefer-dist --no-scripts
+          npm ci
+      - name: Build assets (Actions only per compute policy)
+        run: npm run build
+      - name: Prepare environment
+        run: |
+          cp .env.example .env
+          mkdir -p storage/framework/cache/data storage/framework/sessions storage/framework/views storage/framework/testing storage/logs bootstrap/cache
+          chmod -R 775 storage bootstrap/cache
+          php artisan key:generate
+          php artisan migrate --force
+      - name: Install Playwright browser
+        run: npx playwright install --with-deps chromium
+      - name: Start application
+        run: php artisan serve --host=127.0.0.1 --port=8000 &
+      - name: Wait for application
+        run: |
+          for i in $(seq 1 30); do
+            curl -sf http://127.0.0.1:8000 >/dev/null && break || sleep 2
+          done
+      - name: Run Playwright suite
+        run: npx playwright test --reporter=line
+      - name: Upload failure artifacts
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 7
+
   build:
-    needs: test
+    needs: [test]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

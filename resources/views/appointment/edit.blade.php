@@ -104,7 +104,7 @@
                     autocomplete="off" required="required" value="{{ $appointment->date }}"
                     data-dates={{ json_encode($combinedArray) }}>
                 <span class="input-group-text">
-                    <i class="feather icon-calendar"></i>
+                    <i class="ti ti-calendar"></i>
                 </span>
             </div>
         </div>

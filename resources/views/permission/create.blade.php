@@ -9,14 +9,14 @@
         @enderror
     </div>
     <div class="form-group">
-        {{Form::label('name',__('Module'),array('class'=>'col-form-label'))}}
-        <select class="form-control" data-trigger name="module" id="choices-single-default" placeholder="This is a search placeholder">
+        {{Form::label('module',__('Module'),array('class'=>'col-form-label'))}}
+        <select class="form-control" data-trigger name="module" id="choices-single-default">
             @foreach ($modules as $module)
                 <option value="{{ $module }}">{{ $module }}</option>
             @endforeach
         </select>
-        @error('name')
-        <span class="invalid-name" role="alert">
+        @error('module')
+        <span class="invalid-module" role="alert">
                     <strong class="text-danger">{{ $message }}</strong>
                 </span>
         @enderror
@@ -31,7 +31,7 @@
 <script>
     "use strict";
  var multipleCancelButton = new Choices(
-        '#choices-single-defaultlq', {
+        '#choices-single-default', {
             removeItemButton: true,
         }
         );

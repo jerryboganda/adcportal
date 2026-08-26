@@ -5,16 +5,11 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta http-equiv="X-UA-Compatible" content="ie=edge">
-    <meta name="author" content="form-one">
-    <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>{{ $business->name }}</title>
-    <meta name="description" content="form-one">
-    <meta name="keywords" content="form-one">
-    <link rel="icon" href="{{ asset('packages/adc/' . $module . '/favicon.png') }}">
+    <meta name="description" content="{{ __('Book your diagnostic appointment online at') }} {{ $business->name }}">
+    <meta name="keywords" content="diagnostic, radiology, appointment, {{ $business->name }}">
+    <link rel="icon" href="{{ asset('form_layouts/' . $business->layouts . '/images/favicon.png') }}">
     @stack('font-link')
-    <link
-        href="https://fonts.googleapis.com/css2?family=Kaisei+Tokumin&family=Mulish:ital,wght@0,200..1000;1,200..1000&display=swap"
-        rel="stylesheet">
 
     {{-- WhatsAppMessenger --}}
     @if (false)
@@ -29,24 +24,6 @@
         $rtl = Cookie::get('THEME_RTL');
     @endphp
 
-    <link rel="stylesheet" href="{{ asset('assets/fonts/fontawesome.css') }}">
-    <link rel="stylesheet"
-        href="{{ asset('packages/adc/' . $module . '/src/Resources/assets/css/swiper-bundle.min.css') }}">
-    @if (isset($rtl) && $rtl == '1')
-        <link rel="stylesheet"
-            href="{{ asset('packages/adc/' . $module . '/src/Resources/assets/css/rtl-main-style.css') }}">
-        <link rel="stylesheet"
-            href="{{ asset('packages/adc/' . $module . '/src/Resources/assets/css/rtl-responsive.css') }}">
-        <link rel="stylesheet" href="{{ asset('module_assets/rtl-custom.css') }}">
-    @else
-        <link rel="stylesheet"
-            href="{{ asset('packages/adc/' . $module . '/src/Resources/assets/css/main-style.css') }}">
-        <link rel="stylesheet"
-            href="{{ asset('packages/adc/' . $module . '/src/Resources/assets/css/responsive.css') }}">
-        <link rel="stylesheet" href="{{ asset('module_assets/ltr-custom.css') }}">
-    @endif
-    @stack('page-style')
-    <!-- <link rel="stylesheet" href="{{ asset('form_layouts/custom.css') }}"> -->
     <link rel="stylesheet" href="{{ asset('assets/css/bootstrap-datepicker.min.css') }}">
     <link rel="stylesheet" href="{{ asset('module_assets/loader.css') }}">
     <link rel="stylesheet" href="{{ asset('module_assets/custom.css') }}">
@@ -114,36 +91,13 @@
     <x-feedback.toast />
     <x-feedback.loader />
 
-    <script src="{{ asset('packages/adc/' . $module . '/src/Resources/assets/js/jquery.min.js') }}"></script>
-    <script src="{{ asset('packages/adc/' . $module . '/src/Resources/assets/js/swiper-bundle.min.js') }}"></script>
+    <script src="{{ asset('js/jquery.min.js') }}"></script>
     <script src="{{ asset('assets/js/custom-bootstrap.js') }}"></script>
     <script src="{{ asset('assets/js/bootstrap-datepicker.js') }}"></script>
-    @if (isset($rtl) && $rtl == '1')
-        <script src="{{ asset('packages/adc/' . $module . '/src/Resources/assets/js/rtl-custom.js') }}"></script>
-    @else
-        <script src="{{ asset('packages/adc/' . $module . '/src/Resources/assets/js/custom.js') }}"></script>
-    @endif
     <script src="{{ asset('assets/js/plugins/bootstrap.min.js') }}"></script>
     <script src="{{ asset('module_assets/loader.js') }}"></script>
     <script src="{{ asset('js/custom.js') }}"></script>
 
-    @if ($business->enable_pwa == 'on')
-        <script type="text/javascript">
-            const container = document.querySelector("body")
-
-            const coffees = [];
-
-            if ("serviceWorker" in navigator) {
-                window.addEventListener("load", function() {
-                    navigator.serviceWorker
-                        .register("{{ asset('/serviceWorker.js') }}")
-                        .then(res => console.log("service worker registered"))
-                        .catch(err => console.log("service worker not registered", err))
-
-                })
-            }
-        </script>
-    @endif
     {{-- WhatsAppMessenger --}}
     @if (false &&
             isset($company_settings['whatsappmessenger_number']))
@@ -296,7 +250,7 @@
                         @if (false &&
                                 isset($company_settings['appointment_review_is_on']) &&
                                 $company_settings['appointment_review_is_on'] == 'on')
-                            text: '<i class="fas fa-star"></i>' + ' ' + staff.review.toFixed(
+                            text: '<i class="ti ti-star"></i>' + ' ' + staff.review.toFixed(
                                     1) + ' ' +
                                 staff.name
                         @else

@@ -32,62 +32,19 @@
                             </span>
                         @enderror
                     </div>
-                    @if (false && (isset($admin_settings['google_recaptcha_is_on']) ? $admin_settings['google_recaptcha_is_on'] : 'off') == 'on')
-                        @if (isset($admin_settings['google_recaptcha_version']) && $admin_settings['google_recaptcha_version'] == 'v2')
-                            <div class="form-group col-lg-12 col-md-12 mt-3">
-                                {!! NoCaptcha::display() !!}
-                                @error('g-recaptcha-response')
-                                <span class="error small text-danger" role="alert">
-                                    <strong>{{ $message }}</strong>
-                                </span>
-                                @enderror
-                            </div>
-                        @else
-                            @if (isset($admin_settings['google_recaptcha_version']) && $admin_settings['google_recaptcha_version'] == 'v3')
-                                <div class="form-group mb-4">
-                                    <input type="hidden" id="g-recaptcha-response" name="g-recaptcha-response" class="form-control">
-                                    @error('g-recaptcha-response')
-                                        <span class="error small text-danger" role="alert">
-                                            <strong>{{ $message }}</strong>
-                                        </span>
-                                    @enderror
-                                </div>
-                            @endif
-                        @endif
-                    @endif
 
                     <div class="d-grid">
                         <button class="btn btn-primary btn-submit btn-block mt-2">{{ __('Send Password Reset Link') }}
                         </button>
                     </div>
-                    <p class="my-4 text-center">{{ __('Or') }}
-                        <a href="{{ route('login', $lang) }}"
-                            class="my-4 text-primary">{{ __('Login') }}</a>{{ __(' With') }}
+                    <p class="my-4 text-center">
+                        <a href="{{ route('login') }}" class="text-primary">
+                            <i class="ti ti-arrow-left me-1" aria-hidden="true"></i>{{ __('Back to login') }}
+                        </a>
                     </p>
                 </div>
             </form>
         </div>
     </div>
 @endsection
-@push('script')
-    @if (false && (isset($admin_settings['google_recaptcha_is_on']) ? $admin_settings['google_recaptcha_is_on'] : 'off') == 'on')
-        @if (isset($admin_settings['google_recaptcha_version']) && $admin_settings['google_recaptcha_version'] == 'v2')
-            {!! NoCaptcha::renderJs() !!}
-        @else
-            @if (isset($admin_settings['google_recaptcha_version']) && $admin_settings['google_recaptcha_version'] == 'v3')
-                <script src="https://www.google.com/recaptcha/api.js?render={{ $admin_settings['google_recaptcha_key'] }}"></script>
-                <script>
-                    $(document).ready(function() {
-                        grecaptcha.ready(function() {
-                            grecaptcha.execute('{{ $admin_settings['google_recaptcha_key'] }}', {
-                                action: 'submit'
-                            }).then(function(token) {
-                                $('#g-recaptcha-response').val(token);
-                            });
-                        });
-                    });
-                </script>
-            @endif
-        @endif
-    @endif
-@endpush
+

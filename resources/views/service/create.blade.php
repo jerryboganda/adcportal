@@ -85,7 +85,7 @@
             <div class="form-check form-switch custom-switch-v1">
                 <label class="form-check-label" for="is_free">{{ __('Free Service') }}</label>
                 <input type="checkbox" class="form-check-input input-primary" name="is_service_free"
-                    id="is_service_free" checked>
+                    id="is_service_free" value="1">
             </div>
         </div>
 

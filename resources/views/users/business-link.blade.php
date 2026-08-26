@@ -16,7 +16,7 @@
                                 class="form-control d-inline-block theme-link"  readonly>
                             <button class="btn btn-outline-primary  gap-2 d-flex align-iteams-center" type="button"
                                 onclick="myFunction('myInput_{{ $value['name'] }}')" id="button-addon2"><i
-                                    class="far fa-copy"></i>
+                                    class="ti ti-copy"></i>
                                 {{ __('Business Link') }}</button>
                         </td>
 

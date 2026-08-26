@@ -149,7 +149,7 @@
                         <div class="card h-100 mb-0">
                             <div class="card-header p-2">
                                 <h6 class="">
-                                    <i data-feather="credit-card" class="me-2"></i>{{ __('Primary color settings') }}
+                                    <i class="ti ti-credit-card me-2"></i>{{ __('Primary color settings') }}
                                 </h6>
                             </div>
                             <div class="card-body p-2">
@@ -233,7 +233,7 @@
                         <div class="card h-100 mb-0">
                             <div class="card-header p-2">
                                 <h6>
-                                    <i data-feather="layout" class="me-2"></i> {{ __('Sidebar settings') }}
+                                    <i class="ti ti-layout me-2"></i> {{ __('Sidebar settings') }}
                                 </h6>
                             </div>
                             <div class="card-body p-2">
@@ -252,7 +252,7 @@
                         <div class="card h-100 mb-0">
                             <div class="card-header p-2">
                                 <h6 class="">
-                                    <i data-feather="sun" class="me-2"></i>{{ __('Layout settings') }}
+                                    <i class="ti ti-sun me-2"></i>{{ __('Layout settings') }}
                                 </h6>
                             </div>
                             <div class="card-body p-2">
@@ -274,8 +274,7 @@
                         <div class="card h-100 mb-0">
                             <div class="card-header p-2">
                                 <h6 class="">
-                                    <i data-feather="align-right"
-                                        class="ti ti-align-right me-2 h5"></i>{{ __('Enable RTL') }}
+                                    <i class="ti ti-align-right me-2 h5"></i>{{ __('Enable RTL') }}
                                 </h6>
                             </div>
                             <div class="card-body p-2">

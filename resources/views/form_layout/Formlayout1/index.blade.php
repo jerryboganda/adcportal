@@ -1,4 +1,4 @@
-@extends('form_layout.layout')
+﻿@extends('form_layout.layout')
 @section('form_content')
     <main>
         <section class="appointment-sec align-center pt pb">
@@ -385,7 +385,7 @@
                                                     <div class="col-md-6 col-12">
                                                         <div class="form-group">
                                                             <label>{{ __('Contact') }}</label>
-                                                            <small class="text-muted">(+917878787878)</small>
+                                                            <small class="text-muted">(+92 3XX XXXXXXX)</small>
                                                             <input type="text" class="form-control" name="contact"
                                                                 id="new-user-contact" placeholder="Phone Number">
                                                         </div>
@@ -432,7 +432,7 @@
                                                     <div class="col-md-6 col-12">
                                                         <div class="form-group">
                                                             <label>{{ __('Contact') }}</label>
-                                                            <small class="text-muted">(+917878787878)</small>
+                                                            <small class="text-muted">(+92 3XX XXXXXXX)</small>
                                                             <input type="text" class="form-control" name="contact"
                                                                 id="guest-user-contact" placeholder="Phone Number">
                                                         </div>

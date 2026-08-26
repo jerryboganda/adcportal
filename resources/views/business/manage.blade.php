@@ -495,13 +495,13 @@
                                                                                 @if ($staff->review < $i)
                                                                                     @if (is_float($staff->review) && round($staff->review) == $i)
                                                                                         <i
-                                                                                            class="text-warning fas fa-star-half-alt"></i>
+                                                                                            class="text-warning ti ti-star-half"></i>
                                                                                     @else
-                                                                                        <i class="fas fa-star"></i>
+                                                                                        <i class="ti ti-star"></i>
                                                                                     @endif
                                                                                 @else
                                                                                     <i
-                                                                                        class="text-warning fas fa-star"></i>
+                                                                                        class="text-warning ti ti-star"></i>
                                                                                 @endif
                                                                             @endfor
                                                                             <span
@@ -758,7 +758,7 @@
 
                                                 <div class="mt-2 add-break-btn">
                                                     <span data-repeater-create="">
-                                                        <i class="fas fa-plus-circle"></i>
+                                                        <i class="ti ti-circle-plus"></i>
                                                         {{ __('Add break') }}
                                                     </span>
                                                 </div>
@@ -908,7 +908,7 @@
                                                                         name="enable_domain" value="enable_businesslink"
                                                                         id="enable_storelink"
                                                                         {{ isset($company_settings['enable_businesslink']) && $company_settings['enable_businesslink'] == 'on' ? 'checked' : '' }} /><i
-                                                                        class="me-2" data-feather="folder"></i>
+                                                                        class="ti ti-folder me-2"></i>
                                                                     {{ __('Business Link') }}
                                                                 </label>
                                                             </div>
@@ -922,7 +922,7 @@
                                                                         name="enable_domain" value="enable_domain"
                                                                         id="enable_domain"
                                                                         {{ isset($company_settings['enable_domain']) && $company_settings['enable_domain'] == 'on' ? 'checked' : '' }} /><i
-                                                                        class="me-2" data-feather="folder"></i>
+                                                                        class="ti ti-folder me-2"></i>
                                                                     {{ __('Domain') }}
                                                                 </label>
                                                             </div>
@@ -936,7 +936,7 @@
                                                                         name="enable_domain" value="enable_subdomain"
                                                                         id="enable_subdomain"
                                                                         {{ isset($company_settings['enable_subdomain']) && $company_settings['enable_subdomain'] == 'on' ? 'checked' : '' }}><i
-                                                                        class="me-2" data-feather="folder"></i>
+                                                                        class="ti ti-folder me-2"></i>
                                                                     {{ __('Sub Domain') }}
                                                                 </label>
                                                             </div>
@@ -961,7 +961,7 @@
                                                                         data-bs-original-title="{{ __('Copy Business Link') }}"
                                                                         title="{{ __('Copy Business Link') }}"
                                                                         id="button-addon2" onclick="myFunction()"><i
-                                                                            class="far fa-copy"></i></button>
+                                                                            class="ti ti-copy"></i></button>
                                                                 </div>
                                                             </div>
                                                         </div>

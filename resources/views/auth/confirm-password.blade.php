@@ -1,36 +1,34 @@
-<x-guest-layout>
-    <x-auth-card>
-        <x-slot name="logo">
-            <a href="/">
-                <x-application-logo class="w-20 h-20 fill-current text-gray-500" />
-            </a>
-        </x-slot>
+@extends('layouts.auth')
 
-        <div class="mb-4 text-sm text-gray-600">
-            {{ __('This is a secure area of the application. Please confirm your password before continuing.') }}
+@section('page-title')
+    {{ __('Confirm Password') }}
+@endsection
+
+@section('content')
+<div class="card">
+    <div class="card-body">
+        <div class="">
+            <h2 class="mb-2 f-w-600">{{ __('Confirm Password') }}</h2>
+            <p class="text-muted mb-4">{{ __('This is a secure area of the application. Please confirm your password before continuing.') }}</p>
         </div>
-
-        <!-- Validation Errors -->
-        <x-auth-validation-errors class="mb-4" :errors="$errors" />
-
         <form method="POST" action="{{ route('password.confirm') }}">
             @csrf
-
-            <!-- Password -->
-            <div>
-                <x-label for="password" :value="__('Password')" />
-
-                <x-input id="password" class="block mt-1 w-full"
-                                type="password"
-                                name="password"
-                                required autocomplete="current-password" />
+            <div class="form-group mb-3">
+                <label class="form-label" for="password">{{ __('Password') }}</label>
+                <input id="password" type="password"
+                    class="form-control @error('password') is-invalid @enderror"
+                    name="password" value="{{ old('password') }}"
+                    placeholder="{{ __('Password') }}" required autocomplete="current-password" autofocus>
+                @error('password')
+                    <span class="invalid-feedback d-block" role="alert">
+                        <small>{{ $message }}</small>
+                    </span>
+                @enderror
             </div>
-
-            <div class="flex justify-end mt-4">
-                <button type="submit" class="btn btn-primary">
-                    {{ __('Confirm') }}
-                </button>
+            <div class="d-grid">
+                <button type="submit" class="btn btn-primary btn-block mt-2">{{ __('Confirm') }}</button>
             </div>
         </form>
-    </x-auth-card>
-</x-guest-layout>
+    </div>
+</div>
+@endsection

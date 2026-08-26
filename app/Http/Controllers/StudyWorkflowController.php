@@ -29,7 +29,19 @@ class StudyWorkflowController extends Controller
 
         $studies = Appointment::forClinic($businessId)
             ->whereIn('workflow_state', [StudyState::Booked->value, StudyState::CheckedIn->value])
-            ->whereDate('date_sort', $request->filled('date') ? $request->date : $today)
+            ->when($request->filled('date'), fn ($q) => $q->whereDate('date_sort', $request->date))
+            ->when(! $request->filled('date'), fn ($q) => $q->whereDate('date_sort', $today))
+            ->when($request->filled('q'), function ($q) use ($request) {
+                $term = '%' . str_replace(['%', '_'], ['\%', '\_'], trim($request->q)) . '%';
+                $q->where(function ($w) use ($term) {
+                    $w->where('name', 'like', $term)
+                        ->orWhere('token_number', 'like', $term)
+                        ->orWhereHas('CustomerData', fn ($c) => $c
+                            ->where('name', 'like', $term)
+                            ->orWhere('mrn', 'like', $term)
+                            ->orWhere('email', 'like', $term));
+                });
+            })
             ->with(self::eagerForWorklist())
             ->orderBy('time')
             ->get();
@@ -145,7 +157,10 @@ class StudyWorkflowController extends Controller
             $query->whereDate('date_sort', today());
         }
 
-        $studies = $query->orderBy('date_sort')->orderBy('time')->get()
+        $studies = $query
+            // Portable STAT-first prioritisation (MySQL & SQLite safe).
+            ->orderByRaw("CASE priority WHEN 'stat' THEN 0 WHEN 'urgent' THEN 1 ELSE 2 END")
+            ->orderBy('date_sort')->orderBy('time')->get()
             ->groupBy(fn ($a) => optional($a->ServiceData)->modality_id ?? 0);
 
         $modalities = Modality::forClinic()->orderBy('name')->get();

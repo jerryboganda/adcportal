@@ -104,7 +104,7 @@
                             <div class="card-inner flex-wrap gap-3 d-flex justify-content-between">
                                 <div class="card-content">
                                     <div class="theme-avtar bg-white">
-                                        <i class="fas fa-briefcase text-danger"></i>
+                                        <i class="ti ti-briefcase text-danger"></i>
 
                                     </div>
                                     {{-- Single-clinic app: business list removed; link to clinic settings. --}}
@@ -121,7 +121,7 @@
                             <div class="card-inner flex-wrap gap-3 d-flex justify-content-between">
                                 <div class="card-content">
                                     <div class="theme-avtar bg-white">
-                                        <i class="fas fa-calendar-alt"></i>
+                                        <i class="ti ti-calendar"></i>
                                     </div>
                                     <a href="{{ route('appointment.index') }}">
                                         <h3 class="mt-3 mb-0">{{ __('Total Appointment') }}</h3>
@@ -136,7 +136,7 @@
                             <div class="card-inner flex-wrap gap-3 d-flex justify-content-between">
                                 <div class="card-content">
                                     <div class="theme-avtar bg-white">
-                                        <i class="fas fa-chart-bar"></i>
+                                        <i class="ti ti-chart-bar"></i>
                                     </div>
                                     <a href="{{ route('appointment.index') }}">
                                         <h3 class="mt-3 mb-0">{{ __('Total Revenue') }}</h3>
@@ -151,7 +151,7 @@
                             <div class="card-inner flex-wrap gap-3 d-flex justify-content-between">
                                 <div class="card-content">
                                     <div class="theme-avtar bg-white">
-                                        <i class="fas fa-user-friends"></i>
+                                        <i class="ti ti-users"></i>
                                     </div>
                                     <a href="{{ route('business.manage', getActiveBusiness()) }}">
                                         <h3 class="mt-3 mb-0">{{ __('Total Staff') }}</h3>
@@ -166,7 +166,7 @@
                             <div class="card-inner flex-wrap gap-3 d-flex justify-content-between">
                                 <div class="card-content">
                                     <div class="theme-avtar bg-white">
-                                        <i class="fas fa-user-cog"></i>
+                                        <i class="ti ti-user-cog"></i>
                                     </div>
                                     <a href="{{ route('business.manage', getActiveBusiness()) }}">
                                         <h3 class="mt-3 mb-0">{{ __('Total Service') }}</h3>
@@ -182,7 +182,7 @@
                             <div class="card-inner flex-wrap gap-3 d-flex justify-content-between">
                                 <div class="card-content">
                                     <div class="theme-avtar bg-white">
-                                        <i class="fas fa-map-marker-alt"></i>
+                                        <i class="ti ti-map-pin"></i>
                                     </div>
                                     <a href="{{ route('business.manage', getActiveBusiness()) }}">
                                         <h3 class="mt-3 mb-0">{{ __('Total Location') }}</h3>

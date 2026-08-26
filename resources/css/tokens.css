@@ -1,56 +1,353 @@
-/* ADC Design Tokens — Single source of truth (replaces 4-way $color logic) */
-:root {
-  /* Primary — mapped from Business->theme_color / admin_settings color; fallback #0CAF60 */
-  --adc-primary: #0CAF60;
-  --adc-primary-hover: #0a9a53;
-  --adc-primary-soft: #e6f7ef;
-  --adc-primary-border: #b7eed1;
+/* ==========================================================================
+   ADC DESIGN TOKENS — Single source of truth
+   Layer 1: primitives (ramps, scales)
+   Layer 2: semantic aliases (--adc-*)
+   Layer 3: Bootstrap 5.3 bridge (component-level CSS variables)
+   Rules for all new UI:
+     - Never hardcode hex values in Blade/JS — reference tokens.
+     - Dark mode is token-driven: [data-bs-theme="dark"] (synced from
+       cust_darklayout in layouts/main.blade.php).
+   Legacy aliases below are kept for backward compatibility during migration;
+   do not use them in new code.
+   ========================================================================== */
 
-  /* Neutrals */
-  --adc-bg: #f8f9fa;
-  --adc-surface: #ffffff;
+/* --------------------------------------------------------------------------
+   LAYER 1 — PRIMITIVES
+   -------------------------------------------------------------------------- */
+:root {
+  /* Primary ramp (brand anchor: 600) */
+  --adc-primary-50:  #ecfdf3;
+  --adc-primary-100: #d1fadf;
+  --adc-primary-200: #a6f4c5;
+  --adc-primary-300: #6ce9a6;
+  --adc-primary-400: #32d583;
+  --adc-primary-500: #12b76a;
+  --adc-primary-600: #0caf60;
+  --adc-primary-700: #027a48;
+  --adc-primary-800: #05603a;
+  --adc-primary-900: #054f31;
+
+  /* Neutral ramp */
+  --adc-gray-0:   #ffffff;
+  --adc-gray-25:  #fcfcfd;
+  --adc-gray-50:  #f8f9fa;
+  --adc-gray-100: #f2f4f7;
+  --adc-gray-200: #eaecf0;
+  --adc-gray-300: #d0d5dd;
+  --adc-gray-400: #98a2b3;
+  --adc-gray-500: #667085;
+  --adc-gray-600: #475467;
+  --adc-gray-700: #344054;
+  --adc-gray-800: #1d2939;
+  --adc-gray-900: #101828;
+
+  /* Status palette (aligned with StudyState::color()) */
+  --adc-success-500: #12b76a;  --adc-success-600: #027a48;  --adc-success-soft: rgba(18,183,106,.12);
+  --adc-warning-500: #f79009;  --adc-warning-600: #b54708;  --adc-warning-soft: rgba(247,144,9,.14);
+  --adc-danger-500:  #f04438;  --adc-danger-600:  #b42318;  --adc-danger-soft:  rgba(240,68,56,.12);
+  --adc-info-500:    #2e90fa;  --adc-info-600:    #175cd3;  --adc-info-soft:    rgba(46,144,250,.12);
+  --adc-purple-500:  #7a5af8;  --adc-purple-600:  #6938ef;  --adc-purple-soft:  rgba(122,90,248,.12);
+  --adc-orange-500:  #f76c44;  --adc-orange-600:  #d92d20;  --adc-orange-soft:  rgba(247,108,68,.14);
+  --adc-teal-500:    #15b79e;  --adc-teal-600:    #0e9384;  --adc-teal-soft:    rgba(21,183,158,.12);
+
+  /* Spacing scale (4pt grid) */
+  --adc-space-1:  4px;
+  --adc-space-2:  8px;
+  --adc-space-3:  12px;
+  --adc-space-4:  16px;
+  --adc-space-5:  20px;
+  --adc-space-6:  24px;
+  --adc-space-7:  32px;
+  --adc-space-8:  40px;
+  --adc-space-9:  48px;
+  --adc-space-10: 56px;
+  --adc-space-11: 64px;
+  --adc-space-12: 80px;
+
+  /* Typography scale */
+  --adc-text-xs:  .75rem;    /* 12 */
+  --adc-text-sm:  .8125rem;  /* 13 */
+  --adc-text-md:  .875rem;   /* 14 */
+  --adc-text-lg:  1rem;      /* 16 */
+  --adc-text-xl:  1.125rem;  /* 18 */
+  --adc-text-2xl: 1.375rem;  /* 22 */
+  --adc-text-3xl: 1.75rem;   /* 28 */
+  --adc-text-4xl: 2.25rem;   /* 36 */
+  --adc-leading-tight: 1.25;
+  --adc-leading-base:  1.5;
+  --adc-leading-relaxed: 1.625;
+  --adc-weight-regular: 400;
+  --adc-weight-medium: 500;
+  --adc-weight-semibold: 600;
+  --adc-weight-bold: 700;
+
+  /* Motion */
+  --adc-dur-fast: 120ms;
+  --adc-dur-base: 220ms;
+  --adc-dur-slow: 420ms;
+  --adc-ease-standard: cubic-bezier(.2, 0, 0, 1);
+  --adc-ease-decelerate: cubic-bezier(0, 0, 0, 1);
+  --adc-ease-accelerate: cubic-bezier(.3, 0, 1, 1);
+
+  /* Z-index scale */
+  --adc-z-dropdown: 1000;
+  --adc-z-sticky:   1020;
+  --adc-z-fixed:    1030;
+  --adc-z-backdrop: 1040;
+  --adc-z-modal:    1055;
+  --adc-z-popover:  1070;
+  --adc-z-tooltip:  1080;
+  --adc-z-toast:    1090;
+  --adc-z-loader:   2000;
+
+/* --------------------------------------------------------------------------
+   LAYER 2 — SEMANTIC ALIASES (light theme defaults)
+   -------------------------------------------------------------------------- */
+  /* Brand */
+  --adc-primary: var(--adc-primary-600);
+  --adc-primary-hover: var(--adc-primary-700);
+  --adc-primary-active: var(--adc-primary-800);
+  --adc-primary-soft: var(--adc-primary-50);
+  --adc-primary-border: var(--adc-primary-200);
+  --adc-on-primary: #ffffff;
+
+  /* Surfaces & text */
+  --adc-bg: var(--adc-gray-50);
+  --adc-surface: var(--adc-gray-0);
+  --adc-surface-alt: var(--adc-gray-100);
   --adc-text: #212529;
-  --adc-text-muted: #6c757d;
-  --adc-border: #e9ecef;
+  --adc-text-muted: var(--adc-gray-500);
+  --adc-border: var(--adc-gray-200);
   --adc-border-strong: #dee2e6;
 
-  /* Radius / Shadow / Font */
-  --adc-radius: 12px;
+  /* Semantic */
+  --adc-success: var(--adc-success-500);
+  --adc-warning: var(--adc-warning-500);
+  --adc-danger: var(--adc-danger-500);
+  --adc-info: var(--adc-info-500);
+  --adc-purple: var(--adc-purple-500);
+  --adc-orange: var(--adc-orange-500);
+  --adc-teal: var(--adc-teal-500);
+
+  /* Radii */
   --adc-radius-sm: 8px;
+  --adc-radius: 12px;
   --adc-radius-lg: 16px;
-  --adc-shadow: 0 4px 20px rgba(0,0,0,0.06);
-  --adc-shadow-lg: 0 8px 30px rgba(0,0,0,0.08);
-  --adc-font: 'Outfit', system-ui, -apple-system, sans-serif;
+  --adc-radius-xl: 20px;
+  --adc-radius-pill: 999px;
+
+  /* Elevation */
+  --adc-shadow-xs: 0 1px 2px rgba(16,24,40,.05);
+  --adc-shadow-sm: 0 2px 8px rgba(16,24,40,.06);
+  --adc-shadow: 0 4px 20px rgba(0,0,0,.06);
+  --adc-shadow-lg: 0 8px 30px rgba(0,0,0,.08);
+  --adc-shadow-xl: 0 16px 48px rgba(16,24,40,.14);
+
+  /* Type families */
+  --adc-font: 'Outfit', system-ui, -apple-system, 'Segoe UI', sans-serif;
   --adc-font-ar: 'Noto Sans Arabic', system-ui, sans-serif;
 
-  /* Bootstrap overrides via CSS vars (Bootstrap 5.3 respects these) */
+  /* Focus */
+  --adc-focus-ring: 0 0 0 3px rgba(12, 175, 96, .35);
+  --adc-focus-ring-danger: 0 0 0 3px rgba(240, 68, 56, .3);
+
+  /* Bootstrap global bridges (runtime-variable based) */
   --bs-primary: var(--adc-primary);
   --bs-primary-rgb: 12, 175, 96;
   --bs-link-color: var(--adc-primary);
   --bs-link-hover-color: var(--adc-primary-hover);
   --bs-border-radius: var(--adc-radius-sm);
   --bs-border-radius-lg: var(--adc-radius);
+  --bs-border-radius-xl: var(--adc-radius-lg);
 }
 
-/* Dark mode tokens — toggled via data-theme="dark" on <html> or body.cust_darklayout */
-[data-theme="dark"], body.cust_darklayout {
-  --adc-bg: #1a1d23;
-  --adc-surface: #232730;
+/* --------------------------------------------------------------------------
+   BOOTSTRAP COMPONENT BRIDGE — re-skins stock BS 5.3 components to tokens
+   (compiled BS uses literal hexes for these, so they need explicit overrides)
+   -------------------------------------------------------------------------- */
+.btn-primary {
+  --bs-btn-bg: var(--adc-primary);
+  --bs-btn-border-color: var(--adc-primary);
+  --bs-btn-hover-bg: var(--adc-primary-hover);
+  --bs-btn-hover-border-color: var(--adc-primary-hover);
+  --bs-btn-active-bg: var(--adc-primary-active);
+  --bs-btn-active-border-color: var(--adc-primary-active);
+  --bs-btn-disabled-bg: var(--adc-primary);
+  --bs-btn-disabled-border-color: var(--adc-primary);
+  --bs-btn-color: var(--adc-on-primary);
+  --bs-btn-hover-color: var(--adc-on-primary);
+  --bs-btn-focus-shadow-rgb: 12, 175, 96;
+}
+.btn-outline-primary {
+  --bs-btn-color: var(--adc-primary);
+  --bs-btn-border-color: var(--adc-primary);
+  --bs-btn-hover-bg: var(--adc-primary);
+  --bs-btn-hover-border-color: var(--adc-primary);
+  --bs-btn-active-bg: var(--adc-primary);
+  --bs-btn-active-border-color: var(--adc-primary);
+  --bs-btn-disabled-color: var(--adc-primary);
+  --bs-btn-disabled-border-color: var(--adc-primary);
+  --bs-btn-focus-shadow-rgb: 12, 175, 96;
+}
+.btn-link { --bs-btn-color: var(--adc-primary); --bs-btn-hover-color: var(--adc-primary-hover); }
+.form-control:focus, .form-select:focus {
+  border-color: var(--adc-primary);
+  box-shadow: var(--adc-focus-ring);
+}
+.form-check-input:checked {
+  background-color: var(--adc-primary);
+  border-color: var(--adc-primary);
+}
+.form-check-input:focus { box-shadow: var(--adc-focus-ring); border-color: var(--adc-primary); }
+.form-control.is-invalid:focus, .form-select.is-invalid:focus { box-shadow: var(--adc-focus-ring-danger); }
+.nav-pills .nav-link.active, .nav-link.active {
+  background-color: var(--adc-primary) !important;
+  color: var(--adc-on-primary) !important;
+}
+.page-item.active .page-link {
+  background-color: var(--adc-primary) !important;
+  border-color: var(--adc-primary) !important;
+}
+.progress-bar { background-color: var(--adc-primary); }
+.spinner-border { color: var(--adc-primary); }
+a { outline: none; }
+a:focus-visible, .btn:focus-visible, .form-control:focus-visible,
+.form-select:focus-visible, .form-check-input:focus-visible,
+.page-link:focus-visible, .dropdown-item:focus-visible {
+  outline: none;
+  box-shadow: var(--adc-focus-ring);
+}
+
+/* Accessible motion preference — applies globally */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: .01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* --------------------------------------------------------------------------
+   DARK THEME — driven by data-bs-theme (set in layouts/main.blade.php),
+   plus legacy hooks (body.cust_darklayout, data-theme="dark")
+   -------------------------------------------------------------------------- */
+[data-bs-theme="dark"], [data-theme="dark"], body.cust_darklayout {
+  --adc-bg: #14161b;
+  --adc-surface: #1d2027;
+  --adc-surface-alt: #23272f;
   --adc-text: #e9ecef;
   --adc-text-muted: #adb5bd;
   --adc-border: #343a40;
+  --adc-border-strong: #495057;
+
+  --adc-primary-soft: rgba(18, 183, 106, .16);
+  --adc-success-soft: rgba(18,183,106,.18);
+  --adc-warning-soft: rgba(247,144,9,.18);
+  --adc-danger-soft:  rgba(240,68,56,.18);
+  --adc-info-soft:    rgba(46,144,250,.18);
+  --adc-purple-soft:  rgba(122,90,248,.18);
+  --adc-orange-soft:  rgba(247,108,68,.18);
+  --adc-teal-soft:    rgba(21,183,158,.18);
+
+  --adc-shadow-xs: 0 1px 2px rgba(0,0,0,.4);
+  --adc-shadow-sm: 0 2px 8px rgba(0,0,0,.45);
+  --adc-shadow: 0 4px 20px rgba(0,0,0,.5);
+  --adc-shadow-lg: 0 8px 30px rgba(0,0,0,.55);
+  --adc-shadow-xl: 0 16px 48px rgba(0,0,0,.6);
+
   --bs-body-bg: var(--adc-bg);
   --bs-body-color: var(--adc-text);
+  --bs-secondary-bg: var(--adc-surface-alt);
+  --bs-tertiary-bg: var(--adc-surface);
+  --bs-border-color: var(--adc-border);
+  --bs-secondary-color: var(--adc-text-muted);
 }
 
-/* RTL — logical props handle most, but keep dir-based overrides minimal */
+/* --------------------------------------------------------------------------
+   RTL — layout handled by logical properties in new code; dir-based
+   exceptions live here only when unavoidable.
+   -------------------------------------------------------------------------- */
 [dir="rtl"] {
-  /* Bootstrap 5 RTL handles via rtlcss; keep custom overrides here if needed */
+  /* reserved */
 }
 
-/* Utility helpers to replace inline style="display:none" etc (Phase 2 will purge inline) */
+[dir="rtl"], [dir="rtl"] input, [dir="rtl"] select, [dir="rtl"] textarea, [dir="rtl"] button {
+  font-family: var(--adc-font-ar), var(--adc-font);
+}
+
+/* --------------------------------------------------------------------------
+   UTILITIES
+   -------------------------------------------------------------------------- */
 .hidden { display: none !important; }
 .sr-only {
   position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
   overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0;
+}
+.no-print { }
+
+/* --------------------------------------------------------------------------
+   PRINT FOUNDATION — dedicated A4/report views refine this further
+   -------------------------------------------------------------------------- */
+@media print {
+  .dash-header, .dash-footer, .loader-bg, .no-print,
+  .modal-backdrop, .toast-container, [data-adc-print-hide] {
+    display: none !important;
+  }
+  body { background: #fff !important; color: #000 !important; }
+  .card { box-shadow: none !important; border: 1px solid #dee2e6 !important; break-inside: avoid; }
+  a[href]::after { content: ''; }
+  @page { margin: 12mm; }
+}
+
+/* --------------------------------------------------------------------------
+   PATIENT PORTAL SHELL — minimal chrome, token-driven
+   -------------------------------------------------------------------------- */
+.adc-topbar {
+  background: var(--adc-surface);
+  border-bottom: 1px solid var(--adc-border);
+  position: sticky;
+  top: 0;
+  z-index: var(--adc-z-sticky);
+}
+.adc-topbar-inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--adc-space-3);
+  min-height: 60px;
+}
+.adc-brand {
+  display: flex;
+  align-items: center;
+  gap: var(--adc-space-2);
+  font-weight: var(--adc-weight-semibold);
+  color: var(--adc-text);
+  text-decoration: none;
+}
+.adc-brand img { height: 36px; width: auto; }
+.adc-userchip {
+  display: flex;
+  align-items: center;
+  gap: var(--adc-space-2);
+  color: var(--adc-text-muted);
+  font-size: var(--adc-text-md);
+}
+.adc-page {
+  max-width: 980px;
+  margin-inline: auto;
+  padding: var(--adc-space-6) var(--adc-space-4);
+}
+.adc-footnote {
+  color: var(--adc-text-muted);
+  font-size: var(--adc-text-xs);
+  text-align: center;
+  padding: var(--adc-space-7) var(--adc-space-4);
+}
+.study-card {
+  border: 1px solid var(--adc-border);
+  border-radius: var(--adc-radius);
+  background: var(--adc-surface);
+  padding: var(--adc-space-4);
+  margin-bottom: var(--adc-space-3);
 }

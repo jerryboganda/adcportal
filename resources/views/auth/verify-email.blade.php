@@ -8,16 +8,16 @@
         <div class="card-body">
             <div class="">
                 <h2 class="mb-3 f-w-600">{{ __('Verify Email') }}</h2>
-                <h6>{{ __('Thanks for signing up! Before getting started, could you verify your email address by clicking on the link we just emailed to you? If you didn\'t receive the email, we will gladly send you another.') }}
-                </h6>
+            <h6 class="text-muted mb-3 fw-normal">{{ __('Thanks for signing up! Before getting started, could you verify your email address by clicking on the link we just emailed to you? If you didn\'t receive the email, we will gladly send you another.') }}
+            </h6>
             </div>
             @if (session('status') == 'verification-link-sent')
-                <div class="mb-4 font-medium text-sm text-success">
+                <div class="mb-4 font-medium text-sm text-success" role="status">
                     {{ __('A new verification link has been sent to the email address you provided during registration.') }}
                 </div>
             @elseif(session('status') == 'verification-link-not-sent')
-                <div class="mb-4 font-medium text-sm text-danger">
-                    {{ __("Oops! We encountered an issue while attempting to send the email. It seems there's a problem with the mail server's SMTP (Simple Mail Transfer Protocol). Please review the SMTP settings and configuration to resolve the problem.") }}
+                <div class="mb-4 font-medium text-sm text-danger" role="alert">
+                    {{ __("We couldn't send the verification email right now. Please try again shortly or contact the clinic for help.") }}
                 </div>
             @endif
             <form method="POST" action="{{ route('verification.send') }}">
@@ -30,9 +30,9 @@
             <form method="POST" action="{{ route('logout') }}">
                 @csrf
                 <div class="d-flex justify-content-center">
-                    <button type="submit" class="btn btn-danger btn-block mt-2">
-                        {{ __('LogOut') }}
-                    </button>
+                <button type="submit" class="btn btn-outline-secondary btn-sm mt-2">
+                    {{ __('LogOut') }}
+                </button>
                 </div>
             </form>
         </div>

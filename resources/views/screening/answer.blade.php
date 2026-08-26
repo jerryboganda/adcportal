@@ -26,7 +26,8 @@
                         @csrf
                         @foreach($questions as $q)
                             @php $saved = $existing->get($q->id); @endphp
-                            <div class="border rounded p-3 mb-3 {{ ($saved?->is_risk && empty($saved?->override_reason)) ? 'border-danger' : '' }}">
+                            <div class="border rounded p-3 mb-3 screening-item {{ ($saved?->is_risk && empty($saved?->override_reason)) ? 'border-danger' : '' }}"
+                                data-risk-value="{{ !empty($q->risk_value) ? $q->risk_value : '' }}">
                                 <label class="form-label fw-bold">{{ $q->question_text }}</label>
                                 @if($q->help_text)
                                     <small class="d-block text-muted mb-2">{{ $q->help_text }}</small>
@@ -57,10 +58,14 @@
                                 </div>
                                 @if(!empty($q->risk_value))
                                     <div class="mt-2 ps-2">
+                                        <div class="risk-live alert alert-warning py-2 px-3 d-none" role="alert">
+                                            <i class="ti ti-alert-triangle me-1"></i>{{ __('Risk flagged — acquisition will be blocked unless an override reason is documented below.') }}
+                                        </div>
                                         <label class="small text-muted">{{ __('If risk flagged: override requires a documented reason') }}</label>
                                         <input type="text" name="overrides[{{ $q->id }}]" class="form-control form-control-sm mt-1"
                                             style="max-width:420px" value="{{ old('overrides.'.$q->id, $saved?->override_reason) }}"
-                                            placeholder="{{ __('Override reason (leave blank to keep blocked)') }}">
+                                            placeholder="{{ __('Override reason (leave blank to keep blocked)') }}"
+                                            aria-describedby="risk-hint-{{ $q->id }}">
                                     </div>
                                 @endif
                             </div>
@@ -76,3 +81,22 @@
         </div>
     </div>
 @endsection
+
+@push('scripts')
+<script>
+    document.addEventListener('change', function (e) {
+        const target = e.target;
+        if (!target.name || target.name.indexOf('answers[') !== 0) return;
+        const item = target.closest('.screening-item');
+        if (!item) return;
+        const riskValue = item.getAttribute('data-risk-value');
+        const flagged = !!riskValue && (
+            (target.type === 'radio' && target.checked && target.value === riskValue) ||
+            (target.type !== 'radio' && target.value === riskValue)
+        );
+        item.classList.toggle('border-danger', flagged);
+        const hint = item.querySelector('.risk-live');
+        if (hint) hint.classList.toggle('d-none', !flagged);
+    });
+</script>
+@endpush

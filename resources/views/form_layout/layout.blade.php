@@ -8,11 +8,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>{{ $business->name }}</title>
-    <meta name="description" content="form-one">
-    <meta name="keywords" content="form-one">
+    <meta name="description" content="{{ __('Book your diagnostic appointment online at') }} {{ $business->name }}">
+    <meta name="keywords" content="diagnostic, radiology, appointment, {{ $business->name }}">
     <link rel="icon" href="{{ asset('form_layouts/' . $business->layouts . '/images/favicon.png') }}">
-    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@100..900&display=swap" rel="stylesheet">
-    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Arabic:wght@100..900&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="{{ asset('form_layouts/' . $business->layouts . '/css/main-style.css') }}">
     <link rel="stylesheet" href="{{ asset('form_layouts/' . $business->layouts . '/css/responsive.css') }}">
     <link rel="stylesheet" href="{{ asset('module_assets/loader.css') }}">
@@ -32,10 +30,6 @@
     @if (!empty($business->pwa_business($business->slug)->background_color))
         <meta name="apple-mobile-web-app-status-bar"
             content="{{ $business->pwa_business($business->slug)->background_color }}" />
-    @endif
-    @if (false)
-        <link rel="stylesheet"
-            href="{{ asset('packages/adc/AdditionalCustomField/src/Resources/assets/custom.css') }}">
     @endif
     {{-- end pwa customer app --}}
 
@@ -92,23 +86,6 @@ $currency_setting = json_encode(
     <script src="{{ asset('module_assets/loader.js') }}"></script>
     <script src="{{ asset('js/custom.js') }}"></script>
 
-    @if ($business->enable_pwa == 'on')
-        <script type="text/javascript">
-            const container = document.querySelector("body")
-
-            const coffees = [];
-
-            if ("serviceWorker" in navigator) {
-                window.addEventListener("load", function() {
-                    navigator.serviceWorker
-                        .register("{{ asset('packages/adc/PWA/src/Resources/assets/js/serviceWorker.js') }}")
-                        .then(res => console.log("service worker registered"))
-                        .catch(err => console.log("service worker not registered", err))
-
-                })
-            }
-        </script>
-    @endif
     <script>
         $(document).ready(function() {
 
@@ -146,14 +123,14 @@ $currency_setting = json_encode(
                             console.log('Layout: First service:', response.services[0]);
                             updateServiceDropdown(response.services);
                         } else {
-                            alert('Error: ' + (response.error || 'Unable to load services'));
+                            adcToast('error', response.error || 'Unable to load services');
                         }
                     },
                     error: function(xhr, status, error) {
                         $('#loader').fadeOut();
                         console.error('Error fetching services:', error);
                         console.error('XHR response:', xhr.responseText);
-                        alert('Failed to load services. Please try again.');
+                        adcToast('error', 'Failed to load services. Please try again.');
                     }
                 });
             }
@@ -809,7 +786,7 @@ $currency_setting = json_encode(
                 var isValidContact = /^\+[1-9]\d{0,2}\d{1,15}$/.test(contact);
 
                 if (!name || !email || !password || !contact || !isValidContact) {
-                    alert('Please fill in all required fields for new user and enter a valid Contact Number.');
+                    adcToast('error', 'Please fill in all required fields for new user and enter a valid Contact Number.');
                     return false;
                 }
                 return true;
@@ -821,7 +798,7 @@ $currency_setting = json_encode(
                 var password = $('#existing-user-password').val();
 
                 if (!email || !password) {
-                    alert('Please fill in all required fields for existing user.');
+                    adcToast('error', 'Please fill in all required fields for existing user.');
                     return Promise.resolve(false);
                 } else {
                     return checkUser(email, password);
@@ -844,7 +821,7 @@ $currency_setting = json_encode(
                         success: function(response) {
                             $('#loader').fadeOut();
                             if (response.status == 'error') {
-                                alert(response.message);
+                                adcToast('error', response.message);
                                 resolve(false);
                             } else {
                                 resolve(true);
@@ -867,7 +844,7 @@ $currency_setting = json_encode(
                 var isValidContact = /^\+[1-9]\d{0,2}\d{1,15}$/.test(contact);
 
                 if (!name || !email || !contact || !isValidContact) {
-                    alert('Please fill in all required fields for guest user and enter a valid Contact Number.');
+                    adcToast('error', 'Please fill in all required fields for guest user and enter a valid Contact Number.');
                     return false;
                 }
                 return true;
@@ -882,7 +859,7 @@ $currency_setting = json_encode(
 
                 if (selectedService?.service_type != 'collaborative') {
                     if (!service || !staff || !location) {
-                        alert('Please select all required fields.');
+                        adcToast('error', 'Please select all required fields.');
                         return false;
                     }
                 }
@@ -896,7 +873,7 @@ $currency_setting = json_encode(
                     var sequential_staff = $repeaterItem.find('.sequential_staff').val();
 
                     if (!sequential_service || !sequential_location || !sequential_staff) {
-                        alert('Please select all required fields in repeater item');
+                        adcToast('error', 'Please select all required fields in repeater item');
                         isValid = false;
                         return false;
                     }
@@ -911,7 +888,7 @@ $currency_setting = json_encode(
                 var timeslot = $('.timeslot').is(':checked');
 
                 if (!date || !timeslot) {
-                    alert('Please select all required field.');
+                    adcToast('error', 'Please select all required field.');
                     return false;
                 }
                 return true;

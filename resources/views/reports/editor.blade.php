@@ -61,8 +61,30 @@
                                     v{{ $r->version }} · {{ ucfirst($r->type) }}
                                     {{ $r->isSigned() ? '✔' : '(draft)' }}
                                     — {{ optional($r->signed_at)?->format('d M H:i') }}
+                                    @if($r->isSigned())
+                                        <a href="{{ route('reports.pdf', $r->id) }}" target="_blank" rel="noopener"
+                                            class="ms-1 small" aria-label="{{ __('Open version PDF') }}">{{ __('open PDF') }}</a>
+                                    @endif
                                 </p>
                             @endforeach
+                        </div>
+                    </div>
+                @endif
+
+                @if($appointment->state() === \App\Enums\StudyState::Reading)
+                    <div class="card">
+                        <div class="card-header py-2"><h6 class="mb-0 text-danger">{{ __('Reject to Technologist') }}</h6></div>
+                        <div class="card-body small">
+                            <form method="POST" action="{{ route('study.transition', $appointment->id) }}"
+                                onsubmit="return confirm('{{ __('Reject this study back to the technologist? A reason is required.') }}')">
+                                @csrf
+                                <input type="hidden" name="action" value="reject">
+                                <label class="form-label" for="reject-reason">{{ __('Reason (required)') }}</label>
+                                <textarea id="reject-reason" name="reason" rows="2" class="form-control form-control-sm" required></textarea>
+                                <button type="submit" class="btn btn-sm btn-outline-danger mt-2">
+                                    <i class="ti ti-arrow-back-up me-1"></i>{{ __('Send back for re-acquisition') }}
+                                </button>
+                            </form>
                         </div>
                     </div>
                 @endif
@@ -158,6 +180,22 @@
             signNow.addEventListener('change', function () {
                 document.getElementById('sign-options').style.display = signNow.checked ? 'flex' : 'none';
             });
+        }
+
+        const form = document.getElementById('report-form');
+        if (!form) return;
+        let dirty = false;
+        form.addEventListener('input', function () { dirty = true; }, { passive: true });
+        form.addEventListener('submit', function () { dirty = false; });
+        window.addEventListener('beforeunload', function (e) {
+            if (dirty) { e.preventDefault(); e.returnValue = ''; }
+        });
+
+        const sigInput = form.querySelector('input[name="signature_confirm"]');
+        if (sigInput) {
+            sigInput.addEventListener('input', function () {
+                sigInput.setCustomValidity('');
+            }, { passive: true });
         }
     });
 </script>

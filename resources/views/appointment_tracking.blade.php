@@ -275,15 +275,22 @@
                             $step2_label = __('Paid');
                         }
 
-                        // Step 3: Booking Status
+                        // Step 3: Booking Status — derived from the clinical pipeline (StudyState),
+                        // never from English substring matching of legacy status titles.
                         $currentStatus = $appointmentDetails->StatusData->title ?? __('Pending');
-                        $step3_state = 'active'; // Default to active
-                        // Check for various "positive" statuses to mark as completed/green
-                        $positiveStatuses = ['Complete', 'Done', 'Paid', 'Confirmed', 'Approved', 'Succeed'];
-                        foreach ($positiveStatuses as $status) {
-                            if (stripos($currentStatus, $status) !== false) {
+                        $step3_state = 'active';
+                        $trackingState = \App\Enums\StudyState::tryFrom((string) ($appointmentDetails->workflow_state ?? ''));
+                        if ($trackingState) {
+                            $currentStatus = $trackingState->label();
+                            if (in_array($trackingState, [\App\Enums\StudyState::Reported, \App\Enums\StudyState::Delivered], true)) {
                                 $step3_state = 'completed';
-                                break;
+                            }
+                        } else {
+                            foreach (['Complete', 'Done', 'Paid', 'Confirmed', 'Approved', 'Succeed'] as $status) {
+                                if (stripos($currentStatus, $status) !== false) {
+                                    $step3_state = 'completed';
+                                    break;
+                                }
                             }
                         }
 
@@ -366,9 +373,9 @@
                                         <div class="d-flex align-items-center">
                                             <div class="bg-light rounded-circle p-1 me-2"
                                                 style="width:30px;height:30px;display:flex;align-items:center;justify-content:center;">
-                                                <i class="ti ti-user text-primary" style="font-size:14px;"></i>
-                                            </div>
-                                            Dr Mian Waheed Ahmad
+                                            <i class="ti ti-user text-primary" style="font-size:14px;"></i>
+                                        </div>
+                                        {{ __('To be assigned') }}
                                         </div>
                                     @endif
                                 </div>

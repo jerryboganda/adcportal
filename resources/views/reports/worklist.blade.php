@@ -15,7 +15,13 @@
                 <label class="d-flex align-items-center gap-1 small">
                     <input type="checkbox" name="mine" value="1" {{ request('mine') ? 'checked' : '' }}> {{ __('Assigned to me') }}
                 </label>
-                <select name="priority" class="form-select form-select-sm" style="max-width:150px">
+                <select name="modality" class="form-select form-select-sm" style="max-width:170px" aria-label="{{ __('Modality') }}">
+                    <option value="">{{ __('All modalities') }}</option>
+                    @foreach($modalities as $mod)
+                        <option value="{{ $mod->id }}" {{ request('modality') == $mod->id ? 'selected' : '' }}>{{ $mod->name }}</option>
+                    @endforeach
+                </select>
+                <select name="priority" class="form-select form-select-sm" style="max-width:150px" aria-label="{{ __('Priority') }}">
                     <option value="">{{ __('Any priority') }}</option>
                     @foreach(['stat','urgent','routine'] as $p)
                         <option value="{{ $p }}" {{ request('priority') == $p ? 'selected' : '' }}>{{ strtoupper($p) }}</option>
@@ -29,7 +35,7 @@
     <div class="card">
         <div class="card-header d-flex justify-content-between align-items-center">
             <h5 class="mb-0">{{ __('Studies Awaiting Interpretation') }}</h5>
-            <span class="badge bg-primary">{{ $studies->count() }}</span>
+            <span class="badge bg-primary">{{ $studies->total() }} {{ __('studies') }}</span>
         </div>
         <div class="card-body table-responsive">
             <table class="table table-hover align-middle">
@@ -75,7 +81,24 @@
                             </a>
                             @endpermission
                             @if($latest?->isSigned())
-                                <a href="{{ route('reports.pdf', $latest->id) }}" class="btn btn-sm btn-outline-secondary"><i class="ti ti-file-download"></i></a>
+                                <a href="{{ route('reports.pdf', $latest->id) }}" class="btn btn-sm btn-outline-secondary"
+                                    aria-label="{{ __('Download PDF') }}"><i class="ti ti-file-download"></i></a>
+                                @if($study->state() === \App\Enums\StudyState::Reported)
+                                    @permission('report release')
+                                    <form method="POST" action="{{ route('reports.release', $latest->id) }}" class="d-inline">
+                                        @csrf
+                                        <input type="hidden" name="channel" value="email">
+                                        <button type="submit" class="btn btn-sm btn-success" data-adc-confirm
+                                            data-adc-confirm-message="{{ __('Release the final report to the patient (email)?') }}"
+                                            data-adc-confirm-text="{{ __('Release Report') }}">
+                                            <i class="ti ti-send me-1"></i>{{ __('Release') }}
+                                        </button>
+                                    </form>
+                                    @endpermission
+                                @endif
+                            @endif
+                            @if($study->state() === \App\Enums\StudyState::Delivered)
+                                <span class="badge bg-label-success align-self-center"><i class="ti ti-check me-1"></i>{{ __('Delivered') }}</span>
                             @endif
                         </td>
                     </tr>
@@ -84,6 +107,10 @@
                 @endforelse
                 </tbody>
             </table>
+        </div>
+        <div class="card-footer py-2 d-flex justify-content-between align-items-center">
+            <span class="small text-muted">{{ __('Showing :count of :total', ['count' => $studies->count(), 'total' => $studies->total()]) }}</span>
+            {{ $studies->links() }}
         </div>
     </div>
 @endsection

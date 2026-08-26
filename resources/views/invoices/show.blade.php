@@ -21,14 +21,17 @@
                         @if(!$invoice->issued_at)
                             @permission('invoice edit')
                             <form method="POST" action="{{ route('invoices.issue', $invoice) }}">@csrf
-                                <button class="btn btn-sm btn-info">{{ __('Issue Invoice') }}</button>
+                                <button class="btn btn-sm btn-primary">{{ __('Issue Invoice') }}</button>
                             </form>
                             @endpermission
                         @endif
                         @permission('invoice delete')
                         <form method="POST" action="{{ route('invoices.void', $invoice) }}">@csrf
-                            <button class="btn btn-sm btn-outline-danger show_confirm"
-                                {{ (float)$invoice->paid_total > 0 ? 'disabled' : '' }}>{{ __('Void') }}</button>
+                            <button type="submit" class="btn btn-sm btn-outline-danger"
+                                {{ (float)$invoice->paid_total > 0 ? 'disabled' : '' }}
+                                data-adc-confirm
+                                data-adc-confirm-message="{{ __('Void this invoice? This cannot be undone.') }}"
+                                data-adc-confirm-text="{{ __('Void Invoice') }}">{{ __('Void') }}</button>
                         </form>
                         @endpermission
                         <a href="{{ route('invoices.pdf', $invoice) }}" class="btn btn-sm btn-secondary"><i class="ti ti-printer me-1"></i>{{ __('PDF / Print') }}</a>
@@ -51,18 +54,18 @@
                             <tr>
                                 <td>{{ $item->description }}</td>
                                 <td class="text-center">{{ $item->quantity }}</td>
-                                <td class="text-end">{{ currency_format($item->unit_price) }}</td>
-                                <td class="text-end">{{ currency_format($item->discount) }}</td>
-                                <td class="text-end fw-bold">{{ currency_format($item->line_total) }}</td>
+                                <td class="text-end">{{ currency_format_with_sym($item->unit_price) }}</td>
+                                <td class="text-end">{{ currency_format_with_sym($item->discount) }}</td>
+                                <td class="text-end fw-bold">{{ currency_format_with_sym($item->line_total) }}</td>
                             </tr>
                         @endforeach
                         </tbody>
                         <tfoot class="border-top">
-                        <tr><td colspan="4" class="text-end text-muted">Subtotal</td><td class="text-end">{{ currency_format($invoice->subtotal) }}</td></tr>
-                        <tr><td colspan="4" class="text-end text-muted">Tax (@{{ $invoice->tax_rate }}%)</td><td class="text-end">{{ currency_format($invoice->tax_amount) }}</td></tr>
-                        <tr><td colspan="4" class="text-end fw-bold">Total</td><td class="text-end fs-5 fw-bold">{{ currency_format($invoice->total) }}</td></tr>
-                        <tr><td colspan="4" class="text-end text-success">Paid</td><td class="text-end text-success">{{ currency_format($invoice->paid_total) }}</td></tr>
-                        <tr><td colspan="4" class="text-end text-danger fw-bold">Balance Due</td><td class="text-end text-danger fw-bold">{{ currency_format($invoice->balance_due) }}</td></tr>
+                        <tr><td colspan="4" class="text-end text-muted">{{ __('Subtotal') }}</td><td class="text-end">{{ currency_format_with_sym($invoice->subtotal) }}</td></tr>
+                        <tr><td colspan="4" class="text-end text-muted">{{ __('Tax') }} ({{ $invoice->tax_rate }}%)</td><td class="text-end">{{ currency_format_with_sym($invoice->tax_amount) }}</td></tr>
+                        <tr><td colspan="4" class="text-end fw-bold">{{ __('Total') }}</td><td class="text-end fs-5 fw-bold">{{ currency_format_with_sym($invoice->total) }}</td></tr>
+                        <tr><td colspan="4" class="text-end text-success">{{ __('Paid') }}</td><td class="text-end text-success">{{ currency_format_with_sym($invoice->paid_total) }}</td></tr>
+                        <tr><td colspan="4" class="text-end text-danger fw-bold">{{ __('Balance Due') }}</td><td class="text-end text-danger fw-bold">{{ currency_format_with_sym($invoice->balance_due) }}</td></tr>
                         </tfoot>
                     </table>
                 </div>
@@ -77,24 +80,30 @@
                         @permission('invoice payment')
                         <form method="POST" action="{{ route('invoices.payments.store', $invoice) }}" class="row g-2">
                             @csrf
+                            @if ($errors->any())
+                                <div class="col-12">
+                                    <div class="alert alert-danger py-2 mb-0 small" role="alert">{{ $errors->first() }}</div>
+                                </div>
+                            @endif
                             <div class="col-12">
                                 <label class="form-label small">{{ __('Amount') }}</label>
                                 <input type="number" step="0.01" min="0.01" max="{{ $invoice->balance_due }}" name="amount"
-                                       class="form-control" value="{{ number_format($invoice->balance_due, 2, '.', '') }}" required>
+                                       class="form-control @error('amount') is-invalid @enderror" value="{{ old('amount', number_format($invoice->balance_due, 2, '.', '')) }}" required>
+                                @error('amount')
+                                    <span class="invalid-feedback d-block" role="alert"><small>{{ $message }}</small></span>
+                                @enderror
                             </div>
                             <div class="col-7">
                                 <label class="form-label small">{{ __('Method') }}</label>
                                 <select name="method" class="form-select">
-                                    <option value="cash">{{ __('Cash') }}</option>
-                                    <option value="card">{{ __('Card') }}</option>
-                                    <option value="bank">{{ __('Bank Transfer') }}</option>
-                                    <option value="mobile">{{ __('Mobile Wallet') }}</option>
-                                    <option value="insurance">{{ __('Insurance') }}</option>
+                                    @foreach(['cash' => __('Cash'), 'card' => __('Card'), 'bank' => __('Bank Transfer'), 'mobile' => __('Mobile Wallet'), 'insurance' => __('Insurance')] as $m => $mLabel)
+                                        <option value="{{ $m }}" {{ old('method', 'cash') === $m ? 'selected' : '' }}>{{ $mLabel }}</option>
+                                    @endforeach
                                 </select>
                             </div>
                             <div class="col-5">
                                 <label class="form-label small">{{ __('Reference') }}</label>
-                                <input name="reference" class="form-control">
+                                <input name="reference" class="form-control" value="{{ old('reference') }}">
                             </div>
                             <div class="col-12"><button class="btn btn-success w-100 btn-sm">{{ __('Save Payment') }}</button></div>
                         </form>
@@ -111,7 +120,7 @@
                     @forelse($invoice->payments as $pay)
                         <li class="list-group-item d-flex justify-content-between align-items-center">
                             <span>
-                                <strong>{{ currency_format($pay->amount) }}</strong> · {{ ucfirst($pay->method) }}
+                                <strong>{{ currency_format_with_sym($pay->amount) }}</strong> · {{ ucfirst($pay->method) }}
                                 @if($pay->reference)<br><small class="text-muted">{{ $pay->reference }}</small>@endif
                             </span>
                             <small class="text-muted text-end">{{ optional($pay->paid_at)->format('d M H:i') }}<br>{{ optional($pay->receivedBy)->name }}</small>

@@ -39,9 +39,11 @@ class RadiologyReportController extends Controller
             ->orderByRaw("CASE priority WHEN 'stat' THEN 0 WHEN 'urgent' THEN 1 ELSE 2 END")
             ->orderBy('acquired_at');
 
-        $studies = $query->get();
+        $modalities = \App\Models\Modality::forClinic()->orderBy('name')->get();
 
-        return view('reports.worklist', compact('studies'));
+        $studies = $query->paginate(25)->withQueryString();
+
+        return view('reports.worklist', compact('studies', 'modalities'));
     }
 
     // ==================== Editor ====================
@@ -250,6 +252,12 @@ class RadiologyReportController extends Controller
         }
         if (! Auth::user()->isAbleTo('report sign')) {
             throw new \InvalidArgumentException(__('You are not allowed to sign reports.'));
+        }
+
+        // Typed-signature confirmation must match the signing radiologist.
+        $confirmed = trim((string) $request->input('signature_confirm'));
+        if (mb_strtolower($confirmed) !== mb_strtolower(trim(Auth::user()->name))) {
+            throw new \InvalidArgumentException(__('Your typed name does not match your account name — signature not applied.'));
         }
 
         $type = $report->type === 'addendum' ? 'addendum' : ($request->input('sign_as') === 'preliminary' ? 'preliminary' : 'final');

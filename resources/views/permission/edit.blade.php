@@ -12,14 +12,14 @@
         @enderror
     </div>
     <div class="form-group">
-        {{Form::label('name',__('Module'),array('class'=>'col-form-label'))}}
-        <select class="form-control" data-trigger name="module" id="choices-single-default" placeholder="This is a search placeholder">
+        {{Form::label('module',__('Module'),array('class'=>'col-form-label'))}}
+        <select class="form-control" data-trigger name="module" id="choices-single-default">
             @foreach ($modules as $module)
-                <option value="{{ $module }}">{{ $module }}</option>
+                <option value="{{ $module }}" {{ $permission->module == $module ? 'selected' : '' }}>{{ $module }}</option>
             @endforeach
         </select>
-        @error('name')
-        <span class="invalid-name" role="alert">
+        @error('module')
+        <span class="invalid-module" role="alert">
                     <strong class="text-danger">{{ $message }}</strong>
                 </span>
         @enderror
@@ -27,14 +27,14 @@
 
     <div class="text-end">
         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{{__('Cancel')}}</button>
-        {{Form::submit(__('Create'),array('class'=>'btn  btn-primary'))}}
+        {{Form::submit(__('Update'),array('class'=>'btn  btn-primary'))}}
     </div>
 {{Form::close()}}
 @push('scripts')
 <script>
     "use strict";
  var multipleCancelButton = new Choices(
-        '#choices-single-defaultlq', {
+        '#choices-single-default', {
             removeItemButton: true,
         }
         );

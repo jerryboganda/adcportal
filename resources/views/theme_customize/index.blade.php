@@ -47,7 +47,7 @@
                                     @permission('theme edit')
                                         <div>
                                             <a href="{{ route('customize.edit', [$id, $json_settings['slug'], $json_settings['sections'][0]['slug'], $businessID ]) }}"
-                                                class="card-btn text-primary d-flex align-items-center gap-2">{{ __('Change Setting') }} <i class="fas fa-chevron-right"></i></a>
+                                                class="card-btn text-primary d-flex align-items-center gap-2">{{ __('Change Setting') }} <i class="ti ti-chevron-right"></i></a>
                                         </div>
                                     @endpermission
                                 </div>

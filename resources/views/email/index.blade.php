@@ -26,7 +26,7 @@
                     </div>
                     <div class="form-group col-md-4">
                         <label for="mail_password" class="form-label">{{ __('Mail Password') }}</label>
-                        {{ Form::text('mail_password', isset($settings['mail_password']) ? $settings['mail_password'] : null, ['class' => 'form-control', 'placeholder' => __('Enter Mail Password'), 'required' => 'required', 'id' => 'mail_password']) }}
+                        {{ Form::password('mail_password', ['class' => 'form-control', 'placeholder' => __('Enter Mail Password'), 'required' => 'required', 'id' => 'mail_password', 'autocomplete' => 'new-password']) }}
                     </div>
                     <div class="form-group col-md-4">
                         <label for="mail_encryption" class="form-label">{{ __('Mail Encryption') }}</label>

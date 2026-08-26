@@ -18,7 +18,7 @@
             <div>
                 <div class="form-group mb-3">
                     <label class="form-label">{{ __('Email') }}</label>
-                    <input id="email" type="email" class="form-control  @error('email') is-invalid @enderror" name="email" value="{{ old('email') }}" placeholder="{{ __('E-Mail Address') }}" required autofocus>
+                    <input id="email" type="email" class="form-control  @error('email') is-invalid @enderror" name="email" value="{{ old('email') }}" placeholder="{{ __('E-Mail Address') }}" required autofocus autocomplete="email">
                     @error('email')
                         <span class="error invalid-email text-danger" role="alert">
                             <small>{{ $message }}</small>
@@ -27,9 +27,9 @@
                 </div>
                 <div class="form-group mb-3">
                     <label class="form-label">{{ __('Password') }}</label>
-                    <input id="password" type="password" class="form-control  @error('password') is-invalid @enderror" name="password" placeholder="{{ __('Password') }}" required>
+                    <input id="password" type="password" class="form-control  @error('password') is-invalid @enderror" name="password" placeholder="{{ __('Password') }}" required autocomplete="current-password">
                     @error('password')
-                    <span class="error invalid-password text-danger" role="alert">
+                    <span class="invalid-feedback d-block" role="alert">
                         <small>{{ $message }}</small>
                     </span>
                     @enderror
@@ -39,28 +39,6 @@
                     </div>
                     @endif
                 </div>
-                @if(false && (isset($admin_settings['google_recaptcha_is_on']) ? $admin_settings['google_recaptcha_is_on'] : 'off') == 'on' )
-                    @if (isset($admin_settings['google_recaptcha_version']) && $admin_settings['google_recaptcha_version'] == 'v2')
-                        <div class="form-group col-lg-12 col-md-12 mt-3">
-                            {!! NoCaptcha::display() !!}
-                            @error('g-recaptcha-response')
-                            <span class="error small text-danger" role="alert">
-                                <strong>{{ $message }}</strong>
-                            </span>
-                            @enderror
-                        </div>
-                    @else
-                        @if (isset($admin_settings['google_recaptcha_version']) && $admin_settings['google_recaptcha_version'] == 'v3')
-                            <div class="form-group mb-4">
-                                <input type="hidden" id="g-recaptcha-response" name="g-recaptcha-response" class="form-control">
-                                @error('g-recaptcha-response')
-                                    <span class="error small text-danger" role="alert">
-                                        <strong>{{ $message }}</strong>
-                                    </span>
-                                @enderror
-                            </div>
-                        @endif
-                    @endif
                 @endif
 
                 <div class="d-grid">
@@ -80,25 +58,4 @@
             return true;
         });
     </script>
-    @if(false && (isset($admin_settings['google_recaptcha_is_on']) ? $admin_settings['google_recaptcha_is_on'] : 'off') == 'on' )
-        @if (isset($admin_settings['google_recaptcha_version']) && $admin_settings['google_recaptcha_version'] == 'v2')
-            {!! NoCaptcha::renderJs() !!}
-        @else
-            @if (isset($admin_settings['google_recaptcha_version']) && $admin_settings['google_recaptcha_version'] == 'v3')
-                <script src="https://www.google.com/recaptcha/api.js?render={{ $admin_settings['google_recaptcha_key'] }}"></script>
-                <script>
-                    $(document).ready(function() {
-                        grecaptcha.ready(function() {
-                            grecaptcha.execute('{{ $admin_settings['google_recaptcha_key'] }}', {
-                                action: 'submit'
-                            }).then(function(token) {
-
-                                $('#g-recaptcha-response').val(token);
-                            });
-                        });
-                    });
-                </script>
-            @endif
-        @endif
-    @endif
 @endpush

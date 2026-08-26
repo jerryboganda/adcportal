@@ -152,7 +152,7 @@
                     autocomplete="off" required="required" data-dates={{ json_encode($combinedArray) }}
                     data-holiday={{ json_encode($businesholiday) }}>
                 <span class="input-group-text">
-                    <i class="feather icon-calendar"></i>
+                    <i class="ti ti-calendar"></i>
                 </span>
             </div>
         </div>

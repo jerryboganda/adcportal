@@ -14,7 +14,8 @@
 
 @endphp
 <!DOCTYPE html>
-<html lang="{{ str_replace('_', '-', app()->getLocale()) }}" dir="{{ isset($company_settings['site_rtl']) && $company_settings['site_rtl'] == 'on' ? 'rtl' : 'ltr' }}">
+<html lang="{{ str_replace('_', '-', app()->getLocale()) }}" dir="{{ isset($company_settings['site_rtl']) && $company_settings['site_rtl'] == 'on' ? 'rtl' : 'ltr' }}"
+    data-bs-theme="{{ isset($company_settings['cust_darklayout']) && $company_settings['cust_darklayout'] == 'on' ? 'dark' : 'light' }}">
 
 @include('partials.head')
 

@@ -72,3 +72,8 @@ Thumbs.db
 # Local dev runtime logs (never commit)
 /serve.err
 /serve.log
+
+# Playwright
+/test-results/
+/playwright-report/
+

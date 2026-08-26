@@ -1046,10 +1046,10 @@ if (!function_exists('currency_format_with_sym')) {
             $company_settings = getCompanyAllSetting();
         }
         $symbol_position = 'pre';
-        $symbol = 'â‚¨'; // Default to PKR symbol
+        $symbol = 'Rs'; // Default to PKR symbol
         $format = '1';
         $currency_space = null;
-        $number = explode('.', $price);
+        $number = explode('.', (string) $price);
         $length = strlen(trim($number[0]));
 
         if (isset($company_settings['site_currency_symbol_position']) && $company_settings['site_currency_symbol_position'] == "post") {
@@ -1064,13 +1064,9 @@ if (!function_exists('currency_format_with_sym')) {
             $format = $company_settings['currency_format'];
         }
 
-        if ($length > 3) {
-            $decimal_separator  = isset($company_settings['float_number']) && $company_settings['float_number'] === 'dot' ? '.' : ',';
-            $thousand_separator = isset($company_settings['thousand_separator']) && $company_settings['thousand_separator'] === 'dot' ? '.' : ',';
-        } else {
-            $decimal_separator  = isset($company_settings['decimal_separator']) && $company_settings['decimal_separator'] === 'dot'  ? '.' : ',';
-            $thousand_separator = isset($company_settings['thousand_separator']) && $company_settings['thousand_separator'] === 'dot' ? '.' : ',';
-        }
+        // Consistent separator handling — no special-casing by magnitude.
+        $decimal_separator  = isset($company_settings['decimal_separator']) && $company_settings['decimal_separator'] === 'dot'  ? '.' : ',';
+        $thousand_separator = isset($company_settings['thousand_separator']) && $company_settings['thousand_separator'] === 'dot' ? '.' : ',';
 
         if (isset($company_settings['currency_space'])) {
             $currency_space = isset($company_settings['currency_space']) ? $company_settings['currency_space'] : '';

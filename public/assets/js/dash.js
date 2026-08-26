@@ -1,8 +1,10 @@
 "use strict";
 var flg = "0";
 document.addEventListener("DOMContentLoaded", function () {
-  // feather icon start
-  feather.replace();
+  // feather icon start (guarded — feather runtime removed in design-system consolidation)
+  if (window.feather) {
+    feather.replace();
+  }
   // feather icon end
   // remove pre-loader start
   setTimeout(function () {

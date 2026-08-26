@@ -6,4 +6,5 @@ window.Alpine = Alpine;
 Alpine.start();
 
 import './bootstrap';
+import './adc-ui';
 import './wizard.js';

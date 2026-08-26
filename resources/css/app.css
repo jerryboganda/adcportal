@@ -1,9 +1,71 @@
-/* ADC Vite entry — Bootstrap 5.3 + Tokens + Utilities */
+/* ADC Vite entry â€” self-hosted fonts + Bootstrap 5.3 + design tokens */
+
+/* --- Self-hosted typography (Outfit + Noto Sans Arabic, OFL licensed) --- */
+@font-face {
+  font-family: 'Outfit';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('../fonts/outfit-latin-400-normal.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Outfit';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url('../fonts/outfit-latin-500-normal.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Outfit';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url('../fonts/outfit-latin-600-normal.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Outfit';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url('../fonts/outfit-latin-700-normal.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Noto Sans Arabic';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('../fonts/noto-sans-arabic-arabic-400-normal.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Noto Sans Arabic';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url('../fonts/noto-sans-arabic-arabic-500-normal.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Noto Sans Arabic';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url('../fonts/noto-sans-arabic-arabic-600-normal.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Noto Sans Arabic';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url('../fonts/noto-sans-arabic-arabic-700-normal.woff2') format('woff2');
+}
+
+/* --- Frameworks & tokens --- */
 @import 'bootstrap/dist/css/bootstrap.min.css';
 @import './tokens.css';
 
-/* Future: migrate public/assets/css/style.css, custome.css, module_assets/*.css here */
-/* @import '../../public/assets/css/style.css';  — deferred to Phase 2 to avoid flash */
-
-/* Minimal app overrides */
-body { font-family: var(--adc-font); background: var(--adc-bg); color: var(--adc-text); }
+/* --- Base --- */
+html { -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility; }
+body {
+  font-family: var(--adc-font);
+  background: var(--adc-bg);
+  color: var(--adc-text);
+}

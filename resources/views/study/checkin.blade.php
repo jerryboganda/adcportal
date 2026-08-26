@@ -17,8 +17,10 @@
                         <h5 class="mb-0">{{ __("Today's Studies") }}</h5>
                         <small class="text-muted">{{ __('Check patients in as they arrive; mark no-shows to keep the queue clean.') }}</small>
                     </div>
-                    <form method="GET" action="{{ route('study.checkin') }}" class="d-flex gap-2 align-items-center">
-                        <input type="date" name="date" value="{{ request('date', now()->format('Y-m-d')) }}" class="form-control form-control-sm">
+                    <form method="GET" action="{{ route('study.checkin') }}" class="d-flex gap-2 align-items-center" role="search">
+                        <input type="search" name="q" value="{{ request('q') }}" class="form-control form-control-sm"
+                            placeholder="{{ __('Search name / MRN / token') }}" aria-label="{{ __('Search patients') }}" style="min-width:200px">
+                        <input type="date" name="date" value="{{ request('date', now()->format('Y-m-d')) }}" class="form-control form-control-sm" aria-label="{{ __('Date') }}">
                         <button type="submit" class="btn btn-sm btn-primary">{{ __('Filter') }}</button>
                     </form>
                 </div>
@@ -69,14 +71,20 @@
                                                     @permission('study checkin')
                                                     <form method="POST" action="{{ route('study.checkin.do', $study->id) }}">
                                                         @csrf
-                                                        <button type="submit" class="btn btn-sm btn-primary"><i class="ti ti-login me-1"></i>{{ __('Check In') }}</button>
+                                                        <button type="submit" class="btn btn-sm btn-primary" data-adc-confirm
+                                                            data-adc-confirm-message="{{ __('Check in :name for :procedure?', ['name' => $study->patientDisplayName(), 'procedure' => $svc?->name ?? __('this study')]) }}"
+                                                            data-adc-confirm-text="{{ __('Check In') }}">
+                                                            <i class="ti ti-login me-1"></i>{{ __('Check In') }}
+                                                        </button>
                                                     </form>
                                                     @endpermission
                                                     @permission('study checkin')
                                                     <form method="POST" action="{{ route('study.no-show', $study->id) }}">
                                                         @csrf
-                                                        <button type="submit" class="btn btn-sm btn-outline-secondary show_confirm"
-                                                            title="{{ __('Mark No-Show') }}"><i class="ti ti-user-x"></i></button>
+                                                        <button type="submit" class="btn btn-sm btn-outline-secondary" data-adc-confirm
+                                                            data-adc-confirm-message="{{ __('Mark :name as no-show?', ['name' => $study->patientDisplayName()]) }}"
+                                                            data-adc-confirm-text="{{ __('Mark No-Show') }}"
+                                                            aria-label="{{ __('Mark No-Show') }}"><i class="ti ti-user-x"></i></button>
                                                     </form>
                                                     @endpermission
                                                 @elseif($state === \App\Enums\StudyState::CheckedIn)
@@ -104,3 +112,13 @@
         </div>
     </div>
 @endsection
+
+@push('scripts')
+<script>
+    setInterval(function () {
+        if (!document.hidden && !document.activeElement.matches('input, textarea, select')) {
+            window.location.reload();
+        }
+    }, 45000);
+</script>
+@endpush
