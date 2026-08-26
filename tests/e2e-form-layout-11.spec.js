@@ -61,7 +61,7 @@ test.describe('Form Layout 11 - Complete Booking Flow', () => {
             // Navigate to appointment form
             // Use the existing AMAD business which has services and data
             console.log('\n[TEST] Navigating to booking form...');
-            await page.goto('https://bookinggo.test/appointments/amad-diagnostic-centre-gujranwala', {
+            await page.goto('/appointments/amad-diagnostic-centre-gujranwala', {
                 waitUntil: 'networkidle',
                 timeout: 30000
             });

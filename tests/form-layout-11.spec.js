@@ -53,7 +53,7 @@ test.describe('Form Layout 11 - Booking Flow with Error Capture', () => {
     try {
       // Navigate to the booking page
       console.log('Navigating to Form Layout 11...');
-      await page.goto('https://bookinggo.test/appointments/form/amaddiagnosticcentre-gujranwala', {
+      await page.goto('/appointments/form/amaddiagnosticcentre-gujranwala', {
         waitUntil: 'networkidle',
         timeout: 30000
       });

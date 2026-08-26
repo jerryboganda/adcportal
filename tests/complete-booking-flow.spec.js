@@ -31,7 +31,7 @@ test.describe('Form Layout 11 - Complete End-to-End Booking', () => {
             console.log('\n=== Starting Complete Booking Test ===\n');
             
             // Navigate to form
-            await page.goto('https://bookinggo.test/appointments/test-form-layout-11-2', {
+            await page.goto('/appointments/test-form-layout-11-2', {
                 waitUntil: 'load',
                 timeout: 30000
             });

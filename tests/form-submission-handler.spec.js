@@ -28,7 +28,7 @@ test.describe('Form Layout 11 - Form Submission Handler Test', () => {
         try {
             // Load the Form Layout 11 from test business
             console.log('[TEST] Loading Form Layout 11...');
-            await page.goto('https://bookinggo.test/appointments/test-form-layout-11-2', {
+            await page.goto('/appointments/test-form-layout-11-2', {
                 waitUntil: 'load',
                 timeout: 30000
             });
