@@ -83,17 +83,26 @@ test.describe('Form Layout 11 - Booking Flow with Error Capture', () => {
         }
       }
 
-      // Step 1: Select first available staff and location (single-option seeds auto-apply)
-      for (const sel of ['#staffSelect', '#locationSelect']) {
-        const el = await page.$(sel);
-        if (el) {
-          const vals = await page.$$eval(sel + ' option', os => os.map(o => o.value).filter(v => v));
-          if (vals.length > 0) {
-            await page.selectOption(sel, vals[0]);
-            await page.waitForTimeout(300);
-            console.log('✓ Selected', sel, '=>', vals[0]);
-          }
-        }
+      // Step 1: Select first available staff and location (single-option seeds auto-apply).
+      // The staff dropdown is populated via AJAX (get-staff-data) only once BOTH service
+      // and location are chosen, so pick location first, then wait for staff options.
+      const locVals = await page.$$eval('#locationSelect option', os => os.map(o => o.value).filter(v => v));
+      if (locVals.length > 0) {
+        await page.selectOption('#locationSelect', locVals[0]);
+        await page.waitForTimeout(300);
+        console.log('✓ Selected #locationSelect =>', locVals[0]);
+      }
+      await page.waitForFunction(() => {
+        const s = document.getElementById('staffSelect');
+        return s && Array.from(s.options).some(o => o.value);
+      }, { timeout: 8000 }).catch(() => {});
+      const staffVals = await page.$$eval('#staffSelect option', os => os.map(o => o.value).filter(v => v));
+      if (staffVals.length > 0) {
+        await page.selectOption('#staffSelect', staffVals[0]);
+        await page.waitForTimeout(300);
+        console.log('✓ Selected #staffSelect =>', staffVals[0]);
+      } else {
+        console.log('WARNING: no staff options loaded');
       }
 
       // Click continue to Step 2
@@ -103,15 +112,21 @@ test.describe('Form Layout 11 - Booking Flow with Error Capture', () => {
 
       // Step 2: Select date
       console.log('\n--- STEP 2: Select Date ---');
-      const datepicker = await page.$('#datepicker');
-      if (datepicker) {
-        const tomorrow = new Date();
-        tomorrow.setDate(tomorrow.getDate() + 1);
-        const dateStr = tomorrow.toISOString().split('T')[0];
-        await page.fill('#datepicker', dateStr);
-        await page.waitForTimeout(500);
-        console.log('✓ Date selected:', dateStr);
-      }
+        const datepicker = await page.$('#datepicker');
+        if (datepicker) {
+          // #datepicker is a readonly bootstrap-datepicker input; drive it via the widget API.
+          await page.evaluate(() => {
+            const d = new Date();
+            d.setDate(d.getDate() + 1);
+            const $el = (window.jQuery || window.$);
+            if ($el) {
+              $el('#datepicker').datepicker('setDate', d);
+              $el('#datepicker').trigger('changeDate');
+            }
+          });
+          await page.waitForTimeout(500);
+          console.log('✓ Date selected (tomorrow)');
+        }
 
       // Step 2: Select time
       console.log('\n--- STEP 2: Select Time ---');

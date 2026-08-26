@@ -99,7 +99,29 @@ test.describe('Form Layout 11 - Complete Booking Flow', () => {
                 if (services.length > 0) {
                     await page.selectOption('#serviceSelect', services[0]);
                     console.log('[TEST] ✓ Service selected:', services[0]);
-                    
+
+                    // Staff + location are required by the booking validator.
+                    // The staff dropdown is populated via AJAX (get-staff-data) only once BOTH
+                    // service and location are chosen, so pick location first, then staff.
+                    const locVals = await page.$$eval('#locationSelect option', os => os.map(o => o.value).filter(v => v));
+                    if (locVals.length > 0) {
+                        await page.selectOption('#locationSelect', locVals[0]);
+                        await page.waitForTimeout(300);
+                        console.log('[TEST] ✓ Selected #locationSelect =>', locVals[0]);
+                    }
+                    await page.waitForFunction(() => {
+                        const s = document.getElementById('staffSelect');
+                        return s && Array.from(s.options).some(o => o.value);
+                    }, { timeout: 8000 }).catch(() => {});
+                    const staffVals = await page.$$eval('#staffSelect option', os => os.map(o => o.value).filter(v => v));
+                    if (staffVals.length > 0) {
+                        await page.selectOption('#staffSelect', staffVals[0]);
+                        await page.waitForTimeout(200);
+                        console.log('[TEST] ✓ Selected #staffSelect =>', staffVals[0]);
+                    } else {
+                        console.log('[TEST] WARNING: no staff options loaded');
+                    }
+
                     // Click Continue button
                     await page.click('#fl11ContinueStep1');
                     await page.waitForTimeout(500);
@@ -122,8 +144,17 @@ test.describe('Form Layout 11 - Complete Booking Flow', () => {
             tomorrow.setDate(tomorrow.getDate() + 1);
             const dateStr = tomorrow.toISOString().split('T')[0];
             
-            await page.fill('#datepicker', dateStr);
-            console.log('[TEST] ✓ Date selected:', dateStr);
+            // #datepicker is a readonly bootstrap-datepicker input; drive it via the widget API.
+            await page.evaluate(() => {
+                const d = new Date();
+                d.setDate(d.getDate() + 1);
+                const $el = (window.jQuery || window.$);
+                if ($el) {
+                    $el('#datepicker').datepicker('setDate', d);
+                    $el('#datepicker').trigger('changeDate');
+                }
+            });
+            console.log('[TEST] ✓ Date selected (tomorrow)');
             
             // Wait for time slots to load
             await page.waitForTimeout(1000);
@@ -186,7 +217,7 @@ test.describe('Form Layout 11 - Complete Booking Flow', () => {
                     await page.click('[data-tab="new-user"]');
                     await page.fill('#new_name', 'New Test User');
                     await page.fill('#new_email', 'newuser@example.com');
-                    await page.fill('#new_contact', '+0987654321');
+                    await page.fill('#new_contact', '+923001234567');
                     await page.fill('#new_password', 'Password@123');
                     console.log('[TEST] ✓ New user form filled');
                 }

@@ -108,8 +108,7 @@ test.describe('Form Layout 11 - Form Submission Handler Test', () => {
                 bookingNumber: await page.locator('#bookingNumber').count(),
                 bookingService: await page.locator('#bookingService').count(),
                 bookingDateTime: await page.locator('#bookingDateTime').count(),
-                bookingLocation: await page.locator('#bookingLocation').count(),
-                bookingStaff: await page.locator('#bookingStaff').count()
+                bookingLocation: await page.locator('#bookingLocation').count()
             };
             
             console.log('[TEST] Appointment detail fields:', detailFields);

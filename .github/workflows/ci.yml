@@ -41,6 +41,19 @@ jobs:
   e2e:
     runs-on: ubuntu-latest
     continue-on-error: true
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ALLOW_EMPTY_PASSWORD: 'yes'
+          MYSQL_DATABASE: adc_e2e
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
     steps:
       - uses: actions/checkout@v4
       - name: Setup PHP 8.3
@@ -60,9 +73,26 @@ jobs:
           npm ci
       - name: Build assets (Actions only per compute policy)
         run: npm run build
+      - name: Wait for MySQL
+        run: |
+          for i in $(seq 1 30); do
+            if (echo > /dev/tcp/127.0.0.1/3306) >/dev/null 2>&1; then echo "MySQL is up"; break; fi
+            sleep 2
+          done
+
       - name: Prepare environment
         run: |
           cp .env.example .env
+          # The booking wizard relies on MySQL-specific SQL (FIND_IN_SET in
+          # get-staff-data), so the e2e suite must run against MySQL, not SQLite.
+          sed -i 's/^DB_CONNECTION=.*/DB_CONNECTION=mysql/' .env
+          {
+            echo "DB_HOST=127.0.0.1"
+            echo "DB_PORT=3306"
+            echo "DB_DATABASE=adc_e2e"
+            echo "DB_USERNAME=root"
+            echo "DB_PASSWORD="
+          } >> .env
           mkdir -p storage/framework/cache/data storage/framework/sessions storage/framework/views storage/framework/testing storage/logs bootstrap/cache
           chmod -R 775 storage bootstrap/cache
           php artisan key:generate
