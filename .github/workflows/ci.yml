@@ -67,6 +67,7 @@ jobs:
           chmod -R 775 storage bootstrap/cache
           php artisan key:generate
           php artisan migrate --force
+          php artisan db:seed --force --class=E2eSeeder
       - name: Install Playwright browser
         run: npx playwright install --with-deps chromium
       - name: Start application

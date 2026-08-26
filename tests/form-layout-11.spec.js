@@ -53,7 +53,7 @@ test.describe('Form Layout 11 - Booking Flow with Error Capture', () => {
     try {
       // Navigate to the booking page
       console.log('Navigating to Form Layout 11...');
-      await page.goto('/appointments/form/amaddiagnosticcentre-gujranwala', {
+      await page.goto('/', {
         waitUntil: 'networkidle',
         timeout: 30000
       });
@@ -80,6 +80,19 @@ test.describe('Form Layout 11 - Booking Flow with Error Capture', () => {
           await page.selectOption('#serviceSelect', options[0]);
           await page.waitForTimeout(500);
           console.log('✓ Service selected:', options[0]);
+        }
+      }
+
+      // Step 1: Select first available staff and location (single-option seeds auto-apply)
+      for (const sel of ['#staffSelect', '#locationSelect']) {
+        const el = await page.$(sel);
+        if (el) {
+          const vals = await page.$$eval(sel + ' option', os => os.map(o => o.value).filter(v => v));
+          if (vals.length > 0) {
+            await page.selectOption(sel, vals[0]);
+            await page.waitForTimeout(300);
+            console.log('✓ Selected', sel, '=>', vals[0]);
+          }
         }
       }
 
