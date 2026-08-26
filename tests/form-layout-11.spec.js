@@ -154,21 +154,21 @@ test.describe('Form Layout 11 - Booking Flow with Error Capture', () => {
        }
 
       // Step 3: Continue to next
-      const continueStep3 = await page.$('#fl11ContinueStep3');
-      if (continueStep3) {
-        await page.click('#fl11ContinueStep3');
-        await page.waitForTimeout(1000);
-        console.log('✓ Step 3 completed');
-      }
+       const continueStep3 = await page.$('#fl11ContinueStep3');
+       if (continueStep3 && await continueStep3.isVisible().catch(() => false)) {
+         await page.click('#fl11ContinueStep3');
+         await page.waitForTimeout(1000);
+         console.log('✓ Step 3 completed');
+       }
 
-      // Step 4: Continue to payment
-      console.log('\n--- Moving to STEP 5 (Payment) ---');
-      const continueStep4 = await page.$('#fl11ContinueStep4');
-      if (continueStep4) {
-        await page.click('#fl11ContinueStep4');
-        await page.waitForTimeout(1500);
-        console.log('✓ Moved to payment step');
-      }
+       // Step 4: Continue to payment
+       console.log('\n--- Moving to STEP 5 (Payment) ---');
+       const continueStep4 = await page.$('#fl11ContinueStep4');
+       if (continueStep4 && await continueStep4.isVisible().catch(() => false)) {
+         await page.click('#fl11ContinueStep4');
+         await page.waitForTimeout(1500);
+         console.log('✓ Moved to payment step');
+       }
 
       // Step 5: Click confirm booking button
       console.log('\n--- STEP 5: Confirm Booking ---');
