@@ -1279,6 +1279,14 @@
                         }
                     });
                     
+                    // Normalize the selected time-slot value to H:i. The radio
+                    // carries "HH:MM-HH:MM" (start-end) for the summary display,
+                    // but the booking validator requires a plain H:i time.
+                    var checkedDuration = appointmentForm.querySelector('input[name="duration"]:checked');
+                    if (checkedDuration && checkedDuration.value && checkedDuration.value.indexOf('-') !== -1) {
+                        checkedDuration.value = checkedDuration.value.split('-')[0];
+                    }
+
                     // Collect form data
                     var formData = new FormData(appointmentForm);
                     
