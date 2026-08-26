@@ -75,6 +75,7 @@ class E2eSeeder extends Seeder
         Staff::firstOrCreate(
             ['business_id' => $business->id, 'name' => 'Dr E2E Radiologist'],
             [
+                'user_id' => $admin->id,
                 'location_id' => (string) $location->id,
                 'service_id' => (string) $service->id,
                 'description' => 'Automated test radiologist.',
