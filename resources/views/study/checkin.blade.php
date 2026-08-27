@@ -25,7 +25,7 @@
                     </form>
                 </div>
                 <div class="card-body">
-                    <div class="table-responsive">
+                    <div class="booking-data-table">
                         <table class="table table-hover align-middle">
                             <thead>
                                 <tr>
@@ -84,13 +84,13 @@
                                                         <button type="submit" class="btn btn-sm btn-outline-secondary" data-adc-confirm
                                                             data-adc-confirm-message="{{ __('Mark :name as no-show?', ['name' => $study->patientDisplayName()]) }}"
                                                             data-adc-confirm-text="{{ __('Mark No-Show') }}"
-                                                            aria-label="{{ __('Mark No-Show') }}"><i class="ti ti-user-x"></i></button>
+                                                            aria-label="{{ __('Mark No-Show') }}"><i class="ti ti-user-x" aria-hidden="true"></i></button>
                                                     </form>
                                                     @endpermission
                                                 @elseif($state === \App\Enums\StudyState::CheckedIn)
                                                     <span class="text-muted">{{ __('Waiting for technologist') }}</span>
                                                     @permission('appointment manage')
-                                                    <a href="{{ route('appointment.details', $study->id) }}" class="btn btn-sm btn-outline-info"><i class="ti ti-eye"></i></a>
+                                                    <a href="{{ route('appointment.details', $study->id) }}" class="btn btn-sm btn-outline-info"><i class="ti ti-eye" aria-hidden="true"></i></a>
                                                     @endpermission
                                                 @endif
                                             </div>
@@ -99,7 +99,7 @@
                                 @empty
                                     <tr>
                                         <td colspan="8" class="text-center py-5 text-muted">
-                                            <i class="ti ti-calendar-off" style="font-size:48px"></i>
+                                            <i class="ti ti-calendar-off" style="font-size:48px" aria-hidden="true"></i>
                                             <p class="mt-2 mb-0">{{ __('No studies scheduled for this date.') }}</p>
                                         </td>
                                     </tr>

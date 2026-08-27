@@ -26,20 +26,20 @@
         @endif
         @permission('user logs history')
             <a href="{{ route('users.userlog.history') }}" class="btn btn-sm btn-primary" data-bs-toggle="tooltip"
-                data-bs-placement="top" title="{{ __('User Logs History') }}"><i class="ti ti-user-check"></i>
+                data-bs-placement="top" title="{{ __('User Logs History') }}" aria-label="{{ __('User Logs History') }}"><i class="ti ti-user-check" aria-hidden="true"></i>
             </a>
         @endpermission
         @permission('user manage')
             <a href="{{ route('users.index') }}" data-bs-toggle="tooltip" data-bs-original-title="{{ __('Grid View') }}"
-                class="btn btn-sm btn-primary btn-icon">
-                <i class="ti ti-layout-grid"></i>
+                class="btn btn-sm btn-primary btn-icon" aria-label="{{ __('Grid View') }}">
+                <i class="ti ti-layout-grid" aria-hidden="true"></i>
             </a>
         @endpermission
         @permission('user create')
             <a href="#" class="btn btn-sm btn-primary" data-ajax-popup="true" data-size="md"
                 data-title="{{ __('Create New ' . $singular_name) }}" data-url="{{ route('users.create') }}"
-                data-bs-toggle="tooltip" data-bs-original-title="{{ __('Create') }}">
-                <i class="ti ti-plus"></i>
+                data-bs-toggle="tooltip" data-bs-original-title="{{ __('Create') }}" aria-label="{{ __('Create New '.$singular_name) }}">
+                <i class="ti ti-plus" aria-hidden="true"></i>
             </a>
         @endpermission
     </div>

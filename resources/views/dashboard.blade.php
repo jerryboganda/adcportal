@@ -10,7 +10,7 @@
                     <h5 class="h3 mb-0">{{ __('Dashboard') }}</h5>
                     {{-- Single-clinic app: business switcher removed. --}}
                     <span class="dash-head-link me-0 cust-btn">
-                        <i class="ti ti-apps"></i>
+                        <i class="ti ti-apps" aria-hidden="true"></i>
                         <span class="hide-mob">{{ $business->name }}</span>
                     </span>
                 </div>
@@ -121,7 +121,7 @@
                             <div class="card-inner flex-wrap gap-3 d-flex justify-content-between">
                                 <div class="card-content">
                                     <div class="theme-avtar bg-white">
-                                        <i class="ti ti-calendar"></i>
+                                        <i class="ti ti-calendar" aria-hidden="true"></i>
                                     </div>
                                     <a href="{{ route('appointment.index') }}">
                                         <h3 class="mt-3 mb-0">{{ __('Total Appointment') }}</h3>
@@ -136,7 +136,7 @@
                             <div class="card-inner flex-wrap gap-3 d-flex justify-content-between">
                                 <div class="card-content">
                                     <div class="theme-avtar bg-white">
-                                        <i class="ti ti-chart-bar"></i>
+                                        <i class="ti ti-chart-bar" aria-hidden="true"></i>
                                     </div>
                                     <a href="{{ route('appointment.index') }}">
                                         <h3 class="mt-3 mb-0">{{ __('Total Revenue') }}</h3>
@@ -151,7 +151,7 @@
                             <div class="card-inner flex-wrap gap-3 d-flex justify-content-between">
                                 <div class="card-content">
                                     <div class="theme-avtar bg-white">
-                                        <i class="ti ti-users"></i>
+                                        <i class="ti ti-users" aria-hidden="true"></i>
                                     </div>
                                     <a href="{{ route('business.manage', getActiveBusiness()) }}">
                                         <h3 class="mt-3 mb-0">{{ __('Total Staff') }}</h3>
@@ -166,7 +166,7 @@
                             <div class="card-inner flex-wrap gap-3 d-flex justify-content-between">
                                 <div class="card-content">
                                     <div class="theme-avtar bg-white">
-                                        <i class="ti ti-user-cog"></i>
+                                        <i class="ti ti-user-cog" aria-hidden="true"></i>
                                     </div>
                                     <a href="{{ route('business.manage', getActiveBusiness()) }}">
                                         <h3 class="mt-3 mb-0">{{ __('Total Service') }}</h3>
@@ -182,7 +182,7 @@
                             <div class="card-inner flex-wrap gap-3 d-flex justify-content-between">
                                 <div class="card-content">
                                     <div class="theme-avtar bg-white">
-                                        <i class="ti ti-map-pin"></i>
+                                        <i class="ti ti-map-pin" aria-hidden="true"></i>
                                     </div>
                                     <a href="{{ route('business.manage', getActiveBusiness()) }}">
                                         <h3 class="mt-3 mb-0">{{ __('Total Location') }}</h3>
@@ -391,7 +391,7 @@
                                                                             class="btn btn-sm  bg-info align-items-center"
                                                                             data-bs-toggle="tooltip" title='Manage Clinic'>
                                                                             <span class="text-white"> <i
-                                                                                    class="ti ti-corner-up-left"></i></span></a>
+                                                                                    class="ti ti-corner-up-left" aria-hidden="true"></i></span></a>
                                                                     </div>
                                                                 @endpermission
                                                             </div>

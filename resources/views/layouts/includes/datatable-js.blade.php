@@ -5,40 +5,32 @@
 <script src="{{ asset('vendor/datatables/buttons.server-side.js') }}"></script>
 
 <script>
-// Add data-label attributes for responsive table
-document.addEventListener(DOMContentLoaded, function() {
-    setTimeout(function() {
-        var tables = document.querySelectorAll(.booking-data-table table);
-        tables.forEach(function(table) {
+(function () {
+    "use strict";
+    // Mirror thead text into data-label on every td so that any responsive-card
+    // CSS (legacy or new) has the column name available. Re-runs on every draw
+    // and on the initial load.
+    function applyDataLabels(root) {
+        var tables = (root || document).querySelectorAll('.booking-data-table table');
+        tables.forEach(function (table) {
             var headers = [];
-            table.querySelectorAll(thead th).forEach(function(th) {
-                headers.push(th.textContent.trim());
+            table.querySelectorAll('thead th').forEach(function (th) {
+                headers.push((th.textContent || '').trim());
             });
-            table.querySelectorAll(tbody tr).forEach(function(tr) {
-                tr.querySelectorAll(td).forEach(function(td, index) {
-                    if (headers[index]) {
-                        td.setAttribute(data-label, headers[index]);
+            table.querySelectorAll('tbody tr').forEach(function (tr) {
+                tr.querySelectorAll('td').forEach(function (td, idx) {
+                    if (headers[idx]) {
+                        td.setAttribute('data-label', headers[idx]);
                     }
                 });
             });
         });
-    }, 500);
-});
-// Re-apply on DataTable draw
-.on(draw.dt, function() {
-    var tables = document.querySelectorAll(.booking-data-table table);
-    tables.forEach(function(table) {
-        var headers = [];
-        table.querySelectorAll(thead th).forEach(function(th) {
-            headers.push(th.textContent.trim());
-        });
-        table.querySelectorAll(tbody tr).forEach(function(tr) {
-            tr.querySelectorAll(td).forEach(function(td, index) {
-                if (headers[index]) {
-                    td.setAttribute(data-label, headers[index]);
-                }
-            });
-        });
+    }
+    document.addEventListener('DOMContentLoaded', function () {
+        // Initial pass after Yajra has injected rows
+        setTimeout(applyDataLabels, 200);
+        // Re-apply on every DataTable draw (search/sort/page)
+        $(document).on('draw.dt', function () { applyDataLabels(); });
     });
-});
+})();
 </script>

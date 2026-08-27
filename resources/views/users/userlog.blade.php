@@ -44,18 +44,17 @@
                                 </div>
                             </div>
 
-                            <div class="col-lg-auto col-12  mt-lg-4 mt-1 d-flex">
+                            <div class="col-lg-auto col-12 mt-lg-4 mt-1 d-flex">
                                 <div class="d-flex header-btn-wrp">
-                                    <a href="#" class="btn btn-sm btn-primary me-2"
-                                        onclick="document.getElementById('user_userlog').submit(); return false;"
-                                        data-bs-toggle="tooltip" data-original-title="{{ __('Apply') }}"
-                                        title="{{ __('Apply') }}">
-                                        <span class="btn-inner--icon"><i class="ti ti-search"></i></span>
-                                    </a>
+                                    <button type="submit" class="btn btn-sm btn-primary me-2"
+                                        data-bs-toggle="tooltip" title="{{ __('Apply') }}">
+                                        <i class="ti ti-search" aria-hidden="true"></i>
+                                        <span>{{ __('Apply') }}</span>
+                                    </button>
                                     <a href="{{ route('users.userlog.history') }}" class="btn btn-sm btn-danger reset"
-                                        data-bs-toggle="tooltip" data-original-title="{{ __('Reset') }}"
-                                        title="{{ __('Reset') }}">
-                                        <span class="btn-inner--icon"><i class="ti ti-refresh text-white-off "></i></span>
+                                        data-bs-toggle="tooltip" title="{{ __('Reset') }}">
+                                        <i class="ti ti-refresh text-white" aria-hidden="true"></i>
+                                        <span>{{ __('Reset') }}</span>
                                     </a>
                                 </div>
 
@@ -72,7 +71,7 @@
         <div class="col-md-12">
             <div class="card">
                 <div class="card-body table-border-style">
-                    <div class="table-responsive">
+                    <div class="booking-data-table">
                         <table class="table mb-0 pc-dt-simple" id="users_log">
                             <thead>
                                 <tr>

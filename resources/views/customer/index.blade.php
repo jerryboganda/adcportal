@@ -17,16 +17,16 @@
             @endpermission
         @endif
         @permission('customer manage')
-            <a href="{{ route('customer.list') }}" class="btn btn-sm btn-primary btn-icon "
-                data-bs-toggle="tooltip" title="{{ __('List View') }}" style="">
-                <i class="ti ti-list text-white"></i>
+            <a href="{{ route('customer.list') }}" class="btn btn-sm btn-primary btn-icon"
+                data-bs-toggle="tooltip" title="{{ __('List View') }}" aria-label="{{ __('List View') }}">
+                <i class="ti ti-list text-white" aria-hidden="true"></i>
             </a>
         @endpermission
         @permission('customer create')
             <a href="#" class="btn btn-sm btn-primary" data-ajax-popup="true" data-size="md"
                 data-title="{{ __('Create New Customer') }}" data-url="{{ route('customer.create') }}" data-bs-toggle="tooltip"
-                data-bs-original-title="{{ __('Create') }}">
-                <i class="ti ti-plus"></i>
+                data-bs-original-title="{{ __('Create') }}" aria-label="{{ __('Create New Customer') }}">
+                <i class="ti ti-plus" aria-hidden="true"></i>
             </a>
         @endpermission
     </div>
@@ -38,30 +38,29 @@
                 <div class="card mb-0">
                     <div class="card-body user-card-head header-btn-wrp">
                         {{ Form::open(['route' => ['customer.index'], 'method' => 'GET', 'id' => 'user_submit']) }}
-                        <div class="row d-flex align-items-center justify-content-end">
-                            <div class="col-xl-2 col-lg-3 col-md-6 col-sm-12 col-12 mr-2">
+                        <div class="row g-3 align-items-end">
+                            <div class="col-xl-3 col-lg-3 col-md-4 col-sm-6 col-12">
                                 <div class="btn-box">
                                     {{ Form::label('name', __('Name'), ['class' => 'form-label']) }}
-                                    {{ Form::text('name', isset($_GET['name']) ? $_GET['name'] : null, ['class' => 'form-control', 'placeholder' => 'Enter Name']) }}
+                                    {{ Form::text('name', isset($_GET['name']) ? $_GET['name'] : null, ['class' => 'form-control', 'placeholder' => __('Enter Name')]) }}
                                 </div>
                             </div>
-                            <div class="col-xl-2 col-lg-3 col-md-6 col-sm-12 col-12 mr-2">
+                            <div class="col-xl-3 col-lg-3 col-md-4 col-sm-6 col-12">
                                 <div class="btn-box">
                                     {{ Form::label('email', __('Email'), ['class' => 'form-label']) }}
-                                    {{ Form::text('email', isset($_GET['email']) ? $_GET['email'] : null, ['class' => 'form-control', 'placeholder' => 'Enter Email']) }}
+                                    {{ Form::text('email', isset($_GET['email']) ? $_GET['email'] : null, ['class' => 'form-control', 'placeholder' => __('Enter Email')]) }}
                                 </div>
                             </div>
-                            <div class="col-auto float-end mt-4 d-flex">
-                                <a href="#" class="btn btn-sm btn-primary me-2"
-                                    onclick="document.getElementById('user_submit').submit(); return false;"
-                                    data-bs-toggle="tooltip" title="{{ __('Apply') }}"
-                                    data-original-title="{{ __('apply') }}">
-                                    <span class="btn-inner--icon"><i class="ti ti-search"></i></span>
-                                </a>
-                                <a href="{{ route('customer.index') }}" id="clearfilter" class="btn btn-sm btn-danger"
-                                    data-bs-toggle="tooltip" title="{{ __('Reset') }}"
-                                    data-original-title="{{ __('Reset') }}">
-                                    <span class="btn-inner--icon"><i class="ti ti-refresh"></i></span>
+                            <div class="col-xl-3 col-lg-3 col-md-4 col-sm-12 col-12 d-flex gap-2">
+                                <button type="submit" class="btn btn-sm btn-primary flex-fill"
+                                    data-bs-toggle="tooltip" title="{{ __('Apply') }}">
+                                    <i class="ti ti-search" aria-hidden="true"></i>
+                                    <span>{{ __('Apply') }}</span>
+                                </button>
+                                <a href="{{ route('customer.index') }}" id="clearfilter" class="btn btn-sm btn-danger flex-fill"
+                                    data-bs-toggle="tooltip" title="{{ __('Reset') }}">
+                                    <i class="ti ti-refresh text-white" aria-hidden="true"></i>
+                                    <span>{{ __('Reset') }}</span>
                                 </a>
                             </div>
                         </div>

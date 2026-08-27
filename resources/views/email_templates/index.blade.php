@@ -13,7 +13,7 @@
         <div class="col-md-12">
             <div class="card">
                 <div class="card-body table-border-style">
-                    <div class="table-responsive">
+                    <div class="booking-data-table">
                         <table class="table datatable pc-dt-simple" id="d">
                             <thead>
                                 <tr>
@@ -34,8 +34,8 @@
                                                 <a href="{{ route('manage.email.language', [$email_template->id, getActiveLanguage()]) }}"
                                                     class="btn btn-sm bg-warning align-items-center"
                                                    title="{{ __('View') }}"
-                                                    data-bs-toggle="tooltip">
-                                                    <i class="ti ti-eye text-white"></i>
+                                                    data-bs-toggle="tooltip" aria-label="{{ __('View') }}">
+                                                    <i class="ti ti-eye text-white" aria-hidden="true"></i>
                                                 </a>
                                             </div>
                                         </td>

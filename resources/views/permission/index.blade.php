@@ -6,8 +6,8 @@
 {{ __('Users') }}
 @endsection
 @section('page-action')
-    <a href="#" class="btn btn-sm btn-primary" data-url="{{ route('permissions.create') }}" data-ajax-popup="true" data-title="{{__('Create New Permission')}}" data-bs-toggle="tooltip"  data-bs-original-title="{{ __('Create') }}">
-            <i class="ti ti-plus"></i>
+    <a href="#" class="btn btn-sm btn-primary" data-url="{{ route('permissions.create') }}" data-ajax-popup="true" data-title="{{__('Create New Permission')}}" data-bs-toggle="tooltip"  data-bs-original-title="{{ __('Create') }}" aria-label="{{ __('Create New Permission') }}">
+            <i class="ti ti-plus" aria-hidden="true"></i>
     </a>
 @endsection
 @section('content')

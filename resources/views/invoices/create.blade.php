@@ -38,7 +38,7 @@
                                 <th style="width:130px">{{ __('Discount') }}</th>
                                 <th style="width:110px">
                                     <button type="button" class="btn btn-sm btn-outline-primary" onclick="addRow()">
-                                        <i class="ti ti-plus"></i> {{ __('Line') }}
+                                        <i class="ti ti-plus" aria-hidden="true"></i> {{ __('Line') }}
                                     </button>
                                 </th>
                             </tr></thead>
@@ -49,7 +49,7 @@
                                     <td><input type="number" name="items[{{ $i }}][quantity]" value="{{ old('items.'.$i.'.quantity', $line['quantity']) }}" min="1" class="form-control form-control-sm line-qty" required aria-label="{{ __('Qty') }}"></td>
                                     <td><input type="number" step="0.01" name="items[{{ $i }}][unit_price]" value="{{ old('items.'.$i.'.unit_price', number_format((float)$line['unit_price'], 2, '.', '')) }}" min="0" class="form-control form-control-sm line-price" required aria-label="{{ __('Unit Price') }}"></td>
                                     <td><input type="number" step="0.01" name="items[{{ $i }}][discount]" value="{{ old('items.'.$i.'.discount', 0) }}" min="0" class="form-control form-control-sm line-discount" aria-label="{{ __('Discount') }}"></td>
-                                    <td><button type="button" class="btn btn-sm btn-outline-danger" onclick="removeRow(this)" aria-label="{{ __('Remove line') }}"><i class="ti ti-trash"></i></button></td>
+                                    <td><button type="button" class="btn btn-sm btn-outline-danger" onclick="removeRow(this)" aria-label="{{ __('Remove line') }}"><i class="ti ti-trash" aria-hidden="true"></i></button></td>
                                 </tr>
                             @endforeach
                             </tbody>
@@ -117,7 +117,7 @@ function addRow() {
         <td><input type="number" name="items[\${rowIdx}][quantity]" value="1" min="1" class="form-control form-control-sm line-qty" required aria-label="{{ __('Qty') }}"></td>
         <td><input type="number" step="0.01" name="items[\${rowIdx}][unit_price]" value="0" min="0" class="form-control form-control-sm line-price" required aria-label="{{ __('Unit Price') }}"></td>
         <td><input type="number" step="0.01" name="items[\${rowIdx}][discount]" value="0" min="0" class="form-control form-control-sm line-discount" aria-label="{{ __('Discount') }}"></td>
-        <td><button type="button" class="btn btn-sm btn-outline-danger" onclick="removeRow(this)" aria-label="{{ __('Remove line') }}"><i class="ti ti-trash"></i></button></td>`;
+        <td><button type="button" class="btn btn-sm btn-outline-danger" onclick="removeRow(this)" aria-label="{{ __('Remove line') }}"><i class="ti ti-trash" aria-hidden="true"></i></button></td>`;
     tbody.appendChild(tr);
     rowIdx++;
     recalc();

@@ -112,13 +112,15 @@ function summernote() {
 
 function toastrs(text, message, type) {
     var f = document.getElementById('liveToast');
-    var a = new bootstrap.Toast(f).show();
-    if (type == 'success') {
-        $('#liveToast').addClass('bg-primary');
-    } else {
-        $('#liveToast').addClass('bg-danger');
-    }
+    if (!f) { return; }
+    var $t = $('#liveToast');
+    $t.removeClass('bg-primary bg-danger bg-warning bg-info text-white');
+    if (type === 'success') { $t.addClass('bg-primary text-white'); }
+    else if (type === 'warning') { $t.addClass('bg-warning'); }
+    else if (type === 'info') { $t.addClass('bg-info text-white'); }
+    else { $t.addClass('bg-danger text-white'); }
     $('#liveToast .toast-body').html(message);
+    new bootstrap.Toast(f).show();
 }
 
 $(document).on('click', 'a[data-ajax-popup="true"], button[data-ajax-popup="true"], div[data-ajax-popup="true"]', function () {

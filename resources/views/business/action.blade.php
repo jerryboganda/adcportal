@@ -11,7 +11,7 @@
     <a href="{{ route('appointment.index', ['business' => $business->id]) }}"
         class="btn btn-sm  bg-secondary align-items-center" data-bs-toggle="tooltip" title='Appointments'> <span
             class="text-white">
-            <i class="ti ti-credit-card"></i></span></a>
+            <i class="ti ti-credit-card" aria-hidden="true"></i></span></a>
 </div>
 {{-- @endpermission --}}
 @permission('subscriber manage')
@@ -19,21 +19,21 @@
         <a href="{{ route('subscribes.index', ['business' => $business->id]) }}"
             class="btn btn-sm bg-dark align-items-center" data-bs-toggle="tooltip" title='Subscribers'> <span
                 class="text-white">
-                <i class="ti ti-mail"></i></span></a>
+                <i class="ti ti-mail" aria-hidden="true"></i></span></a>
     </div>
 @endpermission
 @permission('contact manage')
     <div class="action-btn me-2">
         <a href="{{ route('contacts.index', ['business' => $business->id]) }}"
             class="btn btn-sm bg-warning align-items-center" data-bs-toggle="tooltip" title='Contacts'> <span
-                class="text-white"> <i class="ti ti-phone"></i></span></a>
+                class="text-white"> <i class="ti ti-phone" aria-hidden="true"></i></span></a>
     </div>
 @endpermission
 @permission('business update')
     <div class="action-btn me-2">
         <a href="{{ route('business.manage', $business->id) }}" class="btn btn-sm  bg-info align-items-center"
             data-bs-toggle="tooltip" title='Manage Business'> <span class="text-white"> <i
-                    class="ti ti-corner-up-left"></i></span></a>
+                    class="ti ti-corner-up-left" aria-hidden="true"></i></span></a>
     </div>
 @endpermission
 @permission('business delete')
@@ -44,7 +44,7 @@
             <input name="_method" type="hidden" value="DELETE">
             <button type="button" class="btn btn-sm  bg-danger align-items-center show_confirm"
                 data-bs-toggle="tooltip" title='Delete'>
-                <span class="text-white"> <i class="ti ti-trash"></i></span>
+                <span class="text-white"> <i class="ti ti-trash" aria-hidden="true"></i></span>
             </button>
         </form>
     </div>

@@ -4,10 +4,10 @@
     @include('layouts.includes.datatable-css')
 @endpush
 
-<div class="card">
-    <div class="card-header card-body table-border-style">
-        <div class="table-responsive booking-data-table">
-            {{ $dataTable->table(['width' => '100%']) }}
+<div class="card booking-card">
+    <div class="card-body table-border-style">
+        <div class="booking-data-table">
+            {{ $dataTable->table(['width' => '100%', 'class' => 'table align-middle']) }}
         </div>
     </div>
 </div>

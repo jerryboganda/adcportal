@@ -307,7 +307,7 @@
                     <!-- Step 1 -->
                     <div class="status-item {{ $step1_state }}">
                         <div class="status-circle">
-                            <i class="ti ti-calendar"></i>
+                            <i class="ti ti-calendar" aria-hidden="true"></i>
                         </div>
                         <div class="status-label">{{ __('Booking') }}</div>
                         <div class="small text-muted">{{ __('Confirmed') }}</div>
@@ -316,7 +316,7 @@
                     <!-- Step 2 -->
                     <div class="status-item {{ $step2_state }}">
                         <div class="status-circle">
-                            <i class="ti ti-credit-card"></i>
+                            <i class="ti ti-credit-card" aria-hidden="true"></i>
                         </div>
                         <div class="status-label">{{ __('Payment') }}</div>
                         <div class="small text-muted">{{ $step2_label }}</div>
@@ -325,7 +325,7 @@
                     <!-- Step 3 -->
                     <div class="status-item {{ $step3_state }}">
                         <div class="status-circle">
-                            <i class="ti ti-stethoscope"></i>
+                            <i class="ti ti-stethoscope" aria-hidden="true"></i>
                         </div>
                         <div class="status-label">{{ __('Status') }}</div>
                         <div class="small text-muted">{{ $currentStatus }}</div>
@@ -334,7 +334,7 @@
                     <!-- Step 4 -->
                     <div class="status-item {{ $step4_state }}">
                         <div class="status-circle">
-                            <i class="ti ti-file-report"></i>
+                            <i class="ti ti-file-report" aria-hidden="true"></i>
                         </div>
                         <div class="status-label">{{ __('Report') }}</div>
                         <div class="small text-muted">{{ $step4_label }}</div>
@@ -431,14 +431,14 @@
                             @foreach($appointmentDetails->reports as $report)
                                 <a href="{{ route('appointment.reports.download', $report->id) }}" class="file-item">
                                     <div class="file-icon">
-                                        <i class="ti ti-file-analytics"></i>
+                                        <i class="ti ti-file-analytics" aria-hidden="true"></i>
                                     </div>
                                     <div class="overflow-hidden">
                                         <div class="text-truncate fw-bold text-dark">{{ $report->file_name }}</div>
                                         <div class="small text-muted">{{ $report->file_size_formatted ?? 'PDF Document' }}</div>
                                     </div>
                                     <div class="ms-auto text-primary">
-                                        <i class="ti ti-download"></i>
+                                        <i class="ti ti-download" aria-hidden="true"></i>
                                     </div>
                                 </a>
                             @endforeach

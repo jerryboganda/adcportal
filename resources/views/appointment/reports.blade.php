@@ -52,7 +52,7 @@
     {{-- Reports List --}}
     <div class="reports-list-section">
         <h6 class="mb-3 d-flex align-items-center gap-2">
-            <i class="ti ti-files"></i>
+            <i class="ti ti-files" aria-hidden="true"></i>
             {{ __('Uploaded Reports') }}
             <span class="badge bg-primary rounded-pill" id="reportCount">{{ $appointment->reports->count() }}</span>
         </h6>
@@ -97,11 +97,11 @@
                     <div class="report-actions d-flex gap-2">
                         <a href="{{ route('appointment.reports.download', $report->id) }}"
                             class="btn btn-sm btn-outline-primary" data-bs-toggle="tooltip" title="{{ __('Download') }}">
-                            <i class="ti ti-download"></i>
+                            <i class="ti ti-download" aria-hidden="true"></i>
                         </a>
                         <button type="button" class="btn btn-sm btn-outline-danger delete-report-btn"
                             data-report-id="{{ $report->id }}" data-bs-toggle="tooltip" title="{{ __('Delete') }}">
-                            <i class="ti ti-trash"></i>
+                            <i class="ti ti-trash" aria-hidden="true"></i>
                         </button>
                     </div>
                 </div>
@@ -305,14 +305,14 @@
                            class="btn btn-sm btn-outline-primary" 
                            data-bs-toggle="tooltip" 
                            title="{{ __('Download') }}">
-                            <i class="ti ti-download"></i>
+                            <i class="ti ti-download" aria-hidden="true"></i>
                         </a>
                         <button type="button" 
                                 class="btn btn-sm btn-outline-danger delete-report-btn" 
                                 data-report-id="${report.id}"
                                 data-bs-toggle="tooltip" 
                                 title="{{ __('Delete') }}">
-                            <i class="ti ti-trash"></i>
+                            <i class="ti ti-trash" aria-hidden="true"></i>
                         </button>
                     </div>
                 </div>

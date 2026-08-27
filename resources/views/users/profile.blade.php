@@ -23,10 +23,10 @@
                     <div class="list-group list-group-flush" id="useradd-sidenav">
                         <a href="#useradd-1"
                             class="list-group-item list-group-item-action border-0">{{ __('Personal Info') }} <div
-                                class="float-end"><i class="ti ti-chevron-right"></i></div></a>
+                                class="float-end"><i class="ti ti-chevron-right" aria-hidden="true"></i></div></a>
                         <a href="#useradd-2"
                             class="list-group-item list-group-item-action border-0">{{ __('Change Password') }} <div
-                                class="float-end"><i class="ti ti-chevron-right"></i></div></a>
+                                class="float-end"><i class="ti ti-chevron-right" aria-hidden="true"></i></div></a>
                         @stack('profile_setting_sidebar')
                     </div>
                 </div>

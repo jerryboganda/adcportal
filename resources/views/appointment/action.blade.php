@@ -63,7 +63,7 @@
             class="btn btn-sm bg-success d-inline align-items-center"
             data-bs-toggle="tooltip" 
             data-bs-original-title="{{ __('Print Token') }}">
-            <span class="text-white"><i class="ti ti-printer"></i></span>
+            <span class="text-white"><i class="ti ti-printer" aria-hidden="true"></i></span>
         </a>
     </div>
     {{-- Reports Button --}}
@@ -75,7 +75,7 @@
             data-bs-toggle="tooltip" 
             data-size="lg"
             data-bs-original-title="{{ __('Reports') }}">
-            <span class="text-white"><i class="ti ti-file-text"></i></span>
+            <span class="text-white"><i class="ti ti-file-text" aria-hidden="true"></i></span>
         </a>
     </div>
     {{-- Edit Button --}}
@@ -84,7 +84,7 @@
             data-url="{{ route('appointment.edit', $Appointment->id) }}" class="dropdown-item" data-ajax-popup="true"
             data-title="{{ __('Edit Appointment') }}" data-bs-toggle="tooltip" data-size="lg"
             data-bs-original-title="{{ __('Edit') }}">
-            <span class="text-white"> <i class="ti ti-pencil"></i></span></a>
+            <span class="text-white"> <i class="ti ti-pencil" aria-hidden="true"></i></span></a>
     </div>
 @endpermission
 
@@ -97,7 +97,7 @@
             <input name="_method" type="hidden" value="DELETE">
             <button type="button" class="btn btn-sm bg-danger d-inline align-items-center show_confirm"
                 data-bs-toggle="tooltip" title='Delete'>
-                <span class="text-white"> <i class="ti ti-trash"></i></span>
+                <span class="text-white"> <i class="ti ti-trash" aria-hidden="true"></i></span>
             </button>
         </form>
     </div>

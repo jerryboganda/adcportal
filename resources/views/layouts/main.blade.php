@@ -20,6 +20,7 @@
 @include('partials.head')
 
 <body class="{{ isset($themeColor) ? $themeColor : 'theme-1' }}">
+    <a class="skip-link" href="#dash-content">{{ __('Skip to main content') }}</a>
     <div class="loader-bg">
         <div class="loader-track">
             <div class="loader-fill">
@@ -32,7 +33,7 @@
     @include('partials.sidebar')
     @include('partials.header')
     <section class="dash-container">
-        <div class="dash-content">
+        <div class="dash-content" id="dash-content" tabindex="-1">
             <!-- [ breadcrumb ] start -->
             <div class="page-header">
                 <div class="page-block">
@@ -62,7 +63,7 @@
 
                             </ul>
                         </div>
-                        <div class="col-auto row header-btn-wrp">
+                        <div class="col-auto header-btn-wrp">
                             @yield('page-action')
                         </div>
                     </div>

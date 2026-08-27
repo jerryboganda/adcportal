@@ -82,7 +82,7 @@
                             @endpermission
                             @if($latest?->isSigned())
                                 <a href="{{ route('reports.pdf', $latest->id) }}" class="btn btn-sm btn-outline-secondary"
-                                    aria-label="{{ __('Download PDF') }}"><i class="ti ti-file-download"></i></a>
+                                    aria-label="{{ __('Download PDF') }}"><i class="ti ti-file-download" aria-hidden="true"></i></a>
                                 @if($study->state() === \App\Enums\StudyState::Reported)
                                     @permission('report release')
                                     <form method="POST" action="{{ route('reports.release', $latest->id) }}" class="d-inline">
@@ -103,7 +103,7 @@
                         </td>
                     </tr>
                 @empty
-                    <tr><td colspan="7" class="text-center py-5 text-muted"><i class="ti ti-mood-smile" style="font-size:48px"></i><p class="mt-2 mb-0">{{ __('Nothing waiting — the read queue is clear.') }}</p></td></tr>
+                    <tr><td colspan="7" class="text-center py-5 text-muted"><i class="ti ti-mood-smile" style="font-size:48px" aria-hidden="true"></i><p class="mt-2 mb-0">{{ __('Nothing waiting — the read queue is clear.') }}</p></td></tr>
                 @endforelse
                 </tbody>
             </table>

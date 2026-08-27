@@ -120,14 +120,14 @@
                                 <button type="button"
                                     class="bg-danger btn btn-sm align-items-center show_confirm"
                                     data-bs-toggle="tooltip" title='Delete'>
-                                    <span class="text-white"> <i class="ti ti-trash"></i></span>
+                                    <span class="text-white"> <i class="ti ti-trash" aria-hidden="true"></i></span>
                                 </button>
                             </form>
                         </div>
                         <a download
                             href="{{ check_file($appointment->attachment) ? get_file($appointment->attachment) : '-' }}"
                             class="action-btn btn-primary btn btn-sm align-items-center">
-                            <i class="ti ti-download" data-toggle="popover" title="{{ __('Download') }}"></i>
+                            <i class="ti ti-download" data-toggle="popover" title="{{ __('Download') }}" aria-hidden="true"></i>
                         </a>
                     </dd>
                 </dl>

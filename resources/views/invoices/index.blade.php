@@ -44,7 +44,7 @@
                 <button class="btn btn-sm btn-primary">{{ __('Search') }}</button>
             </form>
         </div>
-        <div class="card-body table-responsive">
+        <div class="card-body booking-data-table">
             <table class="table table-hover align-middle">
                 <thead><tr>
                     <th>{{ __('Invoice #') }}</th><th>{{ __('Patient') }}</th><th>{{ __('Study') }}</th>
@@ -65,8 +65,8 @@
                             <span class="badge {{ $colors[$inv->status] }}">{{ ucfirst($inv->status) }}</span>
                         </td>
                         <td class="text-end">
-                            <a href="{{ route('invoices.show', $inv) }}" class="btn btn-sm btn-outline-primary" aria-label="{{ __('View invoice') }}" data-bs-toggle="tooltip" data-bs-original-title="{{ __('View') }}"><i class="ti ti-eye"></i></a>
-                            <a href="{{ route('invoices.pdf', $inv) }}" class="btn btn-sm btn-outline-secondary" aria-label="{{ __('Download PDF') }}" data-bs-toggle="tooltip" data-bs-original-title="{{ __('PDF') }}"><i class="ti ti-file-download"></i></a>
+                            <a href="{{ route('invoices.show', $inv) }}" class="btn btn-sm btn-outline-primary" aria-label="{{ __('View invoice') }}" data-bs-toggle="tooltip" data-bs-original-title="{{ __('View') }}"><i class="ti ti-eye" aria-hidden="true"></i></a>
+                            <a href="{{ route('invoices.pdf', $inv) }}" class="btn btn-sm btn-outline-secondary" aria-label="{{ __('Download PDF') }}" data-bs-toggle="tooltip" data-bs-original-title="{{ __('PDF') }}"><i class="ti ti-file-download" aria-hidden="true"></i></a>
                         </td>
                     </tr>
                 @empty

@@ -11,7 +11,7 @@
 @section('page-action')
     <div>
         <a href="{{ route('notification-template.index') }}" class="btn btn-sm btn-primary" data-bs-toggle="tooltip"
-            data-bs-placement="top" title="{{ __('Return') }}"><i class="ti ti-arrow-back-up"></i>
+            data-bs-placement="top" title="{{ __('Return') }}"><i class="ti ti-arrow-back-up" aria-hidden="true"></i>
         </a>
     </div>
 @endsection

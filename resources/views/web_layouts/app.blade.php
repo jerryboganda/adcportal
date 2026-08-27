@@ -250,7 +250,7 @@
                         @if (false &&
                                 isset($company_settings['appointment_review_is_on']) &&
                                 $company_settings['appointment_review_is_on'] == 'on')
-                            text: '<i class="ti ti-star"></i>' + ' ' + staff.review.toFixed(
+                            text: '<i class="ti ti-star" aria-hidden="true"></i>' + ' ' + staff.review.toFixed(
                                     1) + ' ' +
                                 staff.name
                         @else

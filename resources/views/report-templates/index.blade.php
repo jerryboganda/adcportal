@@ -59,7 +59,7 @@
         <div class="col-xl-7">
             <div class="card">
                 <div class="card-header"><h5>{{ __('Configured Templates') }}</h5></div>
-                <div class="card-body table-responsive">
+                <div class="card-body booking-data-table">
                     <table class="table table-hover align-middle">
                         <thead><tr><th>{{__('Name')}}</th><th>{{__('Procedure')}}</th><th>{{__('Default')}}</th><th class="text-end">{{__('Action')}}</th></tr></thead>
                         <tbody>
@@ -72,7 +72,7 @@
                                     @permission('report template delete')
                                     <form method="POST" action="{{ route('report-templates.destroy', $tpl->id) }}" class="d-inline">
                                         @csrf @method('DELETE')
-                                        <button class="btn btn-sm btn-outline-danger show_confirm"><i class="ti ti-trash"></i></button>
+                                        <button class="btn btn-sm btn-outline-danger show_confirm"><i class="ti ti-trash" aria-hidden="true"></i></button>
                                     </form>
                                     @endpermission
                                 </td>

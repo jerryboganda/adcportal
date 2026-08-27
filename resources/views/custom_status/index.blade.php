@@ -14,8 +14,8 @@
     @permission('status create')
         <a href="#" class="btn btn-sm btn-primary" data-ajax-popup="true" data-size="md"
             data-title="{{ __('Create New Status') }}" data-url="{{ route('custom-status.create') }}" data-bs-toggle="tooltip"
-            data-bs-original-title="{{ __('Create') }}">
-            <i class="ti ti-plus"></i>
+            data-bs-original-title="{{ __('Create') }}" aria-label="{{ __('Create New Status') }}">
+            <i class="ti ti-plus" aria-hidden="true"></i>
         </a>
     @endpermission
 </div>
@@ -26,7 +26,7 @@
         <div class="col-lg-12 col-md-12">
             <div class="card">
                 <div class="card-header card-body table-border-style">
-                    <div class="table-responsive">
+                    <div class="booking-data-table">
                         <table class="table mb-0 pc-dt-simple" id="pc-dt-simple">
                             <thead class="thead-light">
                             <tr>
@@ -46,10 +46,10 @@
                                         <div class="action-btn me-2">
                                             <a href="#" class="btn btn-sm  bg-info d-inline align-items-center"
                                                 data-url="{{ route('custom-status.edit', $status->id) }}"
-                                                class="dropdown-item" data-ajax-popup="true"
+                                                data-ajax-popup="true"
                                                 data-title="{{ __('Edit Status') }}" data-bs-toggle="tooltip"
-                                                data-bs-original-title="{{ __('Edit') }}">
-                                                <span class="text-white"> <i class="ti ti-pencil"></i></span></a>
+                                                data-bs-original-title="{{ __('Edit') }}" aria-label="{{ __('Edit Status') }}">
+                                                <span class="text-white"> <i class="ti ti-pencil" aria-hidden="true"></i></span></a>
                                         </div>
                                         @endpermission
                                         @permission('status delete')
@@ -59,8 +59,8 @@
                                                         @method('DELETE')
                                                         <input name="_method" type="hidden" value="DELETE">
                                                         <button type="button" class="btn btn-sm bg-danger d-inline align-items-center show_confirm" data-bs-toggle="tooltip"
-                                                        title='Delete'>
-                                                            <span class="text-white"> <i class="ti ti-trash"></i></span>
+                                                        title='{{ __('Delete') }}' aria-label="{{ __('Delete') }}">
+                                                            <span class="text-white"> <i class="ti ti-trash" aria-hidden="true"></i></span>
                                                         </button>
                                                     </form>
                                                 </div>

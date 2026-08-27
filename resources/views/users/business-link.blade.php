@@ -1,5 +1,5 @@
 <div class="modal-body">
-    <div class="table-responsive">
+    <div class="booking-data-table">
         <table class="table mb-0 pc-dt-simple" id="products">
             <thead>
                 <tr>
@@ -16,7 +16,7 @@
                                 class="form-control d-inline-block theme-link"  readonly>
                             <button class="btn btn-outline-primary  gap-2 d-flex align-iteams-center" type="button"
                                 onclick="myFunction('myInput_{{ $value['name'] }}')" id="button-addon2"><i
-                                    class="ti ti-copy"></i>
+                                    class="ti ti-copy" aria-hidden="true"></i>
                                 {{ __('Business Link') }}</button>
                         </td>
 

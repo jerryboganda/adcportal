@@ -7,14 +7,14 @@
             {{ $filter ?? '' }}
             @if($createRoute)
                 <a href="{{ $createRoute }}" class="btn btn-sm btn-primary" data-ajax-popup="true" data-title="{{ $createLabel }}">
-                    <i class="ti ti-plus"></i> {{ $createLabel ?? __('Create') }}
+                    <i class="ti ti-plus" aria-hidden="true"></i> {{ $createLabel ?? __('Create') }}
                 </a>
             @endif
             {{ $action ?? '' }}
         </div>
     </div>
     <div class="card-body">
-        <div class="table-responsive">
+        <div class="booking-data-table">
             {{ $slot }}
         </div>
     </div>

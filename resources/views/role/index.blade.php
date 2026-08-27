@@ -10,8 +10,8 @@
         <div>
             <a href="#" class="btn btn-sm btn-primary" data-url="{{ route('roles.create') }}" data-size="xl"
                 data-bs-toggle="tooltip" data-bs-original-title="{{ __('Create') }}" data-ajax-popup="true"
-                data-title="{{ __('Create New Role') }}">
-                <i class="ti ti-plus"></i>
+                data-title="{{ __('Create New Role') }}" aria-label="{{ __('Create New Role') }}">
+                <i class="ti ti-plus" aria-hidden="true"></i>
             </a>
         </div>
     @endpermission
@@ -21,7 +21,7 @@
         <div class="col-sm-12">
             <div class="card">
                 <div class="card-body table-border-style">
-                    <div class="table-responsive">
+                    <div class="booking-data-table">
                         <table class="table mb-0 pc-dt-simple" id="assets">
                             <thead>
                                 <tr>

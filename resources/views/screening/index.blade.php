@@ -91,7 +91,7 @@
                                     @permission('report template delete')
                                     <form method="POST" action="{{ route('screening.forms.destroy', $form->id) }}" class="d-inline">
                                         @csrf @method('DELETE')
-                                        <button class="btn btn-sm btn-danger show_confirm"><i class="ti ti-trash"></i></button>
+                                        <button class="btn btn-sm btn-danger show_confirm"><i class="ti ti-trash" aria-hidden="true"></i></button>
                                     </form>
                                     @endpermission
                                 </td>

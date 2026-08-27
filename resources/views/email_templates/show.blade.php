@@ -12,7 +12,7 @@
 @section('page-action')
     <div class="d-flex flex-wrap justify-content-lg-end drp-languages">
         <a href="{{ route('email-templates.index') }}" class="btn btn-sm btn-primary" data-bs-toggle="tooltip"
-            data-bs-placement="top" title="{{ __('Return') }}"><i class="ti ti-arrow-back-up"></i>
+            data-bs-placement="top" title="{{ __('Return') }}"><i class="ti ti-arrow-back-up" aria-hidden="true"></i>
         </a>
         <ul class="list-unstyled mb-0 m-2">
             <li class="dropdown dash-h-item drp-language country-select">

@@ -19,15 +19,15 @@
 
        @permission('customer manage')
             <a href="{{ route('customer.index') }}" class="btn btn-sm btn-primary btn-icon" data-bs-toggle="tooltip"
-                title="{{ __('Grid View') }}">
-                <i class="ti ti-layout-grid text-white"></i>
+                title="{{ __('Grid View') }}" aria-label="{{ __('Grid View') }}">
+                <i class="ti ti-layout-grid text-white" aria-hidden="true"></i>
             </a>
         @endpermission
         @permission('customer create')
             <a href="#" class="btn btn-sm btn-primary" data-ajax-popup="true" data-size="md"
                 data-title="{{ __('Create New Customer') }}" data-url="{{ route('customer.create') }}" data-bs-toggle="tooltip"
-                data-bs-original-title="{{ __('Create') }}">
-                <i class="ti ti-plus"></i>
+                data-bs-original-title="{{ __('Create') }}" aria-label="{{ __('Create New Customer') }}">
+                <i class="ti ti-plus" aria-hidden="true"></i>
             </a>
         @endpermission
     </div>

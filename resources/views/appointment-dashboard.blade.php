@@ -18,14 +18,12 @@
         </div>
         <div class="col-auto float-end">
             <div class="d-flex gap-2">
-                <a href="#" class="btn btn-sm btn-primary p-2"
-                    onclick="document.getElementById('appointment-form').submit(); return false;" data-bs-toggle="tooltip"
-                    title="{{ __('Search') }}">
-                    <span class="btn-inner--icon"><i class="ti ti-search"></i></span>
-                </a>
+                <button type="submit" class="btn btn-sm btn-primary p-2" data-bs-toggle="tooltip" title="{{ __('Search') }}">
+                    <i class="ti ti-search" aria-hidden="true"></i>
+                </button>
                 <a href="{{ route('appointment.dashboard') }}" class="btn btn-sm btn-danger reset" data-bs-toggle="tooltip"
                     title="{{ __('Reset') }}">
-                    <span class="btn-inner--icon"><i class="ti ti-refresh text-white-off "></i></span>
+                    <i class="ti ti-refresh text-white" aria-hidden="true"></i>
                 </a>
             </div>
         </div>

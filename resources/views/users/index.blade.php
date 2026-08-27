@@ -21,17 +21,17 @@ $singular_name =__('User');
         @endpermission
     @endif
     @permission('user logs history')
-    <a href="{{ route('users.userlog.history') }}" class="btn btn-sm btn-primary" data-bs-toggle="tooltip" data-bs-placement="top" title="{{ $plural_name .__(' Logs History') }}"><i class="ti ti-user-check"></i>
+    <a href="{{ route('users.userlog.history') }}" class="btn btn-sm btn-primary" data-bs-toggle="tooltip" data-bs-placement="top" title="{{ $plural_name .__(' Logs History') }}" aria-label="{{ $plural_name . __(' Logs History') }}"><i class="ti ti-user-check" aria-hidden="true"></i>
     </a>
     @endpermission
     @permission('user manage')
-    <a href="{{ route('users.list.view') }}" data-bs-toggle="tooltip" data-bs-original-title="{{ __('List View') }}" class="btn btn-sm btn-primary btn-icon ">
-        <i class="ti ti-list"></i>
+    <a href="{{ route('users.list.view') }}" data-bs-toggle="tooltip" data-bs-original-title="{{ __('List View') }}" class="btn btn-sm btn-primary btn-icon" aria-label="{{ __('List View') }}">
+        <i class="ti ti-list" aria-hidden="true"></i>
     </a>
     @endpermission
     @permission('user create')
-    <a href="#" class="btn btn-sm btn-primary" data-ajax-popup="true" data-size="md" data-title="{{ __('Create New '.($singular_name)) }}" data-url="{{ route('users.create') }}" data-bs-toggle="tooltip" data-bs-original-title="{{ __('Create') }}">
-        <i class="ti ti-plus"></i>
+    <a href="#" class="btn btn-sm btn-primary" data-ajax-popup="true" data-size="md" data-title="{{ __('Create New '.($singular_name)) }}" data-url="{{ route('users.create') }}" data-bs-toggle="tooltip" data-bs-original-title="{{ __('Create') }}" aria-label="{{ __('Create New '.$singular_name) }}">
+        <i class="ti ti-plus" aria-hidden="true"></i>
     </a>
     @endpermission
 </div>
@@ -44,30 +44,29 @@ $singular_name =__('User');
             <div class="card mb-0">
                 <div class="card-body user-card-head header-btn-wrp">
                     {{ Form::open(['route' => ['users.index'], 'method' => 'GET', 'id' => 'user_submit']) }}
-                    <div class="row row-gaps d-flex align-items-center justify-content-end">
-                        <div class="col-xl-2 col-lg-3 col-sm-6  col-12 mr-2">
+                    <div class="row g-3 align-items-end">
+                        <div class="col-xl-3 col-lg-3 col-md-4 col-sm-6 col-12">
                             <div class="btn-box">
                                 {{ Form::label('name', __('Name'), ['class' => 'form-label']) }}
-                                {{ Form::text('name', isset($_GET['name']) ? $_GET['name'] : null, ['class' => 'form-control', 'placeholder' => 'Enter Name']) }}
+                                {{ Form::text('name', isset($_GET['name']) ? $_GET['name'] : null, ['class' => 'form-control', 'placeholder' => __('Enter Name')]) }}
                             </div>
                         </div>
-                        <div class="col-xl-2 col-lg-3 col-sm-6 col-12 mr-2">
+                        <div class="col-xl-3 col-lg-3 col-md-4 col-sm-6 col-12">
                             <div class="btn-box">
                                 {{ Form::label('email', __('Email'), ['class' => 'form-label']) }}
-                                {{ Form::text('email', isset($_GET['email']) ? $_GET['email'] : null, ['class' => 'form-control', 'placeholder' => 'Enter Email']) }}
+                                {{ Form::text('email', isset($_GET['email']) ? $_GET['email'] : null, ['class' => 'form-control', 'placeholder' => __('Enter Email')]) }}
                             </div>
                         </div>
-                        <div class="col-lg-auto col-12 float-end mt-lg-4 mt-1 d-flex">
-                            <a href="#" class="btn btn-sm btn-primary me-2"
-                                onclick="document.getElementById('user_submit').submit(); return false;"
-                                data-bs-toggle="tooltip" title="{{ __('Apply') }}"
-                                data-original-title="{{ __('apply') }}">
-                                <span class="btn-inner--icon d-flex align-items-center justify-content-center"><i class="ti ti-search"></i></span>
-                            </a>
-                            <a href="{{ route('users.index') }}" id="clearfilter" class="btn btn-sm btn-danger"
-                                data-bs-toggle="tooltip" title="{{ __('Reset') }}"
-                                data-original-title="{{ __('Reset') }}">
-                                <span class="btn-inner--icon d-flex align-items-center justify-content-center"><i class="ti ti-refresh"></i></span>
+                        <div class="col-xl-3 col-lg-3 col-md-4 col-sm-12 col-12 d-flex gap-2">
+                            <button type="submit" class="btn btn-sm btn-primary flex-fill"
+                                data-bs-toggle="tooltip" title="{{ __('Apply') }}">
+                                <i class="ti ti-search" aria-hidden="true"></i>
+                                <span>{{ __('Apply') }}</span>
+                            </button>
+                            <a href="{{ route('users.index') }}" id="clearfilter" class="btn btn-sm btn-danger flex-fill"
+                                data-bs-toggle="tooltip" title="{{ __('Reset') }}">
+                                <i class="ti ti-refresh text-white" aria-hidden="true"></i>
+                                <span>{{ __('Reset') }}</span>
                             </a>
                         </div>
                     </div>
@@ -93,7 +92,7 @@ $singular_name =__('User');
                                                     data-bs-toggle="dropdown" data-bs-auto-close="true"
                                                     aria-haspopup="true" aria-expanded="false"
                                                     aria-label="{{ __('User actions') }}">
-                                                    <i class="ti ti-dots-vertical"></i>
+                                                    <i class="ti ti-dots-vertical" aria-hidden="true"></i>
                                                 </button>
                                         @else
                                             <a class="btn btn-sm border" data-title="{{ __('Lock') }}"
@@ -114,7 +113,7 @@ $singular_name =__('User');
                                                     data-ajax-popup="true" data-size="md" class="dropdown-item"
                                                     data-title="{{ __('Update ' . $singular_name) }}"
                                                     data-bs-original-title="{{ __('Edit') }}">
-                                                    <i class="ti ti-pencil"></i>
+                                                    <i class="ti ti-pencil" aria-hidden="true"></i>
                                                     <span class="">{{ __('Edit') }}</span>
                                                 </a>
                                             @endpermission
@@ -122,10 +121,10 @@ $singular_name =__('User');
                                                 {{ Form::open(['route' => ['users.destroy', $user->id], 'class' => 'm-0']) }}
                                                 @method('DELETE')
                                                 <a href="#!" class="dropdown-item bs-pass-para show_confirm" data-bs-toggle="tooltip" data-bs-placement="top" data-bs-original-title="{{ __('Delete') }}"
-                                                    aria-label="Delete" data-confirm="{{ __('Are You Sure?') }}"
+                                                    aria-label="{{ __('Delete') }}" data-confirm="{{ __('Are You Sure?') }}"
                                                     data-text="{{ __('This action can not be undone. Do you want to continue?') }}"
                                                     data-confirm-yes="delete-form-{{ $user->id }}">
-                                                    <i class="ti ti-trash"></i>
+                                                    <i class="ti ti-trash" aria-hidden="true"></i>
                                                     <span class="">{{ __('Delete') }}</span>
                                                 </a>
                                                 {{ Form::close() }}
@@ -137,7 +136,7 @@ $singular_name =__('User');
                                                 <a href="{{ route('user.verified', $user->id) }}" class="dropdown-item"
                                                     data-bs-toggle="tooltip"
                                                     data-bs-original-title="{{ __('Verified Now') }}">
-                                                    <i class="ti ti-checks"></i>
+                                                    <i class="ti ti-checks" aria-hidden="true"></i>
                                                     <span class="">{{ __('Verified Now') }}</span>
                                                 </a>
                                             @endif
@@ -149,7 +148,7 @@ $singular_name =__('User');
                                                     data-ajax-popup="true" data-size="md" class="dropdown-item"
                                                     data-title="{{ __('Reset Password') }}"
                                                     data-bs-original-title="{{ __('Reset Password') }}">
-                                                    <i class="ti ti-adjustments"></i>
+                                                    <i class="ti ti-adjustments" aria-hidden="true"></i>
                                                     <span class="">{{ __('Reset Password') }}</span>
                                                 </a>
                                             @endpermission
@@ -157,7 +156,7 @@ $singular_name =__('User');
                                                 @if ($user->is_enable_login == 1)
                                                     <a href="{{ route('users.login', \Crypt::encrypt($user->id)) }}"
                                                         class="dropdown-item">
-                                                        <i class="ti ti-road-sign"></i>
+                                                        <i class="ti ti-road-sign" aria-hidden="true"></i>
                                                         <span class="text-danger "> {{ __('Login Disable') }}</span>
                                                     </a>
                                                 @elseif ($user->is_enable_login == 0 && $user->password == null)
@@ -165,13 +164,13 @@ $singular_name =__('User');
                                                         data-url="{{ route('users.reset', \Crypt::encrypt($user->id)) }}"
                                                         data-ajax-popup="true" data-size="md" class="dropdown-item login_enable"
                                                         data-title="{{ __('New Password') }}" class="dropdown-item">
-                                                        <i class="ti ti-road-sign"></i>
+                                                        <i class="ti ti-road-sign" aria-hidden="true"></i>
                                                         <span class="text-success "> {{ __('Login Enable') }}</span>
                                                     </a>
                                                 @else
                                                     <a href="{{ route('users.login', \Crypt::encrypt($user->id)) }}"
                                                         class="dropdown-item">
-                                                        <i class="ti ti-road-sign"></i>
+                                                        <i class="ti ti-road-sign" aria-hidden="true"></i>
                                                         <span class="text-success "> {{ __('Login Enable') }}</span>
                                                     </a>
                                                 @endif

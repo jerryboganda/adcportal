@@ -1,3 +1,15 @@
-@props(['name', 'label' => null])
+@props(['name', 'label' => null, 'size' => null, 'class' => null])
 
-<i {{ $attributes->merge(['class' => 'ti ti-' . $name]) }} @if ($label) aria-label="{{ $label }}" @else aria-hidden="true" @endif></i>
+@php
+$sizeClass = match($size) {
+    'sm' => 'ti-sm',
+    'lg' => 'ti-lg',
+    'xl' => 'ti-xl',
+    default => null,
+};
+$classes = trim('ti ti-' . $name . ' ' . ($sizeClass ?? '') . ' ' . ($class ?? ''));
+@endphp
+
+<i {{ $attributes->merge(['class' => $classes]) }}
+   @if ($label) role="img" aria-label="{{ $label }}"
+   @else aria-hidden="true" @endif></i>

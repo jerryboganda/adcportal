@@ -10,12 +10,13 @@
     $company_settings = getCompanyAllSetting();
 @endphp
 @section('page-action')
-    <div class="d-flex col-auto gap-2">
+    <div class="d-flex gap-2">
         @stack('addButtonHook')
         @permission('appointment create')
             <a href="#" class="btn btn-sm btn-primary" data-ajax-popup="true" data-size="lg"
                 data-title="{{ __('Create New Appointment') }}" data-url="{{ route('appointment.create') }}"
-                data-bs-toggle="tooltip" data-bs-original-title="{{ __('Create') }}"><i class="ti ti-plus"></i>
+                data-bs-toggle="tooltip" data-bs-original-title="{{ __('Create') }}" aria-label="{{ __('Create New Appointment') }}"><i class="ti ti-plus" aria-hidden="true"></i>
+                <span>{{ __('Create') }}</span>
             </a>
         @endpermission
     </div>
@@ -73,16 +74,15 @@
 
 
                                 <div class="d-flex header-btn-wrp">
-                                    <a class="btn btn-sm btn-primary me-2"
-                                        onclick="document.getElementById('calendar_submit').submit(); return false;"
-                                        data-bs-toggle="tooltip" title="{{ __('Apply') }}"
-                                        data-original-title="{{ __('Apply') }}">
-                                        <span class="btn-inner--icon"><i class="ti ti-search"></i></span>
-                                    </a>
+                                    <button type="submit" class="btn btn-sm btn-primary me-2"
+                                        data-bs-toggle="tooltip" title="{{ __('Apply') }}">
+                                        <i class="ti ti-search" aria-hidden="true"></i>
+                                        <span>{{ __('Apply') }}</span>
+                                    </button>
                                     <a href="{{ route('appointment.calendar') }}" class="btn btn-sm btn-danger"
-                                        data-bs-toggle="tooltip" title="{{ __('Reset') }}"
-                                        data-original-title="{{ __('Reset') }}">
-                                        <span class="btn-inner--icon"><i class="ti ti-refresh text-white-off "></i></span>
+                                        data-bs-toggle="tooltip" title="{{ __('Reset') }}">
+                                        <i class="ti ti-refresh text-white" aria-hidden="true"></i>
+                                        <span>{{ __('Reset') }}</span>
                                     </a>
                                 </div>
                             </div>
@@ -117,7 +117,7 @@
                                         <div class="col-auto mb-0">
                                             <div class="d-flex align-items-center">
                                                 <div class="theme-avtar badge p-2 px-3 bg-primary">
-                                                    <i class="ti ti-calendar"></i>
+                                                    <i class="ti ti-calendar" aria-hidden="true"></i>
                                                 </div>
                                                 <div class="ms-3">
                                                     <h6 class="m-0">

@@ -15,15 +15,13 @@
     </div>
 </footer>
 
-
-
 @if (Route::currentRouteName() !== 'chatify')
     <x-feedback.modal />
 @endif
 <x-feedback.loader />
 <x-feedback.toast />
 
-<!-- Required Js -->
+<!-- Required vendor JS -->
 <script src="{{ asset('assets/js/plugins/popper.min.js') }}"></script>
 <script src="{{ asset('js/jquery.form.js') }}"></script>
 <script src="{{ asset('assets/js/dash.js') }}"></script>
@@ -35,17 +33,15 @@
 <script src="{{ asset('assets/js/plugins/sweetalert2.all.min.js') }}"></script>
 <script src="{{ asset('assets/js/plugins/flatpickr.min.js') }}"></script>
 <script src="{{ asset('assets/js/plugins/choices.js') }}"></script>
-<script src="{{ asset('js/socialSharing.js') }}"></script>
 <script src="{{ asset('assets/js/repeater.js') }}"></script>
 <script src="{{ asset('assets/js/plugins/datepicker-full.js') }}"></script>
-
 <script src="{{ asset('assets/js/bootstrap-datepicker.js') }}"></script>
 <script src="{{ asset('assets/js/plugins/summernote-0.8.18-dist/summernote-lite.min.js') }}"></script>
-
 <script src="{{ asset('js/fontawesome-iconpicker.js') }}"></script>
-
 <script src="{{ asset('js/icons.js') }}"></script>
+<script src="{{ asset('js/socialSharing.js') }}"></script>
 <script src="{{ asset('js/custom.js') }}"></script>
+
 @if ($message = Session::get('success'))
     <script>
         toastrs('Success', {{ json_encode($message) }}, 'success');
@@ -57,10 +53,13 @@
         toastrs('Error', {{ json_encode($message) }}, 'error');
     </script>
 @endif
+
 @stack('scripts')
+
 @if (isset($admin_settings['enable_cookie']) && $admin_settings['enable_cookie'] == 'on')
     @include('layouts.cookie_consent')
 @endif
+
 {{-- custom-js --}}
 <script type="text/javascript">
     {!! isset($admin_settings['custom_js']) ? htmlspecialchars_decode($admin_settings['custom_js']) : '' !!}

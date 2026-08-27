@@ -14,7 +14,7 @@
         <a href="#" class="btn btn-sm btn-primary" data-ajax-popup="true" data-size="md"
             data-title="{{ __('Create New Referring Doctor') }}" data-url="{{ route('referrer.create') }}"
             data-bs-toggle="tooltip" data-bs-original-title="{{ __('Create') }}">
-            <i class="ti ti-plus"></i>
+            <i class="ti ti-plus" aria-hidden="true"></i>
         </a>
         @endpermission
     </div>
@@ -29,7 +29,7 @@
                     <small class="text-muted">{{ __('Manage doctors who refer patients to your diagnostic centre') }}</small>
                 </div>
                 <div class="card-body">
-                    <div class="table-responsive">
+                    <div class="booking-data-table">
                         <table class="table table-hover" id="referrers-table">
                             <thead>
                                 <tr>
@@ -72,14 +72,14 @@
                                                     data-title="{{ __('Edit Referring Doctor') }}" 
                                                     data-url="{{ route('referrer.edit', $referrer->id) }}"
                                                     data-bs-toggle="tooltip" data-bs-original-title="{{ __('Edit') }}">
-                                                    <i class="ti ti-pencil"></i>
+                                                    <i class="ti ti-pencil" aria-hidden="true"></i>
                                                 </a>
                                                 @endpermission
                                                 @permission('referrer delete')
                                                 {!! Form::open(['method' => 'DELETE', 'route' => ['referrer.destroy', $referrer->id], 'class' => 'd-inline']) !!}
                                                 <button type="submit" class="btn btn-sm btn-danger show_confirm"
                                                     data-bs-toggle="tooltip" data-bs-original-title="{{ __('Delete') }}">
-                                                    <i class="ti ti-trash"></i>
+                                                    <i class="ti ti-trash" aria-hidden="true"></i>
                                                 </button>
                                                 {!! Form::close() !!}
                                                 @endpermission
@@ -90,7 +90,7 @@
                                     <tr>
                                         <td colspan="9" class="text-center py-4">
                                             <div class="text-muted">
-                                                <i class="ti ti-users-group" style="font-size: 48px;"></i>
+                                                <i class="ti ti-users-group" style="font-size: 48px;" aria-hidden="true"></i>
                                                 <p class="mt-2">{{ __('No referring doctors found.') }}</p>
                                                 @permission('referrer create')
                                                 <a href="#" class="btn btn-sm btn-primary" data-ajax-popup="true" data-size="md"

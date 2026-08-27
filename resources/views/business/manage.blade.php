@@ -10,21 +10,21 @@
 @section('page-action')
 <div class="d-flex">
     <a href="#" class="btn btn-sm btn-primary cp_link me-2" data-link="{{ route('appointments.form') }}"
-            data-bs-placement="top" data-bs-toggle="tooltip" data-bs-original-title="{{ __('Click To Copy Form Link') }}">
-            <i class="text-white ti ti-link"></i>
+            data-bs-placement="top" data-bs-toggle="tooltip" data-bs-original-title="{{ __('Click To Copy Form Link') }}" aria-label="{{ __('Click To Copy Form Link') }}">
+            <i class="text-white ti ti-link" aria-hidden="true"></i>
         </a>
         @permission('subscriber manage')
             <a href="{{ route('subscribes.index', ['business' => $business->id]) }}" class="btn btn-sm bg-warning-subtle me-2"
-                data-bs-toggle="tooltip" title='{{ __('Subscribers')}}'> <span class="text-white"> <i class="ti ti-mail"></i></span></a>
+                data-bs-toggle="tooltip" title='{{ __('Subscribers')}}' aria-label="{{ __('Subscribers') }}"> <span class="text-white"> <i class="ti ti-mail" aria-hidden="true"></i></span></a>
         @endpermission
         @permission('contact manage')
             <a href="{{ route('contacts.index', ['business' => $business->id]) }}" class="btn btn-sm bg-warning me-2"
-                data-bs-toggle="tooltip" title='{{ __('Contacts')}}'> <span class="text-white"> <i class="ti ti-phone"></i></span></a>
+                data-bs-toggle="tooltip" title='{{ __('Contacts')}}' aria-label="{{ __('Contacts') }}"> <span class="text-white"> <i class="ti ti-phone" aria-hidden="true"></i></span></a>
         @endpermission
         @permission('appointment manage')
         <a href="{{ route('appointment.index', ['business' => $business->id]) }}" class="btn btn-sm bg-secondary"
-            data-bs-toggle="tooltip"  title="{{ __('Appointments') }}"> <span class="text-white"> <i
-                    class="ti ti-credit-card"></i></span></a>
+            data-bs-toggle="tooltip"  title="{{ __('Appointments') }}" aria-label="{{ __('Appointments') }}"> <span class="text-white"> <i
+                    class="ti ti-credit-card" aria-hidden="true"></i></span></a>
         @endpermission
     </div>
 @endsection
@@ -183,7 +183,7 @@
                                     data-title="{{ __('Create New Location') }}"
                                     data-url="{{ route('location.create', ['business_id' => $business->id]) }}"
                                     data-bs-toggle="tooltip" data-bs-original-title="{{ __('Create') }}">
-                                    <i class="ti ti-plus"></i>
+                                    <i class="ti ti-plus" aria-hidden="true"></i>
                                 </a>
                             @endpermission
                             </div>
@@ -192,7 +192,7 @@
                                 <div class="col-sm-12">
                                     <div class="card">
                                         <div class="card-body table-border-style">
-                                            <div class="table-responsive">
+                                            <div class="booking-data-table">
                                                 <table class="table mb-0 pc-dt-simple" id="datatable1">
                                                     <thead>
                                                         <tr>
@@ -230,7 +230,7 @@
                                                                                     data-bs-toggle="tooltip"
                                                                                     data-bs-original-title="{{ __('Edit') }}">
                                                                                     <span class="text-white"> <i
-                                                                                            class="ti ti-pencil"></i></span></a>
+                                                                                            class="ti ti-pencil" aria-hidden="true"></i></span></a>
                                                                             </div>
                                                                         @endpermission
                                                                         @permission('location delete')
@@ -277,7 +277,7 @@
                                         data-bs-original-title="{{ __('Create') }}"
                                         data-url="{{ route('service.create', ['business_id' => $business->id]) }}"
                                         id="create_business_data" title="{{ __('Create') }}">
-                                        <i class="ti ti-plus"></i>
+                                        <i class="ti ti-plus" aria-hidden="true"></i>
                                     </a>
                                 @endpermission
                             </div>
@@ -285,7 +285,7 @@
                                 <div class="col-sm-12">
                                     <div class="card ">
                                         <div class="card-body table-border-style">
-                                            <div class="table-responsive">
+                                            <div class="booking-data-table">
                                                 <table class="table mb-0 pc-dt-simple" id="datatable3">
                                                     <thead>
                                                         <tr>
@@ -384,7 +384,7 @@
                                                                                     data-bs-toggle="tooltip"
                                                                                     data-bs-original-title="{{ __('Edit') }}">
                                                                                     <span class="text-white"> <i
-                                                                                            class="ti ti-pencil"></i></span></a>
+                                                                                            class="ti ti-pencil" aria-hidden="true"></i></span></a>
                                                                             </div>
                                                                         @endpermission
                                                                         @permission('service delete')
@@ -446,7 +446,7 @@
                                         data-title="{{ __('Create New Staff') }}"
                                         data-url="{{ route('staff.create', ['business_id' => $business->id]) }}"
                                         data-bs-toggle="tooltip" data-bs-original-title="{{ __('Create') }}">
-                                        <i class="ti ti-plus"></i>
+                                        <i class="ti ti-plus" aria-hidden="true"></i>
                                     </a>
                                 @endpermission
                             </div>
@@ -454,7 +454,7 @@
                                 <div class="col-sm-12">
                                     <div class="card">
                                         <div class="card-body table-border-style">
-                                            <div class="table-responsive">
+                                            <div class="booking-data-table">
                                                 <table class="table mb-0 pc-dt-simple" id="datatable4">
                                                     <thead>
                                                         <tr>
@@ -497,7 +497,7 @@
                                                                                         <i
                                                                                             class="text-warning ti ti-star-half"></i>
                                                                                     @else
-                                                                                        <i class="ti ti-star"></i>
+                                                                                        <i class="ti ti-star" aria-hidden="true"></i>
                                                                                     @endif
                                                                                 @else
                                                                                     <i
@@ -530,7 +530,7 @@
                                                                                     data-bs-toggle="tooltip"
                                                                                     data-bs-original-title="{{ __('Edit') }}">
                                                                                     <span class="text-white"> <i
-                                                                                            class="ti ti-pencil"></i></span></a>
+                                                                                            class="ti ti-pencil" aria-hidden="true"></i></span></a>
                                                                             </div>
                                                                         @endpermission
                                                                         @permission('staff delete')
@@ -609,7 +609,7 @@
                                         data-title="{{ __('Create New Category') }}"
                                         data-url="{{ route('category.create', ['business_id' => $business->id]) }}"
                                         data-bs-toggle="tooltip" data-bs-original-title="{{ __('Create') }}">
-                                        <i class="ti ti-plus"></i>
+                                        <i class="ti ti-plus" aria-hidden="true"></i>
                                     </a>
                                 @endpermission
                             </div>
@@ -617,7 +617,7 @@
                                 <div class="col-sm-12">
                                     <div class="card">
                                         <div class="card-body table-border-style">
-                                            <div class="table-responsive">
+                                            <div class="booking-data-table">
                                                 <table class="table mb-0 pc-dt-simple" id="datatable2">
                                                     <thead>
                                                         <tr>
@@ -644,7 +644,7 @@
                                                                                     data-bs-toggle="tooltip"
                                                                                     data-bs-original-title="{{ __('Edit') }}">
                                                                                     <span class="text-white"> <i
-                                                                                            class="ti ti-pencil"></i></span></a>
+                                                                                            class="ti ti-pencil" aria-hidden="true"></i></span></a>
                                                                             </div>
                                                                         @endpermission
                                                                         @permission('category delete')
@@ -758,7 +758,7 @@
 
                                                 <div class="mt-2 add-break-btn">
                                                     <span data-repeater-create="">
-                                                        <i class="ti ti-circle-plus"></i>
+                                                        <i class="ti ti-circle-plus" aria-hidden="true"></i>
                                                         {{ __('Add break') }}
                                                     </span>
                                                 </div>
@@ -784,7 +784,7 @@
                                         data-title="{{ __('Create New Holiday') }}"
                                         data-url="{{ route('business-holiday.create', ['business_id' => $business->id]) }}"
                                         data-bs-toggle="tooltip" data-bs-original-title="{{ __('Create') }}">
-                                        <i class="ti ti-plus"></i>
+                                        <i class="ti ti-plus" aria-hidden="true"></i>
                                     </a>
                                 </div>
                             @endpermission
@@ -820,7 +820,7 @@
                                                                 <div class="col-auto mb-0">
                                                                     <div class="d-flex align-items-center">
                                                                         <div class="theme-avtar badge p-2 px-3 bg-primary">
-                                                                            <i class="ti ti-calendar"></i>
+                                                                            <i class="ti ti-calendar" aria-hidden="true"></i>
                                                                         </div>
                                                                         <div class="ms-3">
                                                                             <h6 class="m-0">
@@ -851,7 +851,7 @@
                                                                                 data-bs-toggle="tooltip"
                                                                                 data-bs-original-title="{{ __('Edit') }}">
                                                                                 <span class="text-white"> <i
-                                                                                        class="ti ti-pencil"></i></span></a>
+                                                                                        class="ti ti-pencil" aria-hidden="true"></i></span></a>
                                                                         </div>
                                                                     @endpermission
                                                                     @permission('holiday delete')
@@ -961,7 +961,7 @@
                                                                         data-bs-original-title="{{ __('Copy Business Link') }}"
                                                                         title="{{ __('Copy Business Link') }}"
                                                                         id="button-addon2" onclick="myFunction()"><i
-                                                                            class="ti ti-copy"></i></button>
+                                                                            class="ti ti-copy" aria-hidden="true"></i></button>
                                                                 </div>
                                                             </div>
                                                         </div>

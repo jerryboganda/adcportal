@@ -32,11 +32,11 @@
     <a href="#" class="btn btn-sm btn-primary me-2" data-ajax-popup="true" data-size="md"
             data-title="{{ __('Import Lang Zip File') }}" data-url="{{ route('import.lang.json.upload') }}"
             data-bs-toggle="tooltip" data-bs-original-title="{{ __('Import') }}">
-            <i class="ti ti-file-import"></i>
+            <i class="ti ti-file-import" aria-hidden="true"></i>
         </a>
         <a href="{{ route('export.lang.json') }}" class="btn btn-sm btn-primary" data-bs-toggle="tooltip"
             data-bs-original-title="{{ __('Export') }}">
-            <i class="ti ti-file-export"></i>
+            <i class="ti ti-file-export" aria-hidden="true"></i>
         </a>
 </div>
 @endsection
@@ -69,7 +69,7 @@
                         @foreach ($languages as $key => $language)
                             <a href="{{ route('lang.index', [$key,$module]) }}"
                                 class="nav-link my-1 font-weight-bold @if ($key ==$lang) active @endif">
-                                <i class="d-lg-none d-block mr-1"></i>
+                                <i class="d-lg-none d-block me-1"></i>
                                 <span class="d-none d-lg-block">{{ Str::ucfirst($language)}}</span>
                             </a>
                         @endforeach
@@ -87,9 +87,9 @@
                         </div>
                         <div class="d-flex align-items-center gap-2">
                             <button id="filter-btn" class="btn btn-sm btn-primary" data-bs-toggle="tooltip"
-                                title="{{ __('Apply') }}"><i class="ti ti-search"></i></button>
+                                title="{{ __('Apply') }}"><i class="ti ti-search" aria-hidden="true"></i></button>
                             <button id="reset-btn" class="btn btn-sm btn-danger" data-bs-toggle="tooltip"
-                                title="{{ __('Reset') }}"><i class="ti ti-refresh"></i></button>
+                                title="{{ __('Reset') }}"><i class="ti ti-refresh" aria-hidden="true"></i></button>
                         </div>
                     </div>
                 </div>

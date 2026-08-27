@@ -25,29 +25,31 @@
                     </form>
                     @endpermission
 
-                    <table class="table table-hover align-middle mb-0">
-                        <thead><tr><th>{{__('Name')}}</th><th>{{__('Code')}}</th><th>{{__('Procedures')}}</th><th>{{__('Buffer')}}</th><th></th></tr></thead>
-                        <tbody>
-                        @forelse($modalities as $modality)
-                            <tr>
-                                <td><span class="badge rounded-pill" style="background: {{ $modality->color }}22; color: {{ $modality->color }};">{{ $modality->name }}</span></td>
-                                <td>{{ $modality->code }}</td>
-                                <td><span class="badge bg-label-info">{{ $modality->procedures_count }}</span></td>
-                                <td>{{ $modality->buffer_minutes }} {{ __('min') }}</td>
-                                <td class="text-end">
-                                    @permission('modality delete')
-                                    <form method="POST" action="{{ route('modality.destroy', $modality->id) }}" class="d-inline">
-                                        @csrf @method('DELETE')
-                                        <button class="btn btn-sm btn-outline-danger show_confirm"><i class="ti ti-trash"></i></button>
-                                    </form>
-                                    @endpermission
-                                </td>
-                            </tr>
-                        @empty
-                            <tr><td colspan="5" class="text-center text-muted py-3">{{ __('Add your first modality (e.g. X-ray, Ultrasound, CT).') }}</td></tr>
-                        @endforelse
-                        </tbody>
-                    </table>
+                    <div class="booking-data-table">
+                        <table class="table table-hover align-middle mb-0">
+                            <thead><tr><th>{{__('Name')}}</th><th>{{__('Code')}}</th><th>{{__('Procedures')}}</th><th>{{__('Buffer')}}</th><th></th></tr></thead>
+                            <tbody>
+                            @forelse($modalities as $modality)
+                                <tr>
+                                    <td><span class="badge rounded-pill" style="background: {{ $modality->color }}22; color: {{ $modality->color }};">{{ $modality->name }}</span></td>
+                                    <td>{{ $modality->code }}</td>
+                                    <td><span class="badge bg-label-info">{{ $modality->procedures_count }}</span></td>
+                                    <td>{{ $modality->buffer_minutes }} {{ __('min') }}</td>
+                                    <td class="text-end">
+                                        @permission('modality delete')
+                                        <form method="POST" action="{{ route('modality.destroy', $modality->id) }}" class="d-inline">
+                                            @csrf @method('DELETE')
+                                            <button class="btn btn-sm btn-outline-danger show_confirm" aria-label="{{ __('Delete modality') }}"><i class="ti ti-trash" aria-hidden="true"></i></button>
+                                        </form>
+                                        @endpermission
+                                    </td>
+                                </tr>
+                            @empty
+                                <tr><td colspan="5" class="text-center text-muted py-3">{{ __('Add your first modality (e.g. X-ray, Ultrasound, CT).') }}</td></tr>
+                            @endforelse
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
             </div>
         </div>
@@ -74,29 +76,31 @@
                     </form>
                     @endpermission
 
-                    <table class="table table-hover align-middle mb-0">
-                        <thead><tr><th>{{__('Room')}}</th><th>{{__('Modality')}}</th><th>{{__('Capacity / slot')}}</th><th>{{__('Status')}}</th><th></th></tr></thead>
-                        <tbody>
-                        @forelse($rooms as $room)
-                            <tr>
-                                <td class="fw-bold">{{ $room->name }}</td>
-                                <td>{{ optional($room->modality)->name ?? '-' }}</td>
-                                <td>{{ $room->capacity_per_slot }}</td>
-                                <td><span class="badge {{ $room->is_active ? 'bg-success' : 'bg-secondary' }}">{{ $room->is_active ? __('Active') : __('Off') }}</span></td>
-                                <td class="text-end">
-                                    @permission('room delete')
-                                    <form method="POST" action="{{ route('room.destroy', $room->id) }}" class="d-inline">
-                                        @csrf @method('DELETE')
-                                        <button class="btn btn-sm btn-outline-danger show_confirm"><i class="ti ti-trash"></i></button>
-                                    </form>
-                                    @endpermission
-                                </td>
-                            </tr>
-                        @empty
-                            <tr><td colspan="5" class="text-center text-muted py-3">{{ __('No scan rooms configured.') }}</td></tr>
-                        @endforelse
-                        </tbody>
-                    </table>
+                    <div class="booking-data-table">
+                        <table class="table table-hover align-middle mb-0">
+                            <thead><tr><th>{{__('Room')}}</th><th>{{__('Modality')}}</th><th>{{__('Capacity / slot')}}</th><th>{{__('Status')}}</th><th></th></tr></thead>
+                            <tbody>
+                            @forelse($rooms as $room)
+                                <tr>
+                                    <td class="fw-bold">{{ $room->name }}</td>
+                                    <td>{{ optional($room->modality)->name ?? '-' }}</td>
+                                    <td>{{ $room->capacity_per_slot }}</td>
+                                    <td><span class="badge {{ $room->is_active ? 'bg-success' : 'bg-secondary' }}">{{ $room->is_active ? __('Active') : __('Off') }}</span></td>
+                                    <td class="text-end">
+                                        @permission('room delete')
+                                        <form method="POST" action="{{ route('room.destroy', $room->id) }}" class="d-inline">
+                                            @csrf @method('DELETE')
+                                            <button class="btn btn-sm btn-outline-danger show_confirm" aria-label="{{ __('Delete room') }}"><i class="ti ti-trash" aria-hidden="true"></i></button>
+                                        </form>
+                                        @endpermission
+                                    </td>
+                                </tr>
+                            @empty
+                                <tr><td colspan="5" class="text-center text-muted py-3">{{ __('No scan rooms configured.') }}</td></tr>
+                            @endforelse
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
             </div>
 
@@ -131,7 +135,7 @@
                                 </span>
                                 <form method="POST" action="{{ route('room.downtime.destroy', $dt->id) }}">
                                     @csrf @method('DELETE')
-                                    <button class="btn btn-sm btn-outline-danger show_confirm"><i class="ti ti-x"></i></button>
+                                    <button class="btn btn-sm btn-outline-danger show_confirm"><i class="ti ti-x" aria-hidden="true"></i></button>
                                 </form>
                             </li>
                         @empty

@@ -1,4 +1,9 @@
-/* ADC Vite entry — self-hosted fonts + Bootstrap 5.3 + design tokens */
+/* ADC Vite entry — self-hosted fonts + Bootstrap 5.3 + design tokens + overrides */
+
+/* --- Frameworks & tokens (must be at the top per CSS @import spec) --- */
+@import 'bootstrap/dist/css/bootstrap.min.css';
+@import './tokens.css';
+@import './overrides.css';
 
 /* --- Self-hosted typography (Outfit + Noto Sans Arabic, OFL licensed) --- */
 @font-face {
@@ -57,10 +62,6 @@
   font-display: swap;
   src: url('../fonts/noto-sans-arabic-arabic-700-normal.woff2') format('woff2');
 }
-
-/* --- Frameworks & tokens --- */
-@import 'bootstrap/dist/css/bootstrap.min.css';
-@import './tokens.css';
 
 /* --- Base --- */
 html { -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility; }

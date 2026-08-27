@@ -43,7 +43,7 @@
                         @foreach ($activeNotifications as $key => $notification)
                             <div class="tab-pane fade show " id="{{$key}}-tab" role="tabpanel"
                                 aria-labelledby="pills-user-tab-1">
-                                <div class="table-responsive">
+                                <div class="booking-data-table">
                                     <table class="table mb-0 pc-dt-simple" id="{{$key}}-notify">
                                         <thead>
                                             <tr>
@@ -62,8 +62,8 @@
                                                             <a href="{{ route('notification-template.show', [$value->id, getActiveLanguage()]) }}"
                                                                 class="btn btn-sm  bg-warning align-items-center"
                                                                 data-bs-toggle="tooltip" data-bs-placement="top"
-                                                                title="{{ __('Manage Your :key Message', ['key' => $key]) }}">
-                                                                <i class="ti ti-eye text-white"></i>
+                                                                title="{{ __('Manage Your :key Message', ['key' => $key]) }}" aria-label="{{ __('Manage Your :key Message', ['key' => $key]) }}">
+                                                                <i class="ti ti-eye text-white" aria-hidden="true"></i>
                                                             </a>
                                                         </div>
                                                     </td>

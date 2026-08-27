@@ -31,7 +31,7 @@
                     <span class="badge bg-primary ms-2">{{ $group->count() }}</span></h6>
             </div>
             <div class="card-body py-2">
-                <div class="table-responsive">
+                <div class="booking-data-table">
                     <table class="table table-sm table-hover align-middle mb-0">
                         <thead><tr>
                             <th>{{ __('Time / Date') }}</th>
@@ -64,7 +64,7 @@
                                             <span class="badge bg-warning text-dark">{{ __('Pending') }}</span>
                                         @endif
                                         @permission('study screen')
-                                        <a href="{{ route('screening.answer', $study->id) }}" class="btn btn-sm btn-outline-secondary ms-1"><i class="ti ti-clipboard-check"></i></a>
+                                        <a href="{{ route('screening.answer', $study->id) }}" class="btn btn-sm btn-outline-secondary ms-1"><i class="ti ti-clipboard-check" aria-hidden="true"></i></a>
                                         @endpermission
                                     @else
                                         <span class="text-muted">—</span>
@@ -158,7 +158,7 @@
         </div>
     @empty
         <div class="card"><div class="card-body text-center py-5 text-muted">
-            <i class="ti ti-device-desktop-off" style="font-size:48px"></i>
+            <i class="ti ti-device-desktop-off" style="font-size:48px" aria-hidden="true"></i>
             <p class="mt-2 mb-0">{{ __('No active studies on the worklist.') }}</p>
         </div></div>
     @endforelse

@@ -4,7 +4,7 @@
         <a data-size="lg" data-title="{{ __('Edit Customer') }}" data-ajax-popup="true"
             data-url="{{ route('customer.edit', $customer->id) }}"
             class="btn btn-sm bg-info  d-inline align-items-center" data-toggle="tooltip" title="{{ __('Edit') }}"><span
-                class="text-white"> <i class="ti ti-pencil"></i></span></a>
+                class="text-white"> <i class="ti ti-pencil" aria-hidden="true"></i></span></a>
     </div>
 @endpermission
 @permission('customer delete')
@@ -17,7 +17,7 @@
             <button type="button" class="btn btn-sm  bg-danger d-inline align-items-center show_confirm"
                 data-toggle="tooltip" title="{{ __('Delete') }}" data-confirm="{{ __('Are You Sure?') }}"
                 data-text="{{ __('This action can not be undone. Do you want to continue?') }}">
-                <span class="text-white"> <i class="ti ti-trash"></i></span>
+                <span class="text-white"> <i class="ti ti-trash" aria-hidden="true"></i></span>
             </button>
         </form>
     </div>
