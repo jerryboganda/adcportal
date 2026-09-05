@@ -1,40 +1,37 @@
+﻿# ============================================================
+# ADC Portal — React RIS Frontend & Application Server
+# Multi-stage production build: Node.js 20 build -> Nginx Alpine
 # ============================================================
-# ADC Portal — multi-stage build (assets + vendor + runtime)
-# Runtime: php:8.3-apache. Persistent data is supplied at runtime
-# via host bind-mounts (NEVER baked into the image), so container
-# rebuilds can never destroy patient data.
-# ============================================================
-FROM node:20-alpine AS assets
+FROM node:20-alpine AS build
 WORKDIR /app
-COPY package.json package-lock.json ./
-RUN npm ci
+
+COPY package.json ./
+RUN npm install --legacy-peer-deps
+
 COPY . .
 RUN npm run build
 
-FROM composer:2 AS vendor
-WORKDIR /app
-COPY . .
-RUN composer install --no-dev --prefer-dist --no-interaction --optimize-autoloader --ignore-platform-reqs --no-scripts
+FROM nginx:alpine AS runtime
+COPY --from=build /app/dist /usr/share/nginx/html
 
-FROM php:8.3-apache AS runtime
-RUN apt-get update && apt-get install -y --no-install-recommends \
-        libpng-dev libjpeg-dev libfreetype6-dev libwebp-dev \
-        libicu-dev libzip-dev libonig-dev libxml2-dev zip unzip git \
-    && rm -rf /var/lib/apt/lists/* \
-    && docker-php-ext-configure gd --with-freetype --with-jpeg --with-webp \
-    && docker-php-ext-install pdo_mysql mysqli gd bcmath intl exif zip opcache pcntl \
-    && a2enmod rewrite
+RUN printf 'server {\n\
+    listen 80;\n\
+    server_name _;\n\
+    root /usr/share/nginx/html;\n\
+    index index.html;\n\
+\n\
+    location / {\n\
+        try_files $uri $uri/ /index.html;\n\
+    }\n\
+\n\
+    location ~* \\.(?:css|js|jpg|jpeg|gif|png|ico|svg|woff|woff2|ttf|eot)$ {\n\
+        expires 30d;\n\
+        add_header Cache-Control "public, no-transform";\n\
+    }\n\
+}\n' > /etc/nginx/conf.d/default.conf
 
-COPY docker/apache.conf /etc/apache2/sites-available/000-default.conf
-COPY docker/entrypoint.sh /usr/local/bin/entrypoint.sh
-RUN chmod +x /usr/local/bin/entrypoint.sh
+# Preserve compatibility directories for existing VPS bind-mounts
+RUN mkdir -p /var/www/html/storage /var/www/html/public/uploads
 
-WORKDIR /var/www/html
-COPY . .
-COPY --from=vendor /app/vendor ./vendor
-COPY --from=assets /app/public/build ./public/build
-
-RUN chown -R www-data:www-data /var/www/html \
-    && chmod -R 755 /var/www/html/storage /var/www/html/bootstrap/cache
-
-ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
+EXPOSE 80
+CMD ["nginx", "-g", "daemon off;"]

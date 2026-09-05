@@ -1,0 +1,6 @@
+{
+  "name": "ADC Portal - Radiology Clinic Management System",
+  "description": "Comprehensive Radiology Information System (RIS) for Amad Diagnostic Centre: study workflow, technologist worklist, safety screening, contrast media & clinical consumables inventory, radiologist reporting, billing/invoices, and queue TV display.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

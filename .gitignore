@@ -1,79 +1,50 @@
- # Laravel
- .env
- .env.*
- /idea/
- /.vscode/
- /.DS_Store
- /vendor/
- /node_modules/
- /public/storage/
- /storage/*.key
- /storage/app/private/
- /storage/framework/
- /storage/logs/
- /bootstrap/cache/
- 
- # Local uploads & backups
- /uploads/
- /backups/
- /main-file/backups/
- 
- # Build outputs
- /public/hot
- /public/build/
- /public/mix-manifest.json
- 
- # Coverage & test artifacts
- /coverage/
- .phpunit.result.cache
- 
- # Docker & runtime
- /.docker/
- /.env.docker
- /.env.local
- 
- # Composer
- /composer.phar
- /vendor-bin/**/vendor
- 
- # NPM/Yarn/PNPM
- package-lock.json
- yarn.lock
- pnpm-lock.yaml
- 
- # Logs
- *.log
- *.pid
- 
-# Misc
+# Node & Build outputs
+node_modules/
+dist/
+/public/hot
+/public/build/
+/public/mix-manifest.json
+
+# Environment & Secrets
+.env
+.env.*
+.env.local
+.env.docker
+
+# IDE & OS files
+.idea/
+.vscode/
+.DS_Store
 Thumbs.db
 *.swp
 *.swo
 *.tmp
 *.bak
 *.backup
-*.corrupt
-/.idea
-/.vscode
-.env
-/storage/installed
-/storage/debugbar/*
-/vendor/
-/storage/framework/cache/*
-/storage/framework/sessions/*
-/storage/framework/testing/*
-/storage/framework/views/*
-/bootstrap/cache/*
-/uploads/*
-!packages/workdo/**/composer.json
-!packages/adc/**/composer.json
-.qodo
 
-# Local dev runtime logs (never commit)
+# Package manager locks & logs
+yarn.lock
+pnpm-lock.yaml
+bun.lock
+*.log
+*.pid
 /serve.err
 /serve.log
 
-# Playwright
+# Playwright & Testing
 /test-results/
 /playwright-report/
+/coverage/
+.phpunit.result.cache
+
+# Legacy Laravel paths (if any)
+/vendor/
+/public/storage/
+/storage/*.key
+/storage/app/private/
+/storage/framework/
+/storage/logs/
+/bootstrap/cache/
+/uploads/
+/backups/
 
