@@ -352,7 +352,7 @@ export const App: React.FC = () => {
     }
   }, [appointments, fail, showFlash]);
 
-  const handleAddInvoiceItem = useCallback(async (invoiceId: string, item: Omit<InvoiceItem, 'id' | 'lineTotal'> & { lineTotal?: number }) => {
+  const handleAddInvoiceItem = useCallback(async (invoiceId: string, item: Omit<InvoiceItem, 'id'> & { id?: string; lineTotal?: number }) => {
     try {
       const invoice = await api.addInvoiceItem(invoiceId, {
         description: item.description,
@@ -489,7 +489,7 @@ export const App: React.FC = () => {
     } catch (err: any) { fail(err, 'Could not update the screening form.'); }
   }, [fail]);
 
-  const handleAddTemplate = useCallback(async (newTpl: ReportTemplate) => {
+  const handleAddTemplate = useCallback(async (newTpl: Omit<ReportTemplate, 'id'>) => {
     try {
       const template = await api.createReportTemplate(newTpl);
       setTemplates(prev => [...prev, template]);

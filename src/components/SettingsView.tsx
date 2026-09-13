@@ -914,9 +914,9 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                 <p className="text-xs text-slate-500">Configure appointment alerts, ready report portal links, and emergency doctor notifications.</p>
               </div>
               <div className="flex items-center space-x-2">
-                <span className="inline-flex items-center space-x-1.5 px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                  <span className="w-2 h-2 rounded-full bg-emerald-500" />
-                  <span>Gateway Status: Live & Connected</span>
+                <span className="inline-flex items-center space-x-1.5 px-2.5 py-1 rounded-full text-xs font-bold bg-amber-50 text-amber-700 border border-amber-200">
+                  <span className="w-2 h-2 rounded-full bg-amber-500" />
+                  <span>Templates are stored; sending requires a connected SMS/WhatsApp gateway</span>
                 </span>
               </div>
             </div>
@@ -956,6 +956,8 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
               ))}
             </div>
           </div>
+        </div>
+      )}
 
       {/* SECTION 5: SYSTEM AUDIT LOGS */}
       {activeSection === 'audit' && (

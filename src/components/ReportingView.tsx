@@ -41,7 +41,7 @@ interface ReportingViewProps {
   onSaveReport: (aptId: string, reportData: Partial<RadiologyReport>, isFinalize: boolean) => void;
   onRejectToTech: (aptId: string, reason: string) => void;
   onReleaseReport: (aptId: string, channel: 'hand' | 'email' | 'portal') => void;
-  onAddTemplate?: (template: ReportTemplate) => void;
+  onAddTemplate?: (template: Omit<ReportTemplate, 'id'>) => void;
 }
 
 export const ReportingView: React.FC<ReportingViewProps> = ({

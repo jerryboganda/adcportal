@@ -1,6 +1,6 @@
 # DEPLOYMENT GUIDE — ADC Portal (SaaS) on Hostinger Business Plan
 
-Architecture: **Laravel 11 (PHP 8.3) + MySQL + React/Vite SPA**, deployed as one
+Architecture: **Laravel 11 (PHP 8.4) + MySQL + React/Vite SPA**, deployed as one
 application on Hostinger shared hosting (Business plan). The SPA is compiled by
 **GitHub Actions** and served by Laravel; all heavy compute stays in CI.
 

@@ -37,7 +37,7 @@ exposing `/api/v1` (Sanctum cookie sessions) + **React/Vite SPA frontend**.
 
 ## Deployment & Data Safety
 
-- Target: **Hostinger Business plan** (Apache, PHP 8.3, MySQL). See
+- Target: **Hostinger Business plan** (Apache, PHP 8.4, MySQL). See
   `DEPLOYMENT_GUIDE.md` for the full runbook.
 - Never commit `.env`, secrets, or runtime logs.
 - DB: MySQL 8 via hPanel. The old VPS/docker flow (185.252.233.186, ghcr image)

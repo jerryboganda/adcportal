@@ -159,6 +159,8 @@ export const PatientPortalView: React.FC<PatientPortalViewProps> = ({
         setPaymentSuccessMessage('');
         setPaymentRef('');
       }, 3500);
+    } catch {
+      // failure surfaced by the parent flash message
     } finally {
       setIsProcessingPayment(false);
     }
