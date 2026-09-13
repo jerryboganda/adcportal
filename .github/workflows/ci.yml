@@ -136,10 +136,14 @@ jobs:
           E2E_PASSWORD: E2eDemo#2026
         run: |
           set -o pipefail
-          npx playwright test 2>&1 | tee /tmp/e2e.log || {
-            grep -E "Error|expect|Timed out|failed" /tmp/e2e.log | head -10 | sed 's/^/::error::e2e /'
-            exit 1
-          }
+          npx playwright test 2>&1 | tee /tmp/e2e.log || echo "E2E FAILED — see detail step"
+
+      - name: E2E failure detail (fresh annotation budget)
+        if: failure()
+        run: |
+          grep -aE "passed|failed|✘" /tmp/e2e.log | head -12 | sed 's/^/::error::e2e-result /' || true
+          grep -aE "Error:|Timed out|waiting for|locator" /tmp/e2e.log | head -14 | sed 's/^/::error::e2e-detail /' || true
+          exit 1
 
       - uses: actions/upload-artifact@v4
         if: failure()
