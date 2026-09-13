@@ -85,6 +85,15 @@ class User extends Authenticatable implements LaratrustUser,MustVerifyEmail
         'last_login_at' => 'datetime',
     ];
 
+    /** Portal capability flags consumed by the React RBAC matrix. */
+    public const PORTAL_CAPABILITIES = [
+        'canSignReports',
+        'canVoidInvoices',
+        'canOverrideScreening',
+        'canEditMasters',
+        'canAccessPacs',
+    ];
+
     public function portalRole(): string
     {
         // Map the app's role names onto the React SPA role vocabulary.
