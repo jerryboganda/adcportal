@@ -40,6 +40,13 @@ return new class extends Migration
             $table->text('reject_reason')->nullable()->after('cancel_reason');
         });
 
+        // The React RIS books studies without the legacy wizard's mandatory
+        // location/staff selection (staffing is decided later in the pipeline).
+        Schema::table('appointments', function (Blueprint $table) {
+            $table->unsignedBigInteger('location_id')->nullable()->change();
+            $table->unsignedBigInteger('staff_id')->nullable()->change();
+        });
+
         Schema::table('dose_logs', function (Blueprint $table) {
             $table->decimal('dlp_value', 12, 3)->nullable()->after('dose_unit');
             $table->decimal('kvp', 8, 2)->nullable()->after('dlp_value');
@@ -65,6 +72,11 @@ return new class extends Migration
 
         Schema::table('services', function (Blueprint $table) {
             $table->dropColumn('code');
+        });
+
+        Schema::table('appointments', function (Blueprint $table) {
+            $table->unsignedBigInteger('location_id')->nullable(false)->change();
+            $table->unsignedBigInteger('staff_id')->nullable(false)->change();
         });
 
         Schema::table('appointments', function (Blueprint $table) {

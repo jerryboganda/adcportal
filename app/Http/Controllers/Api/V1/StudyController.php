@@ -111,7 +111,7 @@ class StudyController extends BaseApiController
                 'email' => $customer->email,
                 'contact' => $customer->phone,
                 'service_id' => $service->id,
-                'location_id' => $room?->location_id ?? 0,   // legacy NOT NULL column
+                'location_id' => $room?->location_id,
                 'referrer_id' => $validated['referrerId'] ?? null,
                 'date' => $validated['date'],
                 'time' => $this->normalizeTime($validated['time']),
