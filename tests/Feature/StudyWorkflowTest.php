@@ -33,6 +33,10 @@ class StudyWorkflowTest extends ApiTestCase
 
         $response = $this->actingAs($receptionist)->postJson('/api/v1/studies', $payload);
 
+        if (! $response->isCreated()) {
+            \Log::error('BOOKING-RESPONSE: '.substr($response->getContent(), 0, 2500));
+        }
+
         $response->assertCreated();
 
         return $response->json('data.study');

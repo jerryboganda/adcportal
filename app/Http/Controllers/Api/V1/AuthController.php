@@ -56,8 +56,12 @@ class AuthController extends BaseApiController
         $this->audit('logout', $request->user());
 
         Auth::guard('web')->logout();
-        $request->session()->invalidate();
-        $request->session()->regenerateToken();
+
+        // SPA requests are stateful, but be safe for stateless clients.
+        if ($request->hasSession()) {
+            $request->session()->invalidate();
+            $request->session()->regenerateToken();
+        }
 
         return $this->ok(['message' => 'Logged out']);
     }

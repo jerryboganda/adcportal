@@ -11,13 +11,19 @@ class RbacTest extends ApiTestCase
         $svc = Service::where('code', 'DX-CHEST-PA')->where('business_id', $this->businessA->id)->firstOrFail();
         $receptionist = $this->makeStaff($this->businessA, $this->adminA, 'receptionist');
 
-        return $this->actingAs($receptionist)->postJson('/api/v1/studies', [
+        $response = $this->actingAs($receptionist)->postJson('/api/v1/studies', [
             'newPatient' => ['name' => 'RBAC Patient', 'gender' => 'male'],
             'serviceId' => $svc->id,
             'date' => now()->toDateString(),
             'time' => '12:00 PM',
             'priority' => 'routine',
-        ])->assertCreated()->json('data');
+        ]);
+
+        if (! $response->isCreated()) {
+            \Log::error('BOOKING-RESPONSE: '.substr($response->getContent(), 0, 2500));
+        }
+
+        return $response->assertCreated()->json('data');
     }
 
     public function test_guest_gets_unauthenticated(): void
