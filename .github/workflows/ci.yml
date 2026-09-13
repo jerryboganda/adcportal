@@ -44,7 +44,7 @@ jobs:
         run: |
           set -o pipefail
           php artisan test --testsuite=Feature --stop-on-failure 2>&1 | tee /tmp/phpunit.log || {
-            grep -E "FAILED|Error:|Exception|assert|Expected|Actual" /tmp/phpunit.log | head -10 | sed 's/^/::error::phpunit /'
+            tail -n 14 /tmp/phpunit.log | sed 's/^/::error::phpunit /'
             exit 1
           }
 
