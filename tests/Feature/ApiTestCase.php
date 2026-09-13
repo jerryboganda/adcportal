@@ -66,7 +66,9 @@ abstract class ApiTestCase extends TestCase
 
         // Self-diagnosing fixture: surface RBAC wiring problems with exact state.
         if (! $admin->hasRole('admin')) {
-            throw new \RuntimeException('owner missing admin role');
+            $pivot = \DB::table('role_user')->where('user_id', $admin->id)->get();
+            $rolesTable = \DB::table('roles')->get(['id', 'name', 'guard_name', 'created_by']);
+            throw new \RuntimeException('owner missing admin role; pivot='.json_encode($pivot).' roles='.json_encode($rolesTable));
         }
         if (! $admin->isAbleTo('appointment create')) {
             throw new \RuntimeException('owner lacks appointment create; roles=['
