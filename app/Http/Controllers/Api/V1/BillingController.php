@@ -24,7 +24,7 @@ class BillingController extends BaseApiController
         $this->denyUnless('invoice manage');
 
         $invoices = Invoice::forClinic($this->tenantId())
-            ->with(['items', 'payments.receiver', 'appointment'])
+            ->with(['items', 'payments.receivedBy', 'appointment'])
             ->orderByDesc('id')
             ->get();
 
@@ -95,7 +95,7 @@ class BillingController extends BaseApiController
         });
 
         return response()->json([
-            'data' => ['invoice' => ApiShape::invoice($invoice->fresh(['items', 'payments.receiver', 'appointment']))],
+            'data' => ['invoice' => ApiShape::invoice($invoice->fresh(['items', 'payments.receivedBy', 'appointment']))],
         ], 201);
     }
 
@@ -132,7 +132,7 @@ class BillingController extends BaseApiController
             $this->recalculate($invoice);
         });
 
-        return $this->ok(['invoice' => ApiShape::invoice($invoice->fresh(['items', 'payments.receiver', 'appointment']))]);
+        return $this->ok(['invoice' => ApiShape::invoice($invoice->fresh(['items', 'payments.receivedBy', 'appointment']))]);
     }
 
     public function addPayment(Request $request, Invoice $invoice): JsonResponse
@@ -191,7 +191,7 @@ class BillingController extends BaseApiController
         ]);
 
         return $this->ok([
-            'invoice' => ApiShape::invoice($invoice->fresh(['items', 'payments.receiver', 'appointment'])),
+            'invoice' => ApiShape::invoice($invoice->fresh(['items', 'payments.receivedBy', 'appointment'])),
             'paymentId' => (string) $payment->id,
         ]);
     }
@@ -222,7 +222,7 @@ class BillingController extends BaseApiController
             'reason' => $reason,
         ]);
 
-        return $this->ok(['invoice' => ApiShape::invoice($invoice->fresh(['items', 'payments.receiver', 'appointment']))]);
+        return $this->ok(['invoice' => ApiShape::invoice($invoice->fresh(['items', 'payments.receivedBy', 'appointment']))]);
     }
 
     public function downloadPdf(Invoice $invoice)

@@ -330,7 +330,7 @@ class ApiShape
                     'method' => $p->method,
                     'reference' => (string) ($p->reference ?? ''),
                     'paidAt' => self::time($p->paid_at),
-                    'receivedBy' => optional($p->receiver)->name ?? 'Staff',
+                    'receivedBy' => optional($p->receivedBy)->name ?? 'Staff',
                 ])->all()
                 : [],
             'createdAt' => self::time($inv->created_at),

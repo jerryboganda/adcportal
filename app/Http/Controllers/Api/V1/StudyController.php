@@ -163,7 +163,7 @@ class StudyController extends BaseApiController
         return response()->json([
             'data' => [
                 'study' => ApiShape::appointment($appointment->fresh(self::eager())),
-                'invoice' => ApiShape::invoice($invoice->fresh(['items', 'payments.receiver', 'appointment'])),
+                'invoice' => ApiShape::invoice($invoice->fresh(['items', 'payments.receivedBy', 'appointment'])),
             ],
         ], 201);
     }

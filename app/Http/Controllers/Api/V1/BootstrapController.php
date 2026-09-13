@@ -45,7 +45,7 @@ class BootstrapController extends BaseApiController
             ->get();
 
         $invoices = Invoice::forClinic($tenantId)
-            ->with(['items', 'payments.receiver', 'appointment'])
+            ->with(['items', 'payments.receivedBy', 'appointment'])
             ->orderByDesc('id')
             ->get();
 
