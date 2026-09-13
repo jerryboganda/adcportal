@@ -112,9 +112,19 @@ jobs:
           RIS_DEMO_ADMIN_EMAIL: admin@adc-e2e.test
           RIS_DEMO_PASSWORD: E2eDemo#2026
         run: |
-          php artisan key:generate --force
-          php artisan migrate --force
-          php artisan db:seed --force
+          set -o pipefail
+          {
+            php artisan key:generate --force
+            php artisan migrate --force
+            php artisan db:seed --force
+          } 2>&1 | tee /tmp/prepare.log || echo "PREPARE FAILED — see detail step"
+
+      - name: Prepare failure detail
+        if: failure()
+        run: |
+          grep -aE "ERROR|Exception|Deprecated|at [A-Za-z]" /tmp/prepare.log 2>/dev/null | head -14 | sed 's/^/::error::prepare /' || true
+          tail -n 20 /tmp/prepare.log 2>/dev/null | sed 's/^/::error::prepare-tail /' || true
+          exit 1
 
       - name: Start Laravel (serves API + SPA on one origin)
         run: php artisan serve --host=127.0.0.1 --port=8000 &
