@@ -78,7 +78,7 @@ class RbacTest extends ApiTestCase
         // A staff user of tenant B must not appear in tenant A's staff list.
         $other = $this->makeStaff($this->businessB, $this->adminB, 'receptionist');
 
-        $listing = $this->actingAs($this->makeStaff($this->businessA, $this->adminA, 'receptionist') ?: $this->adminA)
+        $listing = $this->actingAs($this->adminA)
             ->getJson('/api/v1/staff')->assertOk();
 
         $this->assertNotContains($other->id, collect($listing->json('data.staff'))->pluck('id'));
