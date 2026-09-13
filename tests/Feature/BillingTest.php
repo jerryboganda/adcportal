@@ -40,9 +40,9 @@ class BillingTest extends ApiTestCase
                 'reference' => 'RCPT-1',
             ])->assertOk();
 
-        $this->assertSame('partial', $response->json('invoice.status'));
-        $this->assertEquals(1000, $response->json('invoice.paidTotal'));
-        $this->assertEquals(2500, $response->json('invoice.balanceDue'));
+        $this->assertSame('partial', $response->json('data.invoice.status'));
+        $this->assertEquals(1000, $response->json('data.invoice.paidTotal'));
+        $this->assertEquals(2500, $response->json('data.invoice.balanceDue'));
 
         // Settle the rest
         $response = $this->actingAs($billing)
@@ -52,8 +52,8 @@ class BillingTest extends ApiTestCase
                 'reference' => 'POS-1',
             ])->assertOk();
 
-        $this->assertSame('paid', $response->json('invoice.status'));
-        $this->assertEquals(0, $response->json('invoice.balanceDue'));
+        $this->assertSame('paid', $response->json('data.invoice.status'));
+        $this->assertEquals(0, $response->json('data.invoice.balanceDue'));
 
         // Overpayment is rejected
         $this->actingAs($billing)
