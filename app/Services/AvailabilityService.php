@@ -63,7 +63,7 @@ class AvailabilityService
 
         try {
             $selected = Carbon::createFromFormat('d-m-Y', $date);
-        } catch (Throwable) {
+        } catch (\Throwable) {
             return [];
         }
 

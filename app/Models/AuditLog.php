@@ -26,7 +26,7 @@ class AuditLog extends Model
                 'changes' => $changes,
                 'ip' => request()?->ip(),
             ]);
-        } catch (Throwable $e) {
+        } catch (\Throwable $e) {
             report($e); // never break the request because of audit logging
         }
     }

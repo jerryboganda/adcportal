@@ -173,7 +173,7 @@ class V1Controller extends Controller
         // Policy: cancellations allowed until 24h before the slot.
         try {
             $slot = \Carbon\Carbon::createFromFormat('d-m-Y H:i', $appointment->date.' '.$appointment->time);
-        } catch (Throwable) {
+        } catch (\Throwable) {
             $slot = null;
         }
 

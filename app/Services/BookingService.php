@@ -72,7 +72,7 @@ class BookingService
                 $appointment->id,
                 $appointment
             );
-        } catch (Throwable $e) {
+        } catch (\Throwable $e) {
             Log::error('Booking failed: '.$e->getMessage(), ['exception' => $e]);
 
             return $this->respond($business, 'error', __('Failed to create appointment.'), null, null, 'There was an error processing your booking. Please try again.');
