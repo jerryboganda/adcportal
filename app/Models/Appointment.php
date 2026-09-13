@@ -79,7 +79,7 @@ class Appointment extends Model
                     try {
                         $appointment->date_sort = \Carbon\Carbon::createFromFormat($fmt, $appointment->date)->format('Y-m-d');
                         break;
-                    } catch (Throwable $e) {
+                    } catch (\Throwable $e) {
                         continue;
                     }
                 }
