@@ -38,6 +38,8 @@ Route::get('/health', function () {
     ]);
 });
 
+Route::prefix('v1')->group(function () {
+
 // ---------- public ----------
 
 Route::post('/login', [AuthController::class, 'login'])->middleware('throttle:login');
@@ -129,4 +131,5 @@ Route::middleware(['auth', 'tenant.active'])->group(function () {
     Route::put('/platform/tenants/{tenant}', [PlatformAdminController::class, 'updateTenant'])->whereNumber('tenant');
     Route::get('/platform/plans', [PlatformAdminController::class, 'plans']);
     Route::get('/platform/stats', [PlatformAdminController::class, 'platformStats']);
+});
 });
