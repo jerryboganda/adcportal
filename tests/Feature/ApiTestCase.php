@@ -61,6 +61,16 @@ abstract class ApiTestCase extends TestCase
         $admin->MakeRole();
         app(TenantBootstrap::class)->run($business, $admin);
 
+        // Self-diagnosing fixture: surface RBAC wiring problems with exact state.
+        if (! $admin->hasRole('admin')) {
+            throw new \RuntimeException('owner missing admin role');
+        }
+        if (! $admin->isAbleTo('appointment create')) {
+            throw new \RuntimeException('owner lacks appointment create; roles=['
+                .$admin->getRoleNames()->implode(',').'] permissions=['
+                .$admin->allPermissions()->pluck('name')->implode(',').']');
+        }
+
         return [$business, $admin];
     }
 
@@ -92,6 +102,11 @@ abstract class ApiTestCase extends TestCase
 
         if ($role) {
             $user->addRole($role);
+            if (! $user->hasRole($roleName)) {
+                throw new \RuntimeException("addRole({$roleName}) did not attach to user {$user->id}");
+            }
+        } else {
+            throw new \RuntimeException("role {$roleName} (created_by={$owner->id}) not found");
         }
 
         return $user;
