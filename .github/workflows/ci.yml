@@ -25,10 +25,20 @@ jobs:
           coverage: none
 
       - name: Install PHP dependencies
-        run: composer install --prefer-dist --no-interaction --no-progress
+        run: |
+          set -o pipefail
+          composer install --prefer-dist --no-interaction --no-progress 2>&1 | tee /tmp/composer.log || {
+            grep -E "Problem [0-9]|Fatal error|syntax error|ParseError|Error|Script .* handling|returned a non-zero" /tmp/composer.log | head -8 | sed 's/^/::error::composer /'
+            exit 1
+          }
 
       - name: Run API feature suite (auth, RBAC, tenant isolation, workflow, billing, inventory)
-        run: php artisan test --testsuite=Feature --stop-on-failure
+        run: |
+          set -o pipefail
+          php artisan test --testsuite=Feature --stop-on-failure 2>&1 | tee /tmp/phpunit.log || {
+            grep -E "FAILED|Error:|Exception|assert|Expected|Actual" /tmp/phpunit.log | head -10 | sed 's/^/::error::phpunit /'
+            exit 1
+          }
 
   spa-build:
     name: Frontend — typecheck & production build
@@ -109,7 +119,12 @@ jobs:
           E2E_BASE_URL: http://127.0.0.1:8000
           E2E_EMAIL: admin@adc-e2e.test
           E2E_PASSWORD: E2eDemo#2026
-        run: npx playwright test
+        run: |
+          set -o pipefail
+          npx playwright test 2>&1 | tee /tmp/e2e.log || {
+            grep -E "Error|expect|Timed out|failed" /tmp/e2e.log | head -10 | sed 's/^/::error::e2e /'
+            exit 1
+          }
 
       - uses: actions/upload-artifact@v4
         if: failure()
