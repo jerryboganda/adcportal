@@ -39,7 +39,6 @@ class PlatformAdminController extends BaseApiController
         $validated = $request->validate([
             'subscriptionStatus' => ['sometimes', Rule::in(['trialing', 'active', 'suspended', 'expired'])],
             'planId' => ['sometimes', 'nullable', 'integer', 'exists:plans,id'],
-            'isActive' => ['sometimes', 'boolean'],
             'subscriptionEndsAt' => ['sometimes', 'nullable', 'date'],
         ]);
 

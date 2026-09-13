@@ -627,7 +627,7 @@ class ApiShape
             'plan' => $b->plan ? self::plan($b->plan) : null,
             'trialEndsAt' => $b->trial_ends_at?->toIso8601String(),
             'subscriptionEndsAt' => $b->subscription_ends_at?->toIso8601String(),
-            'isActive' => ! $b->is_disable,
+            'isActive' => $b->isSubscribable(),
             'createdAt' => $b->created_at?->toDateString(),
             'counts' => [
                 'users' => $b->users()->count(),

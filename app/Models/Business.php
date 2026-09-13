@@ -38,9 +38,8 @@ class Business extends Model
     /** Subscribable tenants may use the product; suspended/expired may not. */
     public function isSubscribable(): bool
     {
-        if ($this->is_disable) {
-            return false;
-        }
+        // NOTE: the legacy businesses.is_disable flag is inverted (1 = enabled),
+        // so the SaaS gate relies on subscription_status only.
 
         return match ($this->subscription_status) {
             'active' => true,
