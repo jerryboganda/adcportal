@@ -49,7 +49,7 @@ interface PatientPortalViewProps {
   modalities?: Modality[];
   referrers?: Referrer[];
   onRecordPayment?: (invoiceId: string, amount: number, method: 'cash' | 'card' | 'bank' | 'mobile' | 'insurance', reference: string) => void;
-  onBookAppointment?: (newAptData: Partial<Appointment>, newPatientData?: Partial<Patient>) => void;
+  onBookAppointment?: (newAptData: Partial<Appointment>) => Promise<{ tokenNumber?: string } | void> | void;
 }
 
 export const PatientPortalView: React.FC<PatientPortalViewProps> = ({
@@ -141,24 +141,30 @@ export const PatientPortalView: React.FC<PatientPortalViewProps> = ({
     }
   };
 
-  const handleExecutePayment = () => {
+  const handleExecutePayment = async () => {
     if (!payingInvoice || !onRecordPayment) return;
     setIsProcessingPayment(true);
 
-    setTimeout(() => {
-      const ref = paymentRef || `PORTAL-RAAST-${Math.floor(100000 + Math.random() * 900000)}`;
-      onRecordPayment(payingInvoice.id, payingInvoice.balanceDue, paymentMethod === 'raast' ? 'bank' : paymentMethod === 'mobile' ? 'mobile' : 'card', ref);
-      setIsProcessingPayment(false);
-      setPaymentSuccessMessage(`Payment of Rs. ${payingInvoice.balanceDue.toLocaleString()} verified successfully via ${paymentMethod.toUpperCase()} (Ref: ${ref})!`);
+    try {
+      const ref = paymentRef.trim();
+      await onRecordPayment(
+        payingInvoice.id,
+        payingInvoice.balanceDue,
+        paymentMethod === 'raast' ? 'bank' : paymentMethod === 'mobile' ? 'mobile' : 'card',
+        ref
+      );
+      setPaymentSuccessMessage(`Payment reference recorded for Rs. ${payingInvoice.balanceDue.toLocaleString()} via ${paymentMethod.toUpperCase()}. The billing desk verifies online transfers before confirming your receipt.`);
       setTimeout(() => {
         setPayingInvoice(null);
         setPaymentSuccessMessage('');
         setPaymentRef('');
-      }, 2000);
-    }, 1200);
+      }, 3500);
+    } finally {
+      setIsProcessingPayment(false);
+    }
   };
 
-  const handleBookingSubmit = (e: React.FormEvent) => {
+  const handleBookingSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!onBookAppointment || !patient) return;
 
@@ -166,36 +172,28 @@ export const PatientPortalView: React.FC<PatientPortalViewProps> = ({
     const selService = services.find(s => s.id === bookServiceId) || services[0];
     const selReferrer = referrers.find(r => r.id === bookReferrerId);
 
-    const tokenPrefix = selModality.code;
-    const randomTokenNum = Math.floor(10 + Math.random() * 90);
-    const tokenNumber = `${tokenPrefix}-${randomTokenNum}`;
+    try {
+      const created = await onBookAppointment({
+        patientId: patient.id,
+        serviceId: selService.id,
+        modalityId: selModality.id,
+        referrerId: selReferrer?.id,
+        date: bookDate,
+        time: bookTime,
+        priority: 'routine',
+        notes: bookNotes ? `[Portal Booking]: ${bookNotes}` : '[Self-Service Online Booking]',
+      });
 
-    onBookAppointment({
-      tokenNumber,
-      patientId: patient.id,
-      patient,
-      serviceId: selService.id,
-      service: selService,
-      modalityId: selModality.id,
-      modality: selModality,
-      referrerId: selReferrer?.id,
-      referrer: selReferrer,
-      date: bookDate,
-      time: bookTime,
-      priority: 'routine',
-      screeningRequired: selService.requiresScreening,
-      screeningCleared: !selService.requiresScreening,
-      roomNumber: `Room ${selModality.id} (${selModality.name})`,
-      notes: bookNotes ? `[Portal Booking]: ${bookNotes}` : '[Self-Service Online Booking]',
-    });
-
-    setBookingSuccessToken(tokenNumber);
-    setTimeout(() => {
-      setIsBookingOpen(false);
-      setBookingSuccessToken(null);
-      setBookNotes('');
-      setActiveSubTab('overview');
-    }, 2200);
+      setBookingSuccessToken(created?.tokenNumber ?? null);
+      setTimeout(() => {
+        setIsBookingOpen(false);
+        setBookingSuccessToken(null);
+        setBookNotes('');
+        setActiveSubTab('overview');
+      }, 2500);
+    } catch {
+      // failure surfaced by the parent flash message
+    }
   };
 
   const handleShareReport = (apt: Appointment) => {
@@ -205,7 +203,7 @@ export const PatientPortalView: React.FC<PatientPortalViewProps> = ({
 
   const copyShareableLink = () => {
     if (!shareReportApt) return;
-    const url = `https://portal.amaddiagnosticcentre.com.pk/report/verify?token=${shareReportApt.tokenNumber}&mrn=${patient.mrn}`;
+    const url = `${window.location.origin}/?report=${shareReportApt.tokenNumber}&mrn=${encodeURIComponent(patient.mrn)}`;
     navigator.clipboard.writeText(url);
     setCopiedLink(true);
     setTimeout(() => setCopiedLink(false), 2500);
@@ -1407,7 +1405,7 @@ export const PatientPortalView: React.FC<PatientPortalViewProps> = ({
                   <input
                     type="text"
                     readOnly
-                    value={`https://portal.amaddiagnosticcentre.com.pk/report/verify?token=${shareReportApt.tokenNumber}&mrn=${patient.mrn}`}
+                    value={`${window.location.origin}/?report=${shareReportApt.tokenNumber}&mrn=${encodeURIComponent(patient.mrn)}`}
                     className="w-full p-2 rounded-xl bg-slate-100 border border-slate-300 text-[11px] font-mono text-slate-700"
                   />
                   <button
@@ -1423,7 +1421,7 @@ export const PatientPortalView: React.FC<PatientPortalViewProps> = ({
               {/* Share Channels */}
               <div className="pt-2 grid grid-cols-2 gap-2">
                 <a
-                  href={`https://api.whatsapp.com/send?text=${encodeURIComponent(`Amad Diagnostic Centre Verified Report for ${patient.name} (${shareReportApt.service.name}): https://portal.amaddiagnosticcentre.com.pk/report/verify?token=${shareReportApt.tokenNumber}&mrn=${patient.mrn}`)}`}
+                  href={`https://api.whatsapp.com/send?text=${encodeURIComponent(`Amad Diagnostic Centre report for ${patient.name} (${shareReportApt.service.name}) is ready. Token ${shareReportApt.tokenNumber} / MRN ${patient.mrn}.`)}`}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="p-2.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-800 font-bold border border-emerald-300 text-center flex items-center justify-center gap-1.5 cursor-pointer"

@@ -156,12 +156,12 @@ export function generateRadiologyReportPdf(appointment: Appointment, report: Rad
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(10);
   doc.setTextColor(15, 23, 42);
-  doc.text(report.signedBy || appointment.assignedRadiologistName || 'Dr. Shahzad Mir, FRCR (Consultant Radiologist)', margin, y);
+  doc.text(report.signedBy || appointment.assignedRadiologistName || 'Unsigned draft', margin, y);
 
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(7.5);
   doc.setTextColor(148, 163, 184);
-  doc.text(`Report Ref: ADC-REP-${report.id} | Page 1 of 1 | Verified via RIS Secure Cryptographic Stamp`, margin, y + 6);
+  doc.text(`Report Ref: ${report.id} | Page 1 of 1 | Digitally signed via ADC Portal RIS`, margin, y + 6);
 
   // Save / Trigger Download
   const filename = `ADC-Report-${appointment.tokenNumber}-${appointment.patient.mrn}.pdf`;

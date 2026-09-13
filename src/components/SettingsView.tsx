@@ -39,7 +39,7 @@ import {
 
 interface SettingsViewProps {
   staffUsers: StaffUser[];
-  onAddStaffUser: (user: Omit<StaffUser, 'id'>) => void;
+  onAddStaffUser: (user: Omit<StaffUser, 'id'> & { password: string }) => void;
   onUpdateStaffUser: (user: StaffUser) => void;
   onDeleteStaffUser: (userId: string) => void;
 
@@ -50,16 +50,15 @@ interface SettingsViewProps {
   onAddDicomNode: (node: Omit<DicomNodeConfig, 'id'>) => void;
   onUpdateDicomNode: (node: DicomNodeConfig) => void;
   onDeleteDicomNode: (nodeId: string) => void;
+  onPingDicomNode: (nodeId: string) => Promise<void>;
 
   notificationTemplates: NotificationTemplate[];
   onUpdateNotificationTemplate: (template: NotificationTemplate) => void;
 
   auditLogs: AuditLogEntry[];
-  onAddAuditLog: (log: Omit<AuditLogEntry, 'id' | 'timestamp'>) => void;
 
   onResetFactoryDefaults: () => void;
   onExportBackup: () => void;
-  onImportBackup: (snapshot: any) => void;
 }
 
 type SettingsSection = 'users' | 'clinic' | 'dicom' | 'notifications' | 'audit' | 'database';
@@ -75,13 +74,12 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   onAddDicomNode,
   onUpdateDicomNode,
   onDeleteDicomNode,
+  onPingDicomNode,
   notificationTemplates,
   onUpdateNotificationTemplate,
   auditLogs,
-  onAddAuditLog,
   onResetFactoryDefaults,
   onExportBackup,
-  onImportBackup,
 }) => {
   const [activeSection, setActiveSection] = useState<SettingsSection>('users');
 
@@ -101,11 +99,6 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   const [pingingNodeId, setPingingNodeId] = useState<string | null>(null);
   const [pingResult, setPingResult] = useState<{ nodeId: string; success: boolean; latency: number; message: string } | null>(null);
 
-  // Notification tester state
-  const [testTemplate, setTestTemplate] = useState<NotificationTemplate | null>(null);
-  const [testPhoneNumber, setTestPhoneNumber] = useState('+92 300 5557812');
-  const [testDispatchSuccess, setTestDispatchSuccess] = useState(false);
-
   // Audit search state
   const [auditSearch, setAuditSearch] = useState('');
   const [auditModuleFilter, setAuditModuleFilter] = useState('all');
@@ -117,6 +110,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   const [userDepartment, setUserDepartment] = useState('');
   const [userPhone, setUserPhone] = useState('');
   const [userInitials, setUserInitials] = useState('');
+  const [userPassword, setUserPassword] = useState('');
   const [canSignReports, setCanSignReports] = useState(false);
   const [canVoidInvoices, setCanVoidInvoices] = useState(false);
   const [canOverrideScreening, setCanOverrideScreening] = useState(false);
@@ -146,10 +140,12 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
       setCanOverrideScreening(user.canOverrideScreening);
       setCanEditMasters(user.canEditMasters);
       setCanAccessPacs(user.canAccessPacs);
+      setUserPassword('');
     } else {
       setEditingUser(null);
       setUserName('');
       setUserEmail('');
+      setUserPassword('');
       setUserRole('receptionist');
       setUserDepartment('Front Desk');
       setUserPhone('');
@@ -169,6 +165,10 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
       alert('Please provide full name and email.');
       return;
     }
+    if (!editingUser && userPassword.length < 8) {
+      alert('New accounts require a password of at least 8 characters.');
+      return;
+    }
 
     const initials = userInitials.trim() || userName.split(' ').map(n => n[0]).join('').substring(0, 3).toUpperCase();
 
@@ -186,14 +186,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
         canOverrideScreening,
         canEditMasters,
         canAccessPacs,
-      });
-      onAddAuditLog({
-        user: 'Admin Muhammad Farhan',
-        role: 'Administrator',
-        action: 'User Account Updated',
-        module: 'Settings & Security',
-        details: `Updated permissions and profile for ${userName} (${userRole}).`,
-        status: 'success',
+        ...(userPassword ? { password: userPassword } : {}),
       });
     } else {
       onAddStaffUser({
@@ -210,14 +203,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
         canEditMasters,
         canAccessPacs,
         lastLogin: 'Never',
-      });
-      onAddAuditLog({
-        user: 'Admin Muhammad Farhan',
-        role: 'Administrator',
-        action: 'New Staff User Created',
-        module: 'Settings & Security',
-        details: `Created new staff account for ${userName} (${userRole}).`,
-        status: 'success',
+        password: userPassword,
       });
     }
     setUserModalOpen(false);
@@ -226,14 +212,6 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   const handleSaveClinicProfile = (e: React.FormEvent) => {
     e.preventDefault();
     onUpdateClinicSettings(profileForm);
-    onAddAuditLog({
-      user: 'Admin Muhammad Farhan',
-      role: 'Administrator',
-      action: 'Clinic Profile Updated',
-      module: 'Settings & Branding',
-      details: `Updated regulatory registrations, branch contacts, and disclaimers for ${profileForm.name}.`,
-      status: 'success',
-    });
     setProfileSavedToast(true);
     setTimeout(() => setProfileSavedToast(false), 3500);
   };
@@ -288,49 +266,21 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
         modalityCode: nodeModality || undefined,
         isWorklistSCP: nodeIsWorklist,
         isStorageSCP: nodeIsStorage,
-        status: 'online',
-        lastPingTime: 'Just now',
-        lastPingLatencyMs: 12,
       });
     }
     setNodeModalOpen(false);
   };
 
-  const handleTestPingNode = (node: DicomNodeConfig) => {
+  // Real reachability probe: the server opens a TCP socket to the node and
+  // records latency. This is NOT a DICOM C-ECHO handshake.
+  const handleTestPingNode = async (node: DicomNodeConfig) => {
     setPingingNodeId(node.id);
     setPingResult(null);
-
-    setTimeout(() => {
-      const simulatedLatency = Math.floor(6 + Math.random() * 18);
+    try {
+      await onPingDicomNode(node.id);
+    } finally {
       setPingingNodeId(null);
-      setPingResult({
-        nodeId: node.id,
-        success: true,
-        latency: simulatedLatency,
-        message: `DICOM C-ECHO Response received from ${node.aeTitle}@${node.ipAddress}:${node.port} in ${simulatedLatency}ms. Node status is ONLINE and compliant with DICOM 3.0 standard.`,
-      });
-
-      onUpdateDicomNode({
-        ...node,
-        status: 'online',
-        lastPingTime: 'Just now',
-        lastPingLatencyMs: simulatedLatency,
-      });
-    }, 900);
-  };
-
-  const handleSendTestMessage = () => {
-    if (!testTemplate) return;
-    setTestDispatchSuccess(true);
-    onAddAuditLog({
-      user: 'Staff Tester',
-      role: 'Administrator',
-      action: 'Test Notification Dispatched',
-      module: 'SMS/WhatsApp Gateway',
-      details: `Dispatched test message (${testTemplate.name}) to ${testPhoneNumber} via ${testTemplate.channel.toUpperCase()}.`,
-      status: 'success',
-    });
-    setTimeout(() => setTestDispatchSuccess(false), 4000);
+    }
   };
 
   // Filtered users
@@ -647,7 +597,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
           {profileSavedToast && (
             <div className="p-3 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-xl text-xs font-semibold flex items-center space-x-2">
               <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-              <span>Clinic settings and legal disclaimers successfully saved to storage!</span>
+              <span>Clinic settings and legal disclaimers saved to the server.</span>
             </div>
           )}
 
@@ -926,7 +876,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                     className="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-cyan-50 text-slate-700 hover:text-cyan-700 text-xs font-semibold transition-all cursor-pointer"
                   >
                     <Radio className={`w-3.5 h-3.5 ${pingingNodeId === node.id ? 'animate-spin text-cyan-600' : 'text-slate-500'}`} />
-                    <span>{pingingNodeId === node.id ? 'Echoing...' : 'Ping C-ECHO'}</span>
+                    <span>{pingingNodeId === node.id ? 'Probing…' : 'TCP Probe'}</span>
                   </button>
 
                   <div className="flex items-center space-x-2">
@@ -983,16 +933,6 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                       <h4 className="font-bold text-slate-900 text-xs">{tpl.name}</h4>
                     </div>
                     <div className="flex items-center space-x-2">
-                      <button
-                        onClick={() => {
-                          setTestTemplate(tpl);
-                          setTestDispatchSuccess(false);
-                        }}
-                        className="px-2.5 py-1 rounded-md bg-white border border-slate-200 text-slate-700 hover:text-cyan-700 hover:border-cyan-300 text-xs font-semibold shadow-xs cursor-pointer flex items-center space-x-1"
-                      >
-                        <Send className="w-3 h-3 text-cyan-600" />
-                        <span>Test Send</span>
-                      </button>
                       <label className="relative inline-flex items-center cursor-pointer">
                         <input
                           type="checkbox"
@@ -1016,63 +956,6 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
               ))}
             </div>
           </div>
-
-          {/* Test Dispatch Modal / Drawer */}
-          {testTemplate && (
-            <div className="bg-white rounded-xl border border-cyan-200 p-5 shadow-md space-y-4">
-              <div className="flex items-center justify-between pb-2 border-b border-slate-100">
-                <div className="flex items-center space-x-2">
-                  <Smartphone className="w-4 h-4 text-cyan-600" />
-                  <h4 className="font-bold text-slate-900 text-sm">Live Dispatch Test: {testTemplate.name}</h4>
-                </div>
-                <button onClick={() => setTestTemplate(null)} className="text-slate-400 hover:text-slate-600 cursor-pointer">
-                  <X className="w-4 h-4" />
-                </button>
-              </div>
-
-              {testDispatchSuccess ? (
-                <div className="p-3 bg-emerald-50 text-emerald-800 border border-emerald-200 rounded-lg text-xs font-semibold flex items-center space-x-2">
-                  <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-                  <span>Dispatched successfully to {testPhoneNumber}! Message ID: MSG-2026-{Math.floor(100000 + Math.random() * 900000)}</span>
-                </div>
-              ) : (
-                <div className="space-y-3 text-xs">
-                  <div>
-                    <label className="block text-slate-700 font-semibold mb-1">Destination Phone Number</label>
-                    <input
-                      type="text"
-                      value={testPhoneNumber}
-                      onChange={e => setTestPhoneNumber(e.target.value)}
-                      className="w-full max-w-sm px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-slate-800 font-mono"
-                    />
-                  </div>
-                  <div className="p-3 bg-slate-50 rounded-lg border border-slate-200 font-mono text-[11px] text-slate-700">
-                    <span className="text-slate-400 block mb-1">Preview with sample values:</span>
-                    {testTemplate.templateBody
-                      .replace('{patient_name}', 'Muhammad Haroon')
-                      .replace('{token}', 'MR-01')
-                      .replace('{mrn}', 'ADC-2026-08142')
-                      .replace('{study_name}', 'MRI Lumbar Spine')
-                      .replace('{time}', '09:30 AM')
-                      .replace('{date}', 'Today')
-                      .replace('{report_link}', 'https://portal.amaddiagnosticcentre.com.pk/report/ADC-2026-08142')
-                      .replace('{clinic_phone}', '+92 51 2801122')
-                      .replace('{doctor_name}', 'Dr. Shahzad Khan')
-                      .replace('{prep_notes}', 'Remove metal items')}
-                  </div>
-                  <button
-                    onClick={handleSendTestMessage}
-                    className="px-4 py-2 bg-cyan-600 hover:bg-cyan-700 text-white rounded-lg font-bold text-xs shadow-xs cursor-pointer flex items-center space-x-1.5"
-                  >
-                    <Send className="w-3.5 h-3.5" />
-                    <span>Trigger Live Dispatch</span>
-                  </button>
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-      )}
 
       {/* SECTION 5: SYSTEM AUDIT LOGS */}
       {activeSection === 'audit' && (
@@ -1131,7 +1014,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                     </td>
                     <td className="p-3 text-slate-600 whitespace-nowrap">{log.module}</td>
                     <td className="p-3 text-slate-700">{log.details}</td>
-                    <td className="p-3 font-mono text-slate-400 text-[11px]">{log.ipAddress || '192.168.10.x'}</td>
+                    <td className="p-3 font-mono text-slate-400 text-[11px]">{log.ipAddress || '—'}</td>
                   </tr>
                 ))}
               </tbody>
@@ -1163,46 +1046,24 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
             </button>
           </div>
 
-          {/* Import Card */}
+          {/* Import: deliberately disabled - restoring a snapshot would overwrite live clinical records */}
           <div className="bg-white rounded-xl border border-slate-200 p-6 shadow-xs space-y-4">
-            <div className="w-10 h-10 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center font-bold">
+            <div className="w-10 h-10 rounded-xl bg-slate-100 text-slate-400 flex items-center justify-center font-bold">
               <Upload className="w-5 h-5" />
             </div>
             <div>
               <h3 className="font-bold text-slate-900 text-sm">Restore from Backup Snapshot</h3>
               <p className="text-xs text-slate-500 mt-1">
-                Upload a verified JSON snapshot file to restore records across all clinical departments.
+                Snapshot import is disabled to protect live clinical records (studies, invoices and signed reports
+                cannot be safely overwritten from a JSON file). Use the JSON export for archiving and audits.
+                Full database restores are performed by the platform administrator from server backups.
               </p>
             </div>
-            <label className="w-full py-2.5 bg-purple-600 hover:bg-purple-700 text-white rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer flex items-center justify-center space-x-2">
-              <Upload className="w-4 h-4" />
-              <span>Select Backup File to Restore</span>
-              <input
-                type="file"
-                accept=".json"
-                className="hidden"
-                onChange={e => {
-                  const file = e.target.files?.[0];
-                  if (file) {
-                    const reader = new FileReader();
-                    reader.onload = ev => {
-                      try {
-                        const parsed = JSON.parse(ev.target?.result as string);
-                        onImportBackup(parsed);
-                      } catch (err) {
-                        alert('Invalid JSON file format.');
-                      }
-                    };
-                    reader.readAsText(file);
-                  }
-                }}
-              />
-            </label>
           </div>
         </div>
       )}
 
-      {/* User Add / Edit Modal */}
+            {/* User Add / Edit Modal */}
       {userModalOpen && (
         <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-lg w-full p-6 space-y-5 animate-in fade-in zoom-in-95 duration-150">
@@ -1236,6 +1097,21 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                     value={userEmail}
                     onChange={e => setUserEmail(e.target.value)}
                     placeholder="email@amaddiagnosticcentre.com.pk"
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-slate-800 focus:ring-1 focus:ring-cyan-500"
+                  />
+                </div>
+                <div className="col-span-2">
+                  <label className="block font-semibold text-slate-700 mb-1">
+                    {editingUser ? 'Reset Password (leave blank to keep current)' : 'Password * (min 8 characters)'}
+                  </label>
+                  <input
+                    type="password"
+                    required={!editingUser}
+                    minLength={editingUser ? undefined : 8}
+                    value={userPassword}
+                    onChange={e => setUserPassword(e.target.value)}
+                    placeholder={editingUser ? '••••••••' : 'Set an initial login password'}
+                    autoComplete="new-password"
                     className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-slate-800 focus:ring-1 focus:ring-cyan-500"
                   />
                 </div>

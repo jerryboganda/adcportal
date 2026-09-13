@@ -17,10 +17,12 @@ class ReportTemplate extends Model
 
     protected $casts = ['is_default' => 'boolean'];
 
-    public function scopeForClinic($query, $businessId = null, $creatorId = null)
+        public function scopeForClinic($query, $businessId = null, $creatorId = null)
     {
+        // Tenant boundary is business_id ONLY. Creator scoping must be explicit.
         return $query->where('business_id', $businessId ?? getActiveBusiness())
-            ->when($creatorId !== false, fn ($q) => $q->where('created_by', $creatorId ?? creatorId()));
+            ->when($creatorId !== null && $creatorId !== false, fn ($q) => $q->where('created_by', $creatorId));
+    }
     }
 
     public function serviceData()

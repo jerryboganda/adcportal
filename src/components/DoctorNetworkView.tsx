@@ -44,7 +44,11 @@ interface DoctorNetworkViewProps {
   onAddReferrer: (ref: Omit<Referrer, 'id'>) => void;
   onUpdateReferrer: (ref: Referrer) => void;
   onDeleteReferrer: (refId: number) => void;
-  onAddDoctorDispatch: (dispatch: Omit<DoctorDispatchLog, 'id' | 'sentAt'>) => void;
+  onAddDoctorDispatch: (input: {
+    appointmentId: string;
+    channel: DoctorDispatchLog['channel'];
+    recipientContact: string;
+  }) => Promise<void> | void;
 }
 
 type DoctorSubTab = 'directory' | 'manifest' | 'dispatches' | 'commission' | 'analytics';
@@ -170,22 +174,14 @@ export const DoctorNetworkView: React.FC<DoctorNetworkViewProps> = ({
     setDispatchModalOpen(true);
   };
 
-  const handleSendDispatch = (e: React.FormEvent) => {
+  const handleSendDispatch = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!dispatchApt) return;
 
-    const doctor = referrers.find(r => r.id === dispatchApt.referrerId);
-    onAddDoctorDispatch({
+    await onAddDoctorDispatch({
       appointmentId: dispatchApt.id,
-      tokenNumber: dispatchApt.tokenNumber,
-      patientName: dispatchApt.patient.name,
-      referrerId: dispatchApt.referrerId || 1,
-      referrerName: doctor?.name || 'Referring Physician',
-      studyName: dispatchApt.service?.name || 'Radiology Examination',
       channel: dispatchChannel,
       recipientContact: dispatchRecipient,
-      status: 'delivered',
-      sentBy: 'Reception / Portal Auto-Gateway',
     });
 
     setDispatchModalOpen(false);
@@ -570,7 +566,7 @@ export const DoctorNetworkView: React.FC<DoctorNetworkViewProps> = ({
               <p className="text-xs text-slate-500">Live communication audit log of digital reports and portal links sent to referring physicians.</p>
             </div>
             <span className="text-xs font-semibold px-3 py-1 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-full">
-              WhatsApp & Email Gateway Active
+              Dispatch log — WhatsApp/SMS recorded as pending until a gateway is connected
             </span>
           </div>
 
@@ -632,7 +628,7 @@ export const DoctorNetworkView: React.FC<DoctorNetworkViewProps> = ({
               <div className="flex items-center space-x-2">
                 <span className="text-xs text-slate-500 font-medium">Default Share Rate:</span>
                 <span className="px-2.5 py-1 bg-emerald-50 text-emerald-700 font-bold text-xs rounded-lg border border-emerald-200">
-                  12% Institutional Incentive
+                  Referral incentive (per catalogue fee)
                 </span>
               </div>
             </div>
@@ -902,7 +898,7 @@ export const DoctorNetworkView: React.FC<DoctorNetworkViewProps> = ({
               <div className="p-3 bg-sky-50/60 rounded-xl border border-sky-100 text-slate-700 space-y-1 font-mono text-[11px]">
                 <span className="text-slate-400 block font-sans font-semibold">Message Preview:</span>
                 <p>
-                  "Dr. {dispatchApt.referrer?.name || 'Doctor'}, official Radiology Report for your patient {dispatchApt.patient.name} ({dispatchApt.service?.name || 'Radiology Study'}) has been finalized and verified by Amad Diagnostic Centre. Review online: https://portal.amaddiagnosticcentre.com.pk/report/{dispatchApt.patient.mrn}"
+                  "Dr. {dispatchApt.referrer?.name || 'Doctor'}, the official Radiology Report for your patient {dispatchApt.patient.name} ({dispatchApt.service?.name || 'Radiology Study'}) has been finalized and verified by Amad Diagnostic Centre. The report is available for collection or secure portal access."
                 </p>
               </div>
 
@@ -975,12 +971,12 @@ export const DoctorNetworkView: React.FC<DoctorNetworkViewProps> = ({
                     <th className="p-2.5">Patient</th>
                     <th className="p-2.5">Investigation</th>
                     <th className="p-2.5 text-right">Fee (PKR)</th>
-                    <th className="p-2.5 text-right">Share (12%)</th>
+                    <th className="p-2.5 text-right">Referral Share</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 text-slate-700">
                   {appointments.filter(a => a.referrerId === settlementDoctor.id).map(apt => {
-                    const fee = 6500;
+                    const fee = apt.service?.price || 0;
                     const share = Math.round(fee * 0.12);
                     return (
                       <tr key={apt.id}>

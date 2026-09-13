@@ -12,10 +12,12 @@ class Appointment extends Model
     use HasFactory, SoftDeletes;
 
     /** Clinic-scoped query scope: every tenant query should pass through here. */
-    public function scopeForClinic($query, $businessId = null, $creatorId = null)
+        public function scopeForClinic($query, $businessId = null, $creatorId = null)
     {
+        // Tenant boundary is business_id ONLY. Creator scoping must be explicit.
         return $query->where('business_id', $businessId ?? getActiveBusiness())
-            ->where('created_by', $creatorId ?? creatorId());
+            ->when($creatorId !== null && $creatorId !== false, fn ($q) => $q->where('created_by', $creatorId));
+    }
     }
 
     /** Eager-load map for list/dashboard rendering (kills N+1). */
@@ -43,11 +45,13 @@ class Appointment extends Model
         // Radiology study lifecycle
         'workflow_state',
         'priority',
+        'room_number',
         'assigned_radiologist_id',
         'performed_by_staff_id',
         'screening_required',
         'screening_cleared',
         'cancel_reason',
+        'reject_reason',
         'checked_in_at',
         'preparing_at',
         'in_progress_at',

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   FileText,
   CheckCircle2,
@@ -33,6 +33,7 @@ import { generateRadiologyReportPdf } from '../utils/pdfGenerator';
 import { RadiologicalVisualizer } from './RadiologicalVisualizer';
 
 interface ReportingViewProps {
+  currentUser: { name: string; role: string };
   appointments: Appointment[];
   templates: ReportTemplate[];
   selectedAppointment: Appointment | null;
@@ -44,6 +45,7 @@ interface ReportingViewProps {
 }
 
 export const ReportingView: React.FC<ReportingViewProps> = ({
+  currentUser,
   appointments,
   templates,
   selectedAppointment,
@@ -224,8 +226,7 @@ export const ReportingView: React.FC<ReportingViewProps> = ({
   // Save new custom template
   const handleSaveCustomTemplate = () => {
     if (!newTemplateName.trim() || !apt) return;
-    const newTpl: ReportTemplate = {
-      id: `tpl-custom-${Date.now()}`,
+    const newTpl: Omit<ReportTemplate, 'id'> = {
       modalityId: apt.modalityId,
       name: newTemplateName.trim(),
       code: `TPL-${newTemplateName.toUpperCase().replace(/\s+/g, '-')}`,
@@ -244,41 +245,41 @@ export const ReportingView: React.FC<ReportingViewProps> = ({
     showToast(`Custom Template "${newTpl.name}" saved!`);
   };
 
-  // Simulated Voice Dictation
+  // Real voice dictation via the browser Web Speech API (Chromium).
+  const recognitionRef = useRef<any>(null);
   const toggleDictation = () => {
-    if (!isDictating) {
-      setIsDictating(true);
-      showToast('Voice dictation active. Speak clinical findings...');
-      setTimeout(() => {
-        setFindings((prev) =>
-          prev
-            ? `${prev}\nNo acute intracranial hemorrhage, territorial infarction, or mass effect. Ventricles and sulci are normal for age.`
-            : 'No acute intracranial hemorrhage, territorial infarction, or mass effect. Ventricles and sulci are normal for age.'
-        );
-        setIsDictating(false);
-        showToast('Voice transcription transcribed to Findings.');
-      }, 2200);
-    } else {
-      setIsDictating(false);
-    }
-  };
-
-  // AI Structured Cleanup
-  const handleAiCleanup = () => {
-    if (!findings.trim()) {
-      showToast('Please type some rough findings before running AI structuring.');
+    const SR = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SR) {
+      showToast('Voice dictation is not supported in this browser.');
       return;
     }
-    showToast('AI RadLex formatting in progress...');
-    setTimeout(() => {
-      setFindings((prev) => {
-        return `ANATOMICAL FINDINGS:\n• Parenchyma: Homogeneous signal intensity without focal lesion.\n• Vascular: Major vessels demonstrate expected flow voids.\n• Osseous Structures: Intact alignment without aggressive lytic or blastic changes.\n• Soft Tissues: Unremarkable symmetrical presentation.`;
-      });
-      if (!impression.trim()) {
-        setImpression('Normal diagnostic study. No acute radiological abnormality detected.');
+    if (isDictating) {
+      recognitionRef.current?.stop();
+      setIsDictating(false);
+      return;
+    }
+    const rec = new SR();
+    rec.lang = 'en-US';
+    rec.interimResults = false;
+    rec.continuous = true;
+    rec.onresult = (e: any) => {
+      let text = '';
+      for (let i = e.resultIndex; i < e.results.length; i++) {
+        if (e.results[i].isFinal) text += e.results[i][0].transcript;
       }
-      showToast('AI Formatted report generated to RadLex standard.');
-    }, 700);
+      if (text.trim()) {
+        setFindings((prev) => (prev ? `${prev}\n${text.trim()}` : text.trim()));
+      }
+    };
+    rec.onerror = () => {
+      setIsDictating(false);
+      showToast('Dictation error - microphone unavailable.');
+    };
+    rec.onend = () => setIsDictating(false);
+    recognitionRef.current = rec;
+    rec.start();
+    setIsDictating(true);
+    showToast('Voice dictation active - speak your findings.');
   };
 
   // Common quick macros by modality
@@ -435,10 +436,10 @@ export const ReportingView: React.FC<ReportingViewProps> = ({
           <div className="flex items-center space-x-3 text-slate-600">
             <span className="flex items-center gap-1">
               <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-              PACS Storage Server: <strong className="text-slate-900">Connected (DICOM SCP)</strong>
+              Reading worklist is live from the server
             </span>
             <span>•</span>
-            <span>Signed Radiologist: <strong className="text-purple-900">Dr. M. Raza, MBBS, FCPS (Radiology)</strong></span>
+            <span>Reporting as: <strong className="text-purple-900">{currentUser.name}</strong></span>
           </div>
 
           <div className="flex items-center space-x-2">
@@ -743,7 +744,7 @@ export const ReportingView: React.FC<ReportingViewProps> = ({
                     )}
                   </div>
                   <p className="text-xs text-slate-500 mt-1">
-                    Accession: <span className="font-mono font-bold text-slate-800">ACC-{apt.id.slice(-6).toUpperCase()}</span> | Token:{' '}
+                    Token:{' '}
                     <span className="font-mono font-bold text-cyan-700">#{apt.tokenNumber}</span> | Room: {apt.roomNumber}
                   </p>
                 </div>
@@ -804,14 +805,6 @@ export const ReportingView: React.FC<ReportingViewProps> = ({
                       >
                         {isDictating ? <MicOff className="w-3 h-3" /> : <Mic className="w-3 h-3 text-purple-600" />}
                         <span>{isDictating ? 'Recording...' : 'Voice Dictate'}</span>
-                      </button>
-
-                      <button
-                        onClick={handleAiCleanup}
-                        className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-purple-600 hover:bg-purple-500 text-white flex items-center gap-1 cursor-pointer transition-colors shadow-2xs"
-                      >
-                        <Sparkles className="w-3 h-3" />
-                        <span>AI RadLex Clean</span>
                       </button>
                     </div>
                   </div>
@@ -1379,8 +1372,8 @@ export const ReportingView: React.FC<ReportingViewProps> = ({
                       impression,
                       recommendations,
                       criticalFlag,
-                      authoredBy: 'Dr. M. Raza, MBBS, FCPS',
-                      signedBy: 'Dr. M. Raza, MBBS, FCPS (Consultant Radiologist)',
+                      authoredBy: currentUser.name,
+                      signedBy: currentUser.name,
                       signedAt: new Date().toLocaleDateString(),
                       releases: [],
                     };
@@ -1408,7 +1401,6 @@ export const ReportingView: React.FC<ReportingViewProps> = ({
                     <div className="text-[9px] text-slate-400">Plot 14-B, Executive Sector, Islamabad, Pakistan • +92 51 2223344</div>
                   </div>
                   <div className="text-right font-mono text-[10px]">
-                    <div>ACC: ACC-{apt.id.slice(-6).toUpperCase()}</div>
                     <div className="text-cyan-400">TOKEN: #{apt.tokenNumber}</div>
                   </div>
                 </div>
@@ -1471,13 +1463,11 @@ export const ReportingView: React.FC<ReportingViewProps> = ({
                 {/* Signature Block */}
                 <div className="pt-4 border-t border-slate-200 flex justify-between items-end text-[10px]">
                   <div>
-                    <div className="font-mono text-slate-400">Electronic Verification Hash: 9F8A-7C2B-44E1</div>
-                    <div className="text-slate-400">Authenticated via ADC Secure PACS Gateway</div>
+                    <div className="text-slate-400">Draft preview - identity and signature are applied by the server on sign-off.</div>
                   </div>
                   <div className="text-right">
-                    <div className="font-bold text-slate-900">Dr. M. Raza, MBBS, FCPS</div>
-                    <div className="text-slate-500">Consultant Radiologist</div>
-                    <div className="text-purple-700 font-bold">Electronically Signed</div>
+                    <div className="font-bold text-slate-900">{currentUser.name}</div>
+                    <div className="text-slate-500">Reporting Radiologist</div>
                   </div>
                 </div>
               </div>

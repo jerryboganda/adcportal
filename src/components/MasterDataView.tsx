@@ -49,14 +49,24 @@ interface MasterDataViewProps {
   onAddReferrer?: (newRef: Omit<Referrer, 'id'>) => void;
   onUpdateReferrer?: (updatedRef: Referrer) => void;
   onDeleteReferrer?: (refId: number) => void;
-  onAddForm?: (newForm: ScreeningForm) => void;
+  onAddForm?: (newForm: {
+    name: string;
+    description: string;
+    modalityId?: number | null;
+    questions: Array<{
+      questionText: string;
+      helpText?: string;
+      answerType: 'boolean' | 'select' | 'text';
+      riskValue?: string;
+      isRiskBlocking: boolean;
+    }>;
+  }) => void;
   onUpdateForm?: (updatedForm: ScreeningForm) => void;
-  onAddTemplate?: (newTpl: ReportTemplate) => void;
+  onAddTemplate?: (newTpl: Omit<ReportTemplate, 'id'>) => void;
   onUpdateTemplate?: (updatedTpl: ReportTemplate) => void;
   onDeleteTemplate?: (templateId: string) => void;
   onResetFactoryDefaults?: () => void;
   onExportBackup?: () => void;
-  onImportBackup?: (snapshot: any) => void;
 }
 
 export const MasterDataView: React.FC<MasterDataViewProps> = ({
@@ -80,7 +90,6 @@ export const MasterDataView: React.FC<MasterDataViewProps> = ({
   onDeleteTemplate,
   onResetFactoryDefaults,
   onExportBackup,
-  onImportBackup,
 }) => {
   const [activeSubTab, setActiveSubTab] = useState<'services' | 'modalities' | 'referrers' | 'forms' | 'templates'>('services');
   const [searchQuery, setSearchQuery] = useState('');
@@ -102,6 +111,13 @@ export const MasterDataView: React.FC<MasterDataViewProps> = ({
 
   const [formModalOpen, setFormModalOpen] = useState(false);
   const [editingForm, setEditingForm] = useState<ScreeningForm | null>(null);
+  // Screening form builder (create)
+  const [newFormName, setNewFormName] = useState('');
+  const [newFormDescription, setNewFormDescription] = useState('');
+  const [newFormModality, setNewFormModality] = useState<number | null>(null);
+  const [newFormQuestions, setNewFormQuestions] = useState<Array<{ questionText: string; isRiskBlocking: boolean }>>([
+    { questionText: '', isRiskBlocking: true },
+  ]);
 
   const [questionModalOpen, setQuestionModalOpen] = useState(false);
   const [targetFormId, setTargetFormId] = useState<string | null>(null);
@@ -226,37 +242,6 @@ export const MasterDataView: React.FC<MasterDataViewProps> = ({
               <Download className="w-3.5 h-3.5 text-slate-600" />
               <span>Backup JSON</span>
             </button>
-          )}
-
-          {onImportBackup && (
-            <label
-              className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-semibold flex items-center space-x-1.5 border border-slate-300 transition-colors cursor-pointer"
-              title="Restore database from JSON backup file"
-            >
-              <FileSpreadsheet className="w-3.5 h-3.5 text-slate-600" />
-              <span>Restore JSON</span>
-              <input
-                type="file"
-                accept=".json"
-                className="hidden"
-                onChange={e => {
-                  const file = e.target.files?.[0];
-                  if (file) {
-                    const reader = new FileReader();
-                    reader.onload = event => {
-                      try {
-                        const parsed = JSON.parse(event.target?.result as string);
-                        onImportBackup(parsed);
-                      } catch (err) {
-                        alert('Invalid JSON backup file format.');
-                      }
-                    };
-                    reader.readAsText(file);
-                  }
-                  e.target.value = '';
-                }}
-              />
-            </label>
           )}
 
           {onResetFactoryDefaults && (
@@ -966,8 +951,7 @@ export const MasterDataView: React.FC<MasterDataViewProps> = ({
             if (editingTemplate && onUpdateTemplate) {
               onUpdateTemplate({ ...tplData, id: editingTemplate.id });
             } else if (onAddTemplate) {
-              const newId = `tpl-${Date.now()}`;
-              onAddTemplate({ ...tplData, id: newId });
+              onAddTemplate(tplData);
             }
             setTemplateModalOpen(false);
             setEditingTemplate(null);
@@ -1002,6 +986,139 @@ export const MasterDataView: React.FC<MasterDataViewProps> = ({
             setTargetFormId(null);
           }}
         />
+      )}
+
+      {/* 5b. Create Screening Form Modal */}
+      {formModalOpen && !editingForm && (
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-xl w-full p-6 space-y-4 animate-in fade-in zoom-in-95 duration-150">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <h3 className="font-bold text-slate-900 text-base">Create Screening Form</h3>
+              <button onClick={() => setFormModalOpen(false)} className="text-slate-400 hover:text-slate-600 cursor-pointer">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="space-y-3 text-xs">
+              <div>
+                <label className="block font-semibold text-slate-700 mb-1">Form Name *</label>
+                <input
+                  type="text"
+                  value={newFormName}
+                  onChange={e => setNewFormName(e.target.value)}
+                  placeholder="e.g. MRI Safety Screening"
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-slate-800 focus:ring-1 focus:ring-cyan-500"
+                />
+              </div>
+              <div>
+                <label className="block font-semibold text-slate-700 mb-1">Description</label>
+                <input
+                  type="text"
+                  value={newFormDescription}
+                  onChange={e => setNewFormDescription(e.target.value)}
+                  placeholder="When is this questionnaire required?"
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-slate-800 focus:ring-1 focus:ring-cyan-500"
+                />
+              </div>
+              <div>
+                <label className="block font-semibold text-slate-700 mb-1">Modality (optional — blank applies to all)</label>
+                <select
+                  value={newFormModality ?? ''}
+                  onChange={e => setNewFormModality(e.target.value === '' ? null : Number(e.target.value))}
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-slate-800"
+                >
+                  <option value="">All modalities</option>
+                  {modalities.map(m => (
+                    <option key={m.id} value={m.id}>{m.name} ({m.code})</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="space-y-2">
+                <label className="block font-semibold text-slate-700">Questions *</label>
+                {newFormQuestions.map((q, i) => (
+                  <div key={i} className="flex items-center gap-2">
+                    <input
+                      type="text"
+                      value={q.questionText}
+                      onChange={e => {
+                        const next = [...newFormQuestions];
+                        next[i] = { ...q, questionText: e.target.value };
+                        setNewFormQuestions(next);
+                      }}
+                      placeholder={`Question ${i + 1} (yes/no)`}
+                      className="flex-1 px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-slate-800"
+                    />
+                    <label className="flex items-center gap-1 whitespace-nowrap text-slate-600">
+                      <input
+                        type="checkbox"
+                        checked={q.isRiskBlocking}
+                        onChange={e => {
+                          const next = [...newFormQuestions];
+                          next[i] = { ...q, isRiskBlocking: e.target.checked };
+                          setNewFormQuestions(next);
+                        }}
+                      />
+                      <span className="font-semibold">Blocking</span>
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => setNewFormQuestions(newFormQuestions.filter((_, j) => j !== i))}
+                      className="text-rose-500 hover:text-rose-700 font-bold px-1 cursor-pointer"
+                      disabled={newFormQuestions.length === 1}
+                    >
+                      ×
+                    </button>
+                  </div>
+                ))}
+                <button
+                  type="button"
+                  onClick={() => setNewFormQuestions([...newFormQuestions, { questionText: '', isRiskBlocking: true }])}
+                  className="text-cyan-700 hover:text-cyan-900 font-semibold"
+                >
+                  + Add question
+                </button>
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-2 pt-3 border-t border-slate-100">
+              <button
+                onClick={() => setFormModalOpen(false)}
+                className="px-4 py-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-xs cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => {
+                  const questions = newFormQuestions.filter(q => q.questionText.trim());
+                  if (!newFormName.trim() || questions.length === 0) {
+                    alert('Provide a form name and at least one question.');
+                    return;
+                  }
+                  onAddForm?.({
+                    name: newFormName.trim(),
+                    description: newFormDescription.trim(),
+                    modalityId: newFormModality,
+                    questions: questions.map(q => ({
+                      questionText: q.questionText.trim(),
+                      answerType: 'boolean' as const,
+                      riskValue: 'yes',
+                      isRiskBlocking: q.isRiskBlocking,
+                    })),
+                  });
+                  setFormModalOpen(false);
+                  setNewFormName('');
+                  setNewFormDescription('');
+                  setNewFormModality(null);
+                  setNewFormQuestions([{ questionText: '', isRiskBlocking: true }]);
+                }}
+                className="px-4 py-2 rounded-lg bg-cyan-600 hover:bg-cyan-700 text-white font-bold text-xs cursor-pointer"
+              >
+                Create Form
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* 6. Test Questionnaire Simulator */}

@@ -118,14 +118,10 @@ export const TechnologistView: React.FC<TechnologistViewProps> = ({
     setNoteModalApt(null);
   };
 
-  // Handle Repeat / Restart Scan
+  // Handle Repeat / Restart Scan (server transition: Acquired -> InProgress)
   const handleRepeatScan = (apt: Appointment) => {
-    if (!onUpdateAppointment) return;
-    onUpdateAppointment(apt.id, {
-      workflowState: 'in_progress',
-      rejectReason: undefined,
-      inProgressAt: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-    });
+    if (!onStartAcquisition) return;
+    onStartAcquisition(apt);
   };
 
   // Handle Cancel Submission
@@ -706,7 +702,7 @@ export const TechnologistView: React.FC<TechnologistViewProps> = ({
           onSignOff={() => {
             if (onUpdateAppointment) {
               onUpdateAppointment(pacsModalApt.id, {
-                notes: pacsModalApt.notes ? `${pacsModalApt.notes} [PACS QC Verified]` : '[PACS QC Verified by Tech]',
+                notes: pacsModalApt.notes ? `${pacsModalApt.notes} [PACS QC reviewed by technologist]` : '[PACS QC reviewed by technologist]',
               });
             }
             setPacsModalApt(null);
@@ -865,7 +861,6 @@ export const TechnologistView: React.FC<TechnologistViewProps> = ({
               <div className="flex justify-between items-start border-b border-slate-200 pb-2">
                 <div>
                   <div className="font-black text-sm text-cyan-800">AMAD DIAGNOSTIC CENTRE</div>
-                  <div className="text-[10px] text-slate-500">RIS Accession: ACC-{wristbandApt.id.slice(-6).toUpperCase()}</div>
                 </div>
                 <div className="text-right">
                   <div className="font-mono font-black text-sm bg-slate-200 px-2 py-0.5 rounded">
@@ -968,7 +963,7 @@ const PacsInspectorModal: React.FC<PacsInspectorModalProps> = ({
             </div>
             <div>
               <div className="flex items-center space-x-2">
-                <span className="font-mono font-bold text-cyan-400 text-xs">AMAD PACS-QA v4.2</span>
+                <span className="font-mono font-bold text-cyan-400 text-xs">QC REVIEW VIEWER (schematic preview — not diagnostic DICOM)</span>
                 <span className="text-[10px] bg-slate-800 text-slate-300 px-1.5 py-0.2 rounded font-mono">
                   {appointment.modality.code} • #{appointment.tokenNumber}
                 </span>
@@ -980,9 +975,9 @@ const PacsInspectorModal: React.FC<PacsInspectorModalProps> = ({
           </div>
 
           <div className="flex items-center space-x-2">
-            <span className="text-[11px] font-mono text-emerald-400 bg-emerald-950/60 border border-emerald-800 px-2 py-0.5 rounded flex items-center gap-1">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping" />
-              DICOM STORE SCP: OK
+            <span className="text-[11px] font-mono text-slate-300 bg-slate-800/80 border border-slate-700 px-2 py-0.5 rounded flex items-center gap-1">
+              <span className="w-1.5 h-1.5 rounded-full bg-slate-400" />
+              Reference images for QC only
             </span>
             <button
               onClick={onClose}
@@ -1003,7 +998,6 @@ const PacsInspectorModal: React.FC<PacsInspectorModalProps> = ({
               <div>MRN: {appointment.patient.mrn}</div>
               <div>DOB: {appointment.patient.dob} ({appointment.patient.gender[0].toUpperCase()})</div>
               <div>STUDY: {appointment.service.name}</div>
-              <div>ACC: ACC-{appointment.id.slice(-6).toUpperCase()}</div>
             </div>
 
             {/* DICOM Overlay Top Right */}

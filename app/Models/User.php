@@ -57,6 +57,10 @@ class User extends Authenticatable implements LaratrustUser,MustVerifyEmail
         'is_disable',
         'trial_expire_date',
         'is_trial_done',
+        'department',
+        'initials',
+        'capabilities',
+        'last_login_at',
     ];
 
     /**
@@ -77,7 +81,22 @@ class User extends Authenticatable implements LaratrustUser,MustVerifyEmail
     protected $casts = [
         'email_verified_at' => 'datetime',
         'password' => 'hashed',
+        'capabilities' => 'array',
+        'last_login_at' => 'datetime',
     ];
+
+    public function portalRole(): string
+    {
+        // Map the app's role names onto the React SPA role vocabulary.
+        return match ($this->getRoleNames()->first()) {
+            'radiologist' => 'radiologist',
+            'technician' => 'technologist',
+            'receptionist' => 'receptionist',
+            'billing' => 'billing',
+            'customer' => 'patient',
+            default => 'admin',
+        };
+    }
 
     public static $not_edit_role = [
         'admin',

@@ -25,4 +25,9 @@ class ReportRelease extends Model
     {
         return $this->belongsTo(RadiologyReport::class, 'report_id');
     }
+
+    public function releaser()
+    {
+        return $this->belongsTo(User::class, 'released_by');
+    }
 }

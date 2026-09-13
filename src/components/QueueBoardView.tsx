@@ -39,11 +39,7 @@ export const QueueBoardView: React.FC<QueueBoardViewProps> = ({ appointments }) 
   const [voiceEnabled, setVoiceEnabled] = useState(true);
   const [voiceLanguage, setVoiceLanguage] = useState<'bilingual' | 'english' | 'urdu'>('bilingual');
   const [selectedModalityFilter, setSelectedModalityFilter] = useState<string>('all');
-  const [callHistory, setCallHistory] = useState<{ token: string; room: string; time: string; modality: string }[]>([
-    { token: 'DX-01', room: 'Room 1 (X-Ray Suite A)', time: '12:20 PM', modality: 'DX' },
-    { token: 'CT-01', room: 'Room 2 (128-Slice CT)', time: '12:12 PM', modality: 'CT' },
-    { token: 'US-01', room: 'Room 3 (Ultrasound Suite)', time: '12:05 PM', modality: 'US' },
-  ]);
+  const [callHistory, setCallHistory] = useState<{ token: string; room: string; time: string; modality: string }[]>([]);
 
   const [tickerIndex, setTickerIndex] = useState(0);
   const tickerMessages = [
@@ -562,7 +558,7 @@ export const QueueBoardView: React.FC<QueueBoardViewProps> = ({ appointments }) 
                 <span className="flex items-center gap-1">
                   <RotateCcw className="w-3 h-3" /> Recent Calls Handover:
                 </span>
-                <span className="font-mono text-[10px]">Auto-Synced</span>
+                <span className="font-mono text-[10px]">Session log</span>
               </div>
               <div className="flex flex-wrap items-center gap-2 pt-1">
                 {callHistory.map((item, i) => (

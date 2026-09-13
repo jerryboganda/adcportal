@@ -16,7 +16,6 @@ import {
   ExternalLink,
   ShieldAlert,
   Search,
-  Sparkles,
   Volume2,
   VolumeX
 } from 'lucide-react';
@@ -33,7 +32,6 @@ interface NotificationCenterProps {
   onNavigateToTab: (tab: ActiveTab, appointmentId?: string) => void;
   onSelectAppointment?: (apt: Appointment) => void;
   appointments?: Appointment[];
-  onTriggerTestAlert?: () => void;
 }
 
 export const NotificationCenter: React.FC<NotificationCenterProps> = ({
@@ -47,7 +45,6 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
   onNavigateToTab,
   onSelectAppointment,
   appointments = [],
-  onTriggerTestAlert,
 }) => {
   const [activeCategory, setActiveCategory] = useState<'all' | NotificationCategory>('all');
   const [onlyUnread, setOnlyUnread] = useState(false);
@@ -308,15 +305,6 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
                     ? 'No unread alerts matching your current filter criteria.'
                     : 'No notifications logged in this channel yet.'}
                 </p>
-                {onTriggerTestAlert && (
-                  <button
-                    onClick={onTriggerTestAlert}
-                    className="inline-flex items-center space-x-1.5 px-3 py-1.5 bg-cyan-50 text-cyan-700 border border-cyan-200 rounded-lg text-xs font-semibold hover:bg-cyan-100 cursor-pointer shadow-xs"
-                  >
-                    <Sparkles className="w-3.5 h-3.5 text-cyan-600" />
-                    <span>Send Test STAT Alert</span>
-                  </button>
-                )}
               </div>
             ) : (
               filteredNotifications.map((notif) => {
@@ -430,17 +418,8 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
           <div className="p-3 bg-slate-50 border-t border-slate-200 flex items-center justify-between text-xs text-slate-500">
             <span className="flex items-center space-x-1">
               <span className="w-2 h-2 rounded-full bg-emerald-500 inline-block animate-pulse" />
-              <span>Telemetry Gateway: Connected</span>
+              <span>Live from server — alerts arrive as workflows happen</span>
             </span>
-            {onTriggerTestAlert && (
-              <button
-                onClick={onTriggerTestAlert}
-                className="text-cyan-700 hover:text-cyan-900 font-semibold hover:underline cursor-pointer flex items-center space-x-1"
-              >
-                <Sparkles className="w-3 h-3" />
-                <span>Simulate STAT Alert</span>
-              </button>
-            )}
           </div>
         </div>
       </div>

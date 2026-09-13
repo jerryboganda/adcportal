@@ -22,4 +22,9 @@ class StudyScreeningAnswer extends Model
     {
         return $this->belongsTo(Appointment::class);
     }
+
+    public function answerer()
+    {
+        return $this->belongsTo(User::class, 'answered_by');
+    }
 }

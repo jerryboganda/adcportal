@@ -849,8 +849,8 @@ export const GlobalSearchBar: React.FC<GlobalSearchBarProps> = ({
                       <span className="font-sans">{selectedQuickViewApt.doseLog.recordedBy}</span>
                     </div>
                     <div>
-                      <span className="text-cyan-700 text-[10px] block font-sans">QC Verification:</span>
-                      <span className="text-emerald-700 font-bold font-sans">✓ Verified</span>
+                      <span className="text-cyan-700 text-[10px] block font-sans">QC Status:</span>
+                      <span className="font-bold font-sans">{selectedQuickViewApt.doseLog.qcPassed === false ? 'Failed QC' : 'Passed'}</span>
                     </div>
                   </div>
                 </div>

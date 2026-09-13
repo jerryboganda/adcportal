@@ -17,8 +17,37 @@ class Business extends Model
         'created_by',
         'form_type',
         'layouts',
-        'theme_color'
+        'theme_color',
+        'plan_id',
+        'subscription_status',
+        'trial_ends_at',
+        'subscription_ends_at',
+        'tenant_code',
     ];
+
+    protected $casts = [
+        'trial_ends_at' => 'datetime',
+        'subscription_ends_at' => 'datetime',
+    ];
+
+    public function plan()
+    {
+        return $this->belongsTo(Plan::class);
+    }
+
+    /** Subscribable tenants may use the product; suspended/expired may not. */
+    public function isSubscribable(): bool
+    {
+        if ($this->is_disable) {
+            return false;
+        }
+
+        return match ($this->subscription_status) {
+            'active' => true,
+            'trialing' => $this->trial_ends_at === null || $this->trial_ends_at->isFuture(),
+            default => false,
+        };
+    }
 
     protected static function boot()
     {

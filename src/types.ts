@@ -232,6 +232,9 @@ export interface ReportTemplate {
 
 export type StaffRole = 'admin' | 'radiologist' | 'technologist' | 'receptionist' | 'billing' | 'nurse';
 
+/** Role vocabulary used by the SPA shell (server-issued, never client-picked). */
+export type AppRole = 'admin' | 'radiologist' | 'technologist' | 'receptionist' | 'billing' | 'patient';
+
 export interface StaffUser {
   id: string;
   name: string;

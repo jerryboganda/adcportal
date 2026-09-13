@@ -1,31 +1,32 @@
-import React, { useState, useEffect } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActiveTab,
+  AdverseReactionReport,
+  AppNotification,
   Appointment,
-  Patient,
-  Modality,
-  Service,
-  Referrer,
-  ScreeningForm,
-  ReportTemplate,
-  Invoice,
-  InvoiceItem,
-  RadiologyReport,
-  StudyScreeningAnswer,
-  DoseLog,
-  InvoicePayment,
-  StaffUser,
+  AuditLogEntry,
   ClinicProfileSettings,
   DicomNodeConfig,
-  NotificationTemplate,
-  AuditLogEntry,
   DoctorDispatchLog,
-  AppNotification,
+  DoseLog,
   InventoryItem,
   InventoryTransaction,
-  AdverseReactionReport
+  Invoice,
+  InvoiceItem,
+  InvoicePayment,
+  Modality,
+  Patient,
+  RadiologyReport,
+  Referrer,
+  ReportTemplate,
+  ScreeningForm,
+  Service,
+  StaffUser,
+  StudyScreeningAnswer,
 } from './types';
-import { StorageService } from './services/storageService';
+import {
+  AppRole,
+} from './types';
 
 import { Navbar } from './components/Navbar';
 import { DashboardView } from './components/DashboardView';
@@ -38,6 +39,7 @@ import { InventoryView } from './components/InventoryView';
 import { MasterDataView } from './components/MasterDataView';
 import { DoctorNetworkView } from './components/DoctorNetworkView';
 import { SettingsView } from './components/SettingsView';
+import { LoginView } from './components/LoginView';
 
 import { ScreeningModal } from './components/ScreeningModal';
 import { DoseCaptureModal } from './components/DoseCaptureModal';
@@ -45,1017 +47,715 @@ import { NewBookingModal } from './components/NewBookingModal';
 import { NotificationCenter } from './components/NotificationCenter';
 import { TerminalLockModal } from './components/TerminalLockModal';
 
+import * as api from './services/apiService';
+import { SessionUser } from './services/apiService';
+import { onUnauthorized, initCsrf } from './services/api';
+
+type BootStatus = 'loading' | 'unauthenticated' | 'ready';
+
+const ACTIVE_TAB_KEY = 'adc_ris_active_tab_v2';
+
 export const App: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<ActiveTab>('dashboard');
-  const [role, setRole] = useState<'admin' | 'receptionist' | 'technologist' | 'radiologist' | 'patient'>(() =>
-    StorageService.loadRole('admin')
+  const [bootStatus, setBootStatus] = useState<BootStatus>('loading');
+  const [bootError, setBootError] = useState<string | null>(null);
+  const [user, setUser] = useState<SessionUser | null>(null);
+  const [flash, setFlash] = useState<{ kind: 'error' | 'success'; message: string } | null>(null);
+
+  // ==================== domain state (hydrated from the API) ====================
+  const [appointments, setAppointments] = useState<Appointment[]>([]);
+  const [patients, setPatients] = useState<Patient[]>([]);
+  const [modalities, setModalities] = useState<Modality[]>([]);
+  const [services, setServices] = useState<Service[]>([]);
+  const [referrers, setReferrers] = useState<Referrer[]>([]);
+  const [forms, setForms] = useState<ScreeningForm[]>([]);
+  const [templates, setTemplates] = useState<ReportTemplate[]>([]);
+  const [invoices, setInvoices] = useState<Invoice[]>([]);
+  const [staffUsers, setStaffUsers] = useState<StaffUser[]>([]);
+  const [clinicSettings, setClinicSettings] = useState<ClinicProfileSettings | null>(null);
+  const [dicomNodes, setDicomNodes] = useState<DicomNodeConfig[]>([]);
+  const [notificationTemplates, setNotificationTemplates] = useState<api.NotificationTemplateT[]>([]);
+  const [auditLogs, setAuditLogs] = useState<AuditLogEntry[]>([]);
+  const [doctorDispatches, setDoctorDispatches] = useState<DoctorDispatchLog[]>([]);
+  const [notifications, setNotifications] = useState<AppNotification[]>([]);
+  const [inventoryItems, setInventoryItems] = useState<InventoryItem[]>([]);
+  const [inventoryTransactions, setInventoryTransactions] = useState<InventoryTransaction[]>([]);
+  const [adverseReactions, setAdverseReactions] = useState<AdverseReactionReport[]>([]);
+
+  const [activeTab, setActiveTab] = useState<ActiveTab>(
+    () => (localStorage.getItem(ACTIVE_TAB_KEY) as ActiveTab) || 'dashboard'
   );
-
-  // Core domain state with local storage persistence
-  const [appointments, setAppointments] = useState<Appointment[]>(() => StorageService.loadAppointments());
-  const [patients, setPatients] = useState<Patient[]>(() => StorageService.loadPatients());
-  const [modalities, setModalities] = useState<Modality[]>(() => StorageService.loadModalities());
-  const [services, setServices] = useState<Service[]>(() => StorageService.loadServices());
-  const [referrers, setReferrers] = useState<Referrer[]>(() => StorageService.loadReferrers());
-  const [forms, setForms] = useState<ScreeningForm[]>(() => StorageService.loadForms());
-  const [templates, setTemplates] = useState<ReportTemplate[]>(() => StorageService.loadTemplates());
-  const [invoices, setInvoices] = useState<Invoice[]>(() => StorageService.loadInvoices());
-
-  // Settings & Doctor Network state
-  const [staffUsers, setStaffUsers] = useState<StaffUser[]>(() => StorageService.loadStaffUsers());
-  const [clinicSettings, setClinicSettings] = useState<ClinicProfileSettings>(() => StorageService.loadClinicSettings());
-  const [dicomNodes, setDicomNodes] = useState<DicomNodeConfig[]>(() => StorageService.loadDicomNodes());
-  const [notificationTemplates, setNotificationTemplates] = useState<NotificationTemplate[]>(() => StorageService.loadNotificationTemplates());
-  const [auditLogs, setAuditLogs] = useState<AuditLogEntry[]>(() => StorageService.loadAuditLogs());
-  const [doctorDispatches, setDoctorDispatches] = useState<DoctorDispatchLog[]>(() => StorageService.loadDoctorDispatches());
-  const [notifications, setNotifications] = useState<AppNotification[]>(() => StorageService.loadAppNotifications());
-
-  // Tier 3: Contrast Media & Clinical Consumables Inventory state
-  const [inventoryItems, setInventoryItems] = useState<InventoryItem[]>(() => StorageService.loadInventoryItems());
-  const [inventoryTransactions, setInventoryTransactions] = useState<InventoryTransaction[]>(() => StorageService.loadInventoryTransactions());
-  const [adverseReactions, setAdverseReactions] = useState<AdverseReactionReport[]>(() => StorageService.loadAdverseReactions());
-
-  // UI Drawer / Security Modal states
   const [notificationCenterOpen, setNotificationCenterOpen] = useState(false);
   const [isTerminalLocked, setIsTerminalLocked] = useState(false);
 
-  // Automatic state synchronization to persistent storage
   useEffect(() => {
-    StorageService.saveAppointments(appointments);
+    localStorage.setItem(ACTIVE_TAB_KEY, activeTab);
+  }, [activeTab]);
+
+  // ==================== bootstrap ====================
+
+  const runBootstrap = useCallback(async () => {
+    setBootStatus('loading');
+    setBootError(null);
+    try {
+      await initCsrf();
+      const payload = await api.bootstrap();
+      setUser(payload.user);
+      setAppointments(payload.studies);
+      setInvoices(payload.invoices);
+      setPatients(payload.patients);
+      setModalities(payload.modalities);
+      setServices(payload.services);
+      setReferrers(payload.referrers);
+      setForms(payload.screeningForms);
+      setTemplates(payload.templates);
+      setStaffUsers(payload.staff);
+      setClinicSettings(payload.clinicSettings);
+      setDicomNodes(payload.dicomNodes);
+      setNotificationTemplates(payload.notificationTemplates);
+      setAuditLogs(payload.auditLogs);
+      setDoctorDispatches(payload.dispatches);
+      setNotifications(payload.notifications);
+      setInventoryItems(payload.inventoryItems);
+      setInventoryTransactions(payload.inventoryTransactions);
+      setAdverseReactions(payload.adverseReactions);
+      setBootStatus('ready');
+    } catch (err: any) {
+      if (err?.status === 401) {
+        setBootStatus('unauthenticated');
+      } else {
+        setBootError(err?.message ?? 'Failed to reach the server.');
+        setBootStatus('unauthenticated');
+      }
+    }
+  }, []);
+
+  useEffect(() => {
+    onUnauthorized(() => {
+      setUser(null);
+      setBootStatus('unauthenticated');
+    });
+    runBootstrap();
+  }, [runBootstrap]);
+
+  const showFlash = useCallback((kind: 'error' | 'success', message: string) => {
+    setFlash({ kind, message });
+    window.setTimeout(() => setFlash(null), 5000);
+  }, []);
+
+  const fail = useCallback((err: any, fallback: string) => {
+    showFlash('error', err?.message ?? fallback);
+  }, [showFlash]);
+
+  const handleAuthenticated = useCallback((_user: SessionUser) => {
+    runBootstrap();
+  }, [runBootstrap]);
+
+  const handleLogout = useCallback(async () => {
+    try {
+      await api.logout();
+    } catch {
+      // Session may already be gone — clearing local state is enough.
+    }
+    setUser(null);
+    setBootStatus('unauthenticated');
+    setActiveTab('dashboard');
+  }, []);
+
+  // ==================== shared helpers ====================
+
+  const adoptNotifications = useCallback((incoming: AppNotification[] | undefined) => {
+    if (incoming && incoming.length) {
+      setNotifications(prev => [...incoming, ...prev]);
+    }
+  }, []);
+
+  const replaceStudy = useCallback((study: Appointment) => {
+    const normalized = { ...study, patient: study.patient ?? appointments.find(a => a.id === study.id)?.patient ?? study.patient };
+    setAppointments(prev => prev.map(a => (a.id === normalized.id ? normalized : a)));
   }, [appointments]);
 
-  useEffect(() => {
-    StorageService.savePatients(patients);
-  }, [patients]);
-
-  useEffect(() => {
-    StorageService.saveModalities(modalities);
-  }, [modalities]);
-
-  useEffect(() => {
-    StorageService.saveServices(services);
-  }, [services]);
-
-  useEffect(() => {
-    StorageService.saveReferrers(referrers);
-  }, [referrers]);
-
-  useEffect(() => {
-    StorageService.saveForms(forms);
-  }, [forms]);
-
-  useEffect(() => {
-    StorageService.saveTemplates(templates);
-  }, [templates]);
-
-  useEffect(() => {
-    StorageService.saveInvoices(invoices);
+  const replaceInvoice = useCallback((invoice: Invoice) => {
+    setInvoices(prev => prev.map(inv => (inv.id === invoice.id ? invoice : inv)));
   }, [invoices]);
 
-  useEffect(() => {
-    StorageService.saveRole(role);
-  }, [role]);
+  // ==================== workflow handlers ====================
 
-  useEffect(() => {
-    StorageService.saveStaffUsers(staffUsers);
-  }, [staffUsers]);
-
-  useEffect(() => {
-    StorageService.saveClinicSettings(clinicSettings);
-  }, [clinicSettings]);
-
-  useEffect(() => {
-    StorageService.saveDicomNodes(dicomNodes);
-  }, [dicomNodes]);
-
-  useEffect(() => {
-    StorageService.saveNotificationTemplates(notificationTemplates);
-  }, [notificationTemplates]);
-
-  useEffect(() => {
-    StorageService.saveAuditLogs(auditLogs);
-  }, [auditLogs]);
-
-  useEffect(() => {
-    StorageService.saveDoctorDispatches(doctorDispatches);
-  }, [doctorDispatches]);
-
-  useEffect(() => {
-    StorageService.saveAppNotifications(notifications);
-  }, [notifications]);
-
-  useEffect(() => {
-    StorageService.saveInventoryItems(inventoryItems);
-  }, [inventoryItems]);
-
-  useEffect(() => {
-    StorageService.saveInventoryTransactions(inventoryTransactions);
-  }, [inventoryTransactions]);
-
-  useEffect(() => {
-    StorageService.saveAdverseReactions(adverseReactions);
-  }, [adverseReactions]);
-
-  // Clinical Notification Handlers
-  const handleAddNotification = (
-    notif: Omit<AppNotification, 'id' | 'timestamp' | 'isRead'> & { timestamp?: string; isRead?: boolean }
+  const runTransition = useCallback(async (
+    aptId: string,
+    action: api.WorkflowAction,
+    extra?: { reason?: string; dose?: DoseLog }
   ) => {
-    const timeNow = notif.timestamp || 'Just now';
-    const newNotif: AppNotification = {
-      id: `notif-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
-      timestamp: timeNow,
-      isRead: notif.isRead ?? false,
-      ...notif,
-    };
-    setNotifications(prev => [newNotif, ...prev]);
-  };
-
-  const handleMarkNotifAsRead = (id: string) => {
-    setNotifications(prev => prev.map(n => (n.id === id ? { ...n, isRead: true } : n)));
-  };
-
-  const handleMarkAllNotifsAsRead = () => {
-    setNotifications(prev => prev.map(n => ({ ...n, isRead: true })));
-  };
-
-  const handleClearAllNotifs = () => {
-    setNotifications([]);
-  };
-
-  const handleDeleteNotif = (id: string) => {
-    setNotifications(prev => prev.filter(n => n.id !== id));
-  };
-
-  const handleTriggerTestAlert = () => {
-    handleAddNotification({
-      title: 'EMERGENCY STAT: Cardiac CT Angiogram',
-      message: 'Trauma protocol activated for Emergency Token CT-09. Immediate radiologist clearance needed.',
-      category: 'stat',
-      priority: 'critical',
-      tokenNumber: 'CT-09',
-      patientName: 'Malik Tariq (ICU Referral)',
-      targetTab: 'technologist',
-      actionLabel: 'View STAT Worklist',
-    });
-  };
-
-  // Master Data Configuration Handlers
-  const handleResetFactoryDefaults = () => {
-    if (confirm('Are you sure you want to reset all records to the original factory configuration? All changes and new records will be refreshed.')) {
-      StorageService.resetToFactoryDefaults();
-      setAppointments(StorageService.loadAppointments());
-      setPatients(StorageService.loadPatients());
-      setModalities(StorageService.loadModalities());
-      setServices(StorageService.loadServices());
-      setReferrers(StorageService.loadReferrers());
-      setForms(StorageService.loadForms());
-      setTemplates(StorageService.loadTemplates());
-      setInvoices(StorageService.loadInvoices());
-      setStaffUsers(StorageService.loadStaffUsers());
-      setClinicSettings(StorageService.loadClinicSettings());
-      setDicomNodes(StorageService.loadDicomNodes());
-      setNotificationTemplates(StorageService.loadNotificationTemplates());
-      setAuditLogs(StorageService.loadAuditLogs());
-      setDoctorDispatches(StorageService.loadDoctorDispatches());
-      setNotifications(StorageService.loadAppNotifications());
-      setInventoryItems(StorageService.loadInventoryItems());
-      setInventoryTransactions(StorageService.loadInventoryTransactions());
-      setAdverseReactions(StorageService.loadAdverseReactions());
-      alert('System successfully restored to default factory dataset.');
+    try {
+      const { study, notifications: incoming } = await api.transitionStudy({ appointmentId: aptId, action, ...extra });
+      replaceStudy(study);
+      adoptNotifications(incoming);
+      return study;
+    } catch (err: any) {
+      fail(err, 'Workflow action failed.');
+      throw err;
     }
-  };
+  }, [adoptNotifications, fail, replaceStudy]);
 
-  const handleExportBackup = () => {
-    const backup = StorageService.exportDatabaseSnapshot();
-    const dataStr = 'data:text/json;charset=utf-8,' + encodeURIComponent(JSON.stringify(backup, null, 2));
-    const downloadAnchor = document.createElement('a');
-    downloadAnchor.setAttribute('href', dataStr);
-    downloadAnchor.setAttribute('download', `ADC_RIS_Database_Backup_${new Date().toISOString().split('T')[0]}.json`);
-    document.body.appendChild(downloadAnchor);
-    downloadAnchor.click();
-    downloadAnchor.remove();
-  };
+  const handleCheckIn = useCallback((aptId: string) => {
+    runTransition(aptId, 'checkin').catch(() => undefined);
+  }, [runTransition]);
 
-  const handleImportBackup = (snapshot: any) => {
-    const success = StorageService.importDatabaseSnapshot(snapshot);
-    if (success) {
-      setAppointments(StorageService.loadAppointments());
-      setPatients(StorageService.loadPatients());
-      setModalities(StorageService.loadModalities());
-      setServices(StorageService.loadServices());
-      setReferrers(StorageService.loadReferrers());
-      setForms(StorageService.loadForms());
-      setTemplates(StorageService.loadTemplates());
-      setInvoices(StorageService.loadInvoices());
-      setStaffUsers(StorageService.loadStaffUsers());
-      setClinicSettings(StorageService.loadClinicSettings());
-      setDicomNodes(StorageService.loadDicomNodes());
-      setNotificationTemplates(StorageService.loadNotificationTemplates());
-      setAuditLogs(StorageService.loadAuditLogs());
-      setDoctorDispatches(StorageService.loadDoctorDispatches());
-      setNotifications(StorageService.loadAppNotifications());
-      setInventoryItems(StorageService.loadInventoryItems());
-      setInventoryTransactions(StorageService.loadInventoryTransactions());
-      setAdverseReactions(StorageService.loadAdverseReactions());
-      alert('Database backup restored successfully!');
-    } else {
-      alert('Failed to import database snapshot. Please ensure the file format is valid.');
+  const handleMarkNoShow = useCallback((aptId: string) => {
+    runTransition(aptId, 'no_show').catch(() => undefined);
+  }, [runTransition]);
+
+  const handleStartPreparing = useCallback((aptId: string) => {
+    runTransition(aptId, 'prepare').catch(() => undefined);
+  }, [runTransition]);
+
+  const handleStartAcquisition = useCallback((apt: Appointment) => {
+    if (apt.screeningRequired && !apt.screeningCleared) {
+      showFlash('error', 'Safety Notice: complete the safety questionnaire before starting image acquisition.');
+      setScreeningModalApt(apt);
+      return;
     }
-  };
+    runTransition(apt.id, 'start').catch(() => undefined);
+  }, [runTransition, showFlash]);
 
-  // Master Data Configuration Handlers
-  const handleAddService = (newSvc: Omit<Service, 'id'>) => {
-    const nextId = Math.max(...services.map(s => s.id), 0) + 1;
-    setServices(prev => [...prev, { ...newSvc, id: nextId }]);
-  };
+  const handleCompleteAcquisition = useCallback((aptId: string, doseLog: DoseLog) => {
+    runTransition(aptId, 'complete', { dose: doseLog }).catch(() => undefined);
+  }, [runTransition]);
 
-  const handleUpdateService = (updatedSvc: Service) => {
-    setServices(prev => prev.map(s => (s.id === updatedSvc.id ? updatedSvc : s)));
-  };
+  const handleCancelStudy = useCallback((aptId: string, reason: string) => {
+    runTransition(aptId, 'cancel', { reason }).catch(() => undefined);
+  }, [runTransition]);
 
-  const handleDeleteService = (serviceId: number) => {
-    setServices(prev => prev.filter(s => s.id !== serviceId));
-  };
+  const handleRejectToTech = useCallback(async (aptId: string, reason: string) => {
+    try {
+      await runTransition(aptId, 'reject', { reason });
+      showFlash('success', 'Study rejected back to Technologist.');
+    } catch {
+      // Flash already shown by runTransition.
+    }
+  }, [runTransition, showFlash]);
 
-  const handleAddModality = (newMod: Omit<Modality, 'id'>) => {
-    const nextId = Math.max(...modalities.map(m => m.id), 0) + 1;
-    setModalities(prev => [...prev, { ...newMod, id: nextId }]);
-  };
+  const handleUpdateAppointment = useCallback(async (aptId: string, updates: Partial<Appointment>) => {
+    // Direct workflowState writes are not permitted — transitions only.
+    const { workflowState, ...editable } = updates;
+    void workflowState;
+    try {
+      const study = await api.updateStudy(aptId, editable);
+      replaceStudy(study);
+    } catch (err: any) {
+      fail(err, 'Could not update the study.');
+    }
+  }, [fail, replaceStudy]);
 
-  const handleUpdateModality = (updatedMod: Modality) => {
-    setModalities(prev => prev.map(m => (m.id === updatedMod.id ? updatedMod : m)));
-  };
+  // ==================== screening ====================
 
-  const handleAddReferrer = (newRef: Omit<Referrer, 'id'>) => {
-    const nextId = Math.max(...referrers.map(r => r.id), 0) + 1;
-    setReferrers(prev => [...prev, { ...newRef, id: nextId }]);
-  };
+  const handleSaveScreening = useCallback(async (aptId: string, answers: StudyScreeningAnswer[], _isCleared: boolean) => {
+    void _isCleared; // server re-derives clearance from the recorded answers
+    try {
+      const study = await api.submitScreening(
+        aptId,
+        answers.map(a => ({
+          questionId: a.questionId,
+          answerValue: a.answerValue,
+          overrideReason: a.overrideReason || undefined,
+        }))
+      );
+      replaceStudy(study);
+    } catch (err: any) {
+      fail(err, 'Could not record the screening answers.');
+    }
+  }, [fail, replaceStudy]);
 
-  const handleUpdateReferrer = (updatedRef: Referrer) => {
-    setReferrers(prev => prev.map(r => (r.id === updatedRef.id ? updatedRef : r)));
-  };
+  // ==================== reporting ====================
 
-  const handleDeleteReferrer = (refId: number) => {
-    setReferrers(prev => prev.filter(r => r.id !== refId));
-  };
+  const handleSaveReport = useCallback(async (aptId: string, reportData: Partial<RadiologyReport>, isFinalize: boolean) => {
+    try {
+      const { study, notifications: incoming } = await api.saveReport(aptId, {
+        clinicalHistory: reportData.clinicalHistory ?? '',
+        technique: reportData.technique ?? '',
+        comparison: reportData.comparison ?? '',
+        findings: reportData.findings ?? '',
+        impression: reportData.impression ?? '',
+        recommendations: reportData.recommendations ?? '',
+        criticalFlag: reportData.criticalFlag ?? false,
+        signNow: isFinalize,
+        signAs: 'final',
+      });
+      replaceStudy(study);
+      adoptNotifications(incoming);
+      showFlash('success', isFinalize ? 'Report signed and saved.' : 'Draft report saved.');
+    } catch (err: any) {
+      fail(err, 'Could not save the report.');
+      throw err;
+    }
+  }, [adoptNotifications, fail, replaceStudy, showFlash]);
 
-  const handleAddForm = (newForm: ScreeningForm) => {
-    setForms(prev => [...prev, newForm]);
-  };
+  const handleReleaseReport = useCallback(async (aptId: string, channel: 'hand' | 'email' | 'portal') => {
+    const apt = appointments.find(a => a.id === aptId);
+    const reportId = apt?.report?.id;
+    if (!reportId) {
+      showFlash('error', 'No signed report found for this study.');
+      return;
+    }
+    try {
+      const { study, notifications: incoming } = await api.releaseReport(aptId, reportId, channel);
+      replaceStudy(study);
+      adoptNotifications(incoming);
+      showFlash('success', `Report released via ${channel.toUpperCase()} dispatch.`);
+    } catch (err: any) {
+      fail(err, 'Report release failed.');
+    }
+  }, [appointments, adoptNotifications, fail, replaceStudy, showFlash]);
 
-  const handleUpdateForm = (updatedForm: ScreeningForm) => {
-    setForms(prev => prev.map(f => (f.id === updatedForm.id ? updatedForm : f)));
-  };
+  // ==================== billing ====================
 
-  const handleAddTemplate = (newTpl: ReportTemplate) => {
-    setTemplates(prev => [...prev, newTpl]);
-  };
+  const handleRecordPayment = useCallback(async (
+    invoiceId: string,
+    amount: number,
+    method: InvoicePayment['method'],
+    reference: string
+  ) => {
+    try {
+      const invoice = await api.recordPayment(invoiceId, amount, method, reference);
+      replaceInvoice(invoice);
+      showFlash('success', `Payment of Rs. ${amount.toLocaleString()} recorded.`);
+    } catch (err: any) {
+      fail(err, 'Could not record the payment.');
+      throw err;
+    }
+  }, [fail, replaceInvoice, showFlash]);
 
-  const handleUpdateTemplate = (updatedTpl: ReportTemplate) => {
-    setTemplates(prev => prev.map(t => (t.id === updatedTpl.id ? updatedTpl : t)));
-  };
+  const handleCreateInvoice = useCallback(async (
+    appointmentId: string,
+    _discount: number,
+    notes: string,
+    extraItems?: InvoiceItem[],
+    initialPayment?: { amount: number; method: InvoicePayment['method']; reference: string }
+  ) => {
+    void _discount; // discount is embedded per line item by the billing modal
+    const apt = appointments.find(a => a.id === appointmentId);
+    if (!apt) return;
 
-  const handleDeleteTemplate = (templateId: string) => {
-    setTemplates(prev => prev.filter(t => t.id !== templateId));
-  };
+    const items = [
+      { serviceId: apt.service.id, description: `${apt.service.name} (${apt.service.code})`, quantity: 1, unitPrice: apt.service.price, discount: 0 },
+      ...(extraItems ?? []).map(it => ({ description: it.description, quantity: it.quantity, unitPrice: it.unitPrice, discount: it.discount })),
+    ];
 
-  // Staff Users Handlers
-  const handleAddStaffUser = (newUser: Omit<StaffUser, 'id'>) => {
-    const newId = `usr_${Date.now()}`;
-    setStaffUsers(prev => [...prev, { ...newUser, id: newId }]);
-    handleAddAuditLog({
-      user: 'System Administrator',
-      role: 'Administrator',
-      action: 'Create Staff User Account',
-      module: 'RBAC & Access Control',
-      details: `Provisioned user account for ${newUser.name} (${newUser.role})`,
-      status: 'success'
-    });
-  };
+    try {
+      const invoice = await api.createInvoice(appointmentId, items, {
+        notes,
+        initialPayment: initialPayment && initialPayment.amount > 0 ? initialPayment : undefined,
+      });
+      setInvoices(prev => [invoice, ...prev]);
+      showFlash('success', `Invoice ${invoice.invoiceNumber} created.`);
+    } catch (err: any) {
+      fail(err, 'Could not create the invoice.');
+    }
+  }, [appointments, fail, showFlash]);
 
-  const handleUpdateStaffUser = (updatedUser: StaffUser) => {
-    setStaffUsers(prev => prev.map(u => (u.id === updatedUser.id ? updatedUser : u)));
-    handleAddAuditLog({
-      user: 'System Administrator',
-      role: 'Administrator',
-      action: 'Update Staff User Permissions',
-      module: 'RBAC & Access Control',
-      details: `Updated profile and access permissions for ${updatedUser.name}`,
-      status: 'success'
-    });
-  };
+  const handleAddInvoiceItem = useCallback(async (invoiceId: string, item: Omit<InvoiceItem, 'id' | 'lineTotal'> & { lineTotal?: number }) => {
+    try {
+      const invoice = await api.addInvoiceItem(invoiceId, {
+        description: item.description,
+        quantity: item.quantity,
+        unitPrice: item.unitPrice,
+        discount: item.discount ?? 0,
+      });
+      replaceInvoice(invoice);
+    } catch (err: any) {
+      fail(err, 'Could not add the invoice line.');
+    }
+  }, [fail, replaceInvoice]);
 
-  const handleDeleteStaffUser = (userId: string) => {
-    const user = staffUsers.find(u => u.id === userId);
-    setStaffUsers(prev => prev.filter(u => u.id !== userId));
-    handleAddAuditLog({
-      user: 'System Administrator',
-      role: 'Administrator',
-      action: 'Revoke Staff User Account',
-      module: 'RBAC & Access Control',
-      details: `Revoked access for user ${user?.name || userId}`,
-      status: 'warning'
-    });
-  };
+  const handleVoidInvoice = useCallback(async (invoiceId: string, reason: string) => {
+    try {
+      const invoice = await api.voidInvoice(invoiceId, reason);
+      replaceInvoice(invoice);
+      showFlash('success', 'Invoice voided.');
+    } catch (err: any) {
+      fail(err, 'Could not void the invoice.');
+    }
+  }, [fail, replaceInvoice, showFlash]);
 
-  // Clinic Settings Handler
-  const handleUpdateClinicSettings = (newSettings: ClinicProfileSettings) => {
-    setClinicSettings(newSettings);
-    handleAddAuditLog({
-      user: 'System Administrator',
-      role: 'Administrator',
-      action: 'Update Clinic Master Profile',
-      module: 'System Settings',
-      details: `Updated clinic registration and profile for ${newSettings.name}`,
-      status: 'success'
-    });
-  };
+  // ==================== booking ====================
 
-  // DICOM Nodes Handlers
-  const handleAddDicomNode = (newNode: Omit<DicomNodeConfig, 'id'>) => {
-    const newId = `node_${Date.now()}`;
-    setDicomNodes(prev => [...prev, { ...newNode, id: newId }]);
-    handleAddAuditLog({
-      user: 'PACS Administrator',
-      role: 'Administrator',
-      action: 'Register DICOM Modality Node',
-      module: 'PACS / DICOM Networking',
-      details: `Added DICOM AE Title ${newNode.aeTitle} (${newNode.ipAddress}:${newNode.port})`,
-      status: 'success'
-    });
-  };
+  const handleCreateBooking = useCallback(async (newAptData: Partial<Appointment>, newPatientData?: Partial<Patient>) => {
+    try {
+      const { study, invoice, notifications: incoming } = await api.createBooking({
+        patientId: newAptData.patientId,
+        newPatient: newPatientData,
+        serviceId: newAptData.serviceId!,
+        referrerId: newAptData.referrerId,
+        date: newAptData.date || new Date().toISOString().split('T')[0],
+        time: newAptData.time || '11:30 AM',
+        priority: newAptData.priority || 'routine',
+        notes: newAptData.notes,
+      });
 
-  const handleUpdateDicomNode = (updatedNode: DicomNodeConfig) => {
-    setDicomNodes(prev => prev.map(n => (n.id === updatedNode.id ? updatedNode : n)));
-    handleAddAuditLog({
-      user: 'PACS Administrator',
-      role: 'Administrator',
-      action: 'Update DICOM Node Configuration',
-      module: 'PACS / DICOM Networking',
-      details: `Updated DICOM AE Title ${updatedNode.aeTitle} (${updatedNode.ipAddress}:${updatedNode.port})`,
-      status: 'success'
-    });
-  };
+      setAppointments(prev => [study, ...prev]);
+      setInvoices(prev => [invoice, ...prev]);
+      adoptNotifications(incoming);
 
-  const handleDeleteDicomNode = (nodeId: string) => {
-    const node = dicomNodes.find(n => n.id === nodeId);
-    setDicomNodes(prev => prev.filter(n => n.id !== nodeId));
-    handleAddAuditLog({
-      user: 'PACS Administrator',
-      role: 'Administrator',
-      action: 'Delete DICOM Node Configuration',
-      module: 'PACS / DICOM Networking',
-      details: `Deleted DICOM node ${node?.aeTitle || nodeId}`,
-      status: 'warning'
-    });
-  };
+      if (newPatientData) {
+        setPatients(prev => [study.patient, ...prev]);
+      }
 
-  // Notification Template Handler
-  const handleUpdateNotificationTemplate = (updatedTemplate: NotificationTemplate) => {
+      return study;
+    } catch (err: any) {
+      fail(err, 'Booking failed.');
+      throw err;
+    }
+  }, [adoptNotifications, fail]);
+
+  // ==================== master data ====================
+
+  const handleAddService = useCallback(async (newSvc: Omit<Service, 'id'>) => {
+    try {
+      const service = await api.createService(newSvc);
+      setServices(prev => [...prev, service]);
+    } catch (err: any) { fail(err, 'Could not create the procedure.'); }
+  }, [fail]);
+
+  const handleUpdateService = useCallback(async (updatedSvc: Service) => {
+    try {
+      const service = await api.updateService(updatedSvc);
+      setServices(prev => prev.map(s => (s.id === service.id ? service : s)));
+    } catch (err: any) { fail(err, 'Could not update the procedure.'); }
+  }, [fail]);
+
+  const handleDeleteService = useCallback(async (serviceId: number) => {
+    try {
+      await api.deleteService(String(serviceId));
+      setServices(prev => prev.filter(s => s.id !== serviceId));
+    } catch (err: any) { fail(err, 'Could not delete the procedure.'); }
+  }, [fail]);
+
+  const handleAddModality = useCallback(async (newMod: Omit<Modality, 'id'>) => {
+    try {
+      const modality = await api.createModality(newMod);
+      setModalities(prev => [...prev, modality]);
+    } catch (err: any) { fail(err, 'Could not create the modality.'); }
+  }, [fail]);
+
+  const handleUpdateModality = useCallback(async (updatedMod: Modality) => {
+    try {
+      const modality = await api.updateModality(updatedMod);
+      setModalities(prev => prev.map(m => (m.id === modality.id ? modality : m)));
+    } catch (err: any) { fail(err, 'Could not update the modality.'); }
+  }, [fail]);
+
+  const handleAddReferrer = useCallback(async (newRef: Omit<Referrer, 'id'>) => {
+    try {
+      const referrer = await api.createReferrer(newRef);
+      setReferrers(prev => [...prev, referrer]);
+    } catch (err: any) { fail(err, 'Could not create the referrer.'); }
+  }, [fail]);
+
+  const handleUpdateReferrer = useCallback(async (updatedRef: Referrer) => {
+    try {
+      const referrer = await api.updateReferrer(updatedRef);
+      setReferrers(prev => prev.map(r => (r.id === referrer.id ? referrer : r)));
+    } catch (err: any) { fail(err, 'Could not update the referrer.'); }
+  }, [fail]);
+
+  const handleDeleteReferrer = useCallback(async (refId: number) => {
+    try {
+      await api.deleteReferrer(String(refId));
+      setReferrers(prev => prev.filter(r => r.id !== refId));
+    } catch (err: any) { fail(err, 'Could not delete the referrer.'); }
+  }, [fail]);
+
+  const handleAddForm = useCallback(async (newForm: {
+    name: string;
+    description?: string;
+    modalityId?: number | null;
+    questions: Array<{
+      questionText: string;
+      helpText?: string;
+      answerType: 'boolean' | 'select' | 'text';
+      riskValue?: string;
+      isRiskBlocking: boolean;
+    }>;
+  }) => {
+    try {
+      const form = await api.createScreeningForm(newForm);
+      setForms(prev => [...prev, form]);
+    } catch (err: any) { fail(err, 'Could not create the screening form.'); }
+  }, [fail]);
+
+  const handleUpdateForm = useCallback(async (updatedForm: ScreeningForm) => {
+    try {
+      const form = await api.updateScreeningFormQuestions(updatedForm.id, updatedForm.questions);
+      setForms(prev => prev.map(f => (f.id === form.id ? { ...f, questions: form.questions } : f)));
+    } catch (err: any) { fail(err, 'Could not update the screening form.'); }
+  }, [fail]);
+
+  const handleAddTemplate = useCallback(async (newTpl: ReportTemplate) => {
+    try {
+      const template = await api.createReportTemplate(newTpl);
+      setTemplates(prev => [...prev, template]);
+    } catch (err: any) { fail(err, 'Could not create the template.'); }
+  }, [fail]);
+
+  const handleUpdateTemplate = useCallback(async (updatedTpl: ReportTemplate) => {
+    try {
+      const template = await api.updateReportTemplate(updatedTpl);
+      setTemplates(prev => prev.map(t => (t.id === template.id ? template : t)));
+    } catch (err: any) { fail(err, 'Could not update the template.'); }
+  }, [fail]);
+
+  const handleDeleteTemplate = useCallback(async (templateId: string) => {
+    try {
+      await api.deleteReportTemplate(templateId);
+      setTemplates(prev => prev.filter(t => t.id !== templateId));
+    } catch (err: any) { fail(err, 'Could not delete the template.'); }
+  }, [fail]);
+
+  // ==================== staff ====================
+
+  const handleAddStaffUser = useCallback(async (newUser: Omit<StaffUser, 'id'> & { password: string }) => {
+    try {
+      const staff = await api.createStaff(newUser);
+      setStaffUsers(prev => [...prev, staff]);
+      showFlash('success', `Account created for ${staff.name}.`);
+    } catch (err: any) { fail(err, 'Could not create the staff account.'); }
+  }, [fail, showFlash]);
+
+  const handleUpdateStaffUser = useCallback(async (updatedUser: StaffUser & { password?: string }) => {
+    try {
+      const staff = await api.updateStaff(updatedUser);
+      setStaffUsers(prev => prev.map(u => (u.id === staff.id ? staff : u)));
+    } catch (err: any) { fail(err, 'Could not update the staff account.'); }
+  }, [fail]);
+
+  const handleDeleteStaffUser = useCallback(async (userId: string) => {
+    try {
+      await api.deleteStaff(userId);
+      setStaffUsers(prev => prev.filter(u => u.id !== userId));
+      showFlash('success', 'Staff account revoked.');
+    } catch (err: any) { fail(err, 'Could not revoke the staff account.'); }
+  }, [fail, showFlash]);
+
+  // ==================== clinic / platform settings ====================
+
+  const handleUpdateClinicSettings = useCallback(async (newSettings: ClinicProfileSettings) => {
+    try {
+      const clinic = await api.updateClinicSettings(newSettings);
+      setClinicSettings(clinic);
+      showFlash('success', 'Clinic profile saved.');
+    } catch (err: any) { fail(err, 'Could not save the clinic profile.'); }
+  }, [fail, showFlash]);
+
+  const handleAddDicomNode = useCallback(async (newNode: Omit<DicomNodeConfig, 'id'>) => {
+    try {
+      const node = await api.createDicomNode(newNode);
+      setDicomNodes(prev => [...prev, node]);
+    } catch (err: any) { fail(err, 'Could not register the DICOM node.'); }
+  }, [fail]);
+
+  const handleUpdateDicomNode = useCallback(async (updatedNode: DicomNodeConfig) => {
+    try {
+      const node = await api.updateDicomNode(updatedNode);
+      setDicomNodes(prev => prev.map(n => (n.id === node.id ? node : n)));
+    } catch (err: any) { fail(err, 'Could not update the DICOM node.'); }
+  }, [fail]);
+
+  const handleDeleteDicomNode = useCallback(async (nodeId: string) => {
+    try {
+      await api.deleteDicomNode(nodeId);
+      setDicomNodes(prev => prev.filter(n => n.id !== nodeId));
+    } catch (err: any) { fail(err, 'Could not delete the DICOM node.'); }
+  }, [fail]);
+
+  const handlePingDicomNode = useCallback(async (nodeId: string) => {
+    try {
+      const { node, probe } = await api.pingDicomNode(nodeId);
+      setDicomNodes(prev => prev.map(n => (n.id === node.id ? node : n)));
+      showFlash(
+        probe.status === 'online' ? 'success' : 'error',
+        probe.status === 'online'
+          ? `TCP probe OK — ${node.ipAddress}:${node.port} reachable (${probe.latency}ms).`
+          : `Probe failed — ${node.ipAddress}:${node.port} unreachable.`
+      );
+    } catch (err: any) { fail(err, 'Probe request failed.'); }
+  }, [fail, showFlash]);
+
+  // Debounced template persistence (the settings editor persists per keystroke).
+  const templateTimers = useRef<Record<string, number>>({});
+  const handleUpdateNotificationTemplate = useCallback((updatedTemplate: api.NotificationTemplateT) => {
     setNotificationTemplates(prev => prev.map(t => (t.id === updatedTemplate.id ? updatedTemplate : t)));
-    handleAddAuditLog({
-      user: 'System Administrator',
-      role: 'Administrator',
-      action: 'Update Notification Template',
-      module: 'Communications Gateway',
-      details: `Updated template ${updatedTemplate.name} for ${updatedTemplate.channel.toUpperCase()}`,
-      status: 'success'
-    });
-  };
+    window.clearTimeout(templateTimers.current[updatedTemplate.id]);
+    templateTimers.current[updatedTemplate.id] = window.setTimeout(() => {
+      api.updateNotificationTemplate(updatedTemplate).catch((err: any) => fail(err, 'Could not save the template.'));
+    }, 700);
+  }, [fail]);
 
-  // Audit Log Handler
-  const handleAddAuditLog = (log: Omit<AuditLogEntry, 'id' | 'timestamp'>) => {
-    const newEntry: AuditLogEntry = {
-      ...log,
-      id: `audit_${Date.now()}`,
-      timestamp: new Date().toISOString().replace('T', ' ').substring(0, 19),
-    };
-    setAuditLogs(prev => [newEntry, ...prev]);
-  };
+  // ==================== inventory ====================
 
-  // Doctor Dispatch Handler
-  const handleAddDoctorDispatch = (dispatch: Omit<DoctorDispatchLog, 'id' | 'sentAt'>) => {
-    const newDispatch: DoctorDispatchLog = {
-      ...dispatch,
-      id: `disp_${Date.now()}`,
-      sentAt: new Date().toISOString().replace('T', ' ').substring(0, 19),
-    };
-    setDoctorDispatches(prev => [newDispatch, ...prev]);
+  const handleCreateInventoryItem = useCallback(async (item: Omit<InventoryItem, 'id'>) => {
+    try {
+      const created = await api.createInventoryItem(item);
+      setInventoryItems(prev => [created, ...prev]);
+      if (created.currentStock > 0) {
+        setInventoryTransactions(prev => [{
+          id: `local-${created.id}-opening`,
+          itemId: created.id,
+          itemName: created.name,
+          type: 'stock_in',
+          quantity: created.currentStock,
+          batchNumber: created.batches[0]?.batchNumber ?? '',
+          timestamp: 'Just now',
+          performedBy: user?.name ?? 'You',
+          notes: 'Opening stock on SKU creation.',
+        }, ...prev]);
+      }
+    } catch (err: any) { fail(err, 'Could not create the SKU.'); }
+  }, [fail, user]);
 
-    // Also add to audit logs
-    handleAddAuditLog({
-      user: 'Doctor Network Dispatcher',
-      role: 'Staff / Gateway',
-      action: 'Report Dispatched to Doctor',
-      module: 'Doctor Network',
-      details: `Report for token ${dispatch.tokenNumber} sent to ${dispatch.referrerName} via ${dispatch.channel.toUpperCase()}.`,
-      status: 'success',
-    });
+  const handleStockMovement = useCallback(async (input: {
+    itemId: string;
+    type: InventoryTransaction['type'];
+    quantity: number;
+    batchNumber?: string;
+    direction?: 'in' | 'out';
+    tokenNumber?: string;
+    patientName?: string;
+    notes?: string;
+  }) => {
+    try {
+      const { transaction, item } = await api.createInventoryTransaction(input);
+      setInventoryItems(prev => prev.map(it => (it.id === item.id ? item : it)));
+      setInventoryTransactions(prev => [transaction, ...prev]);
+    } catch (err: any) { fail(err, 'Stock movement failed.'); }
+  }, [fail]);
 
-    handleAddNotification({
-      title: `Doctor Dispatch: ${dispatch.channel.toUpperCase()}`,
-      message: `Report sent to ${dispatch.referrerName} for patient ${dispatch.patientName} (${dispatch.studyName}).`,
-      category: 'dispatch',
-      priority: 'low',
-      tokenNumber: dispatch.tokenNumber,
-      patientName: dispatch.patientName,
-      targetTab: 'doctors',
-      actionLabel: 'View Dispatch Hub',
-    });
-  };
+  const handleCreateAdverseReaction = useCallback(async (reaction: Omit<AdverseReactionReport, 'id' | 'reportedAt'>) => {
+    try {
+      const created = await api.createAdverseReaction(reaction);
+      setAdverseReactions(prev => [created, ...prev]);
+      showFlash('success', 'Adverse reaction report recorded.');
+    } catch (err: any) { fail(err, 'Could not record the adverse reaction.'); }
+  }, [fail, showFlash]);
 
-  // Active selections & modal triggers
+  // ==================== doctor dispatch ====================
+
+  const handleAddDoctorDispatch = useCallback(async (input: { appointmentId: string; channel: DoctorDispatchLog['channel']; recipientContact: string }) => {
+    try {
+      const { dispatch, notifications: incoming } = await api.createDispatch(input);
+      setDoctorDispatches(prev => [dispatch, ...prev]);
+      adoptNotifications(incoming);
+      showFlash(
+        'success',
+        dispatch.status === 'delivered'
+          ? `Dispatch sent via ${dispatch.channel.toUpperCase()}.`
+          : `Dispatch logged as pending — ${dispatch.channel.toUpperCase()} gateway is not configured, deliver manually.`
+      );
+    } catch (err: any) { fail(err, 'Dispatch failed.'); }
+  }, [adoptNotifications, fail, showFlash]);
+
+  // ==================== notifications ====================
+
+  const handleMarkNotifAsRead = useCallback((id: string) => {
+    setNotifications(prev => prev.map(n => (n.id === id ? { ...n, isRead: true } : n)));
+    api.markNotificationsRead([id]).catch(() => undefined);
+  }, []);
+
+  const handleMarkAllNotifsAsRead = useCallback(() => {
+    setNotifications(prev => prev.map(n => ({ ...n, isRead: true })));
+    api.markAllNotificationsRead().catch(() => undefined);
+  }, []);
+
+  const handleClearAllNotifs = useCallback(() => {
+    setNotifications([]);
+    api.clearNotifications().catch(() => undefined);
+  }, []);
+
+  const handleDeleteNotif = useCallback((id: string) => {
+    setNotifications(prev => prev.filter(n => n.id !== id));
+    api.deleteNotification(id).catch(() => undefined);
+  }, []);
+
+  // ==================== backup ====================
+
+  const handleExportBackup = useCallback(async () => {
+    try {
+      const snapshot = await api.exportBackup();
+      const blob = new Blob([JSON.stringify(snapshot, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement('a');
+      anchor.href = url;
+      anchor.download = `ADC_RIS_Database_Backup_${new Date().toISOString().split('T')[0]}.json`;
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+      URL.revokeObjectURL(url);
+    } catch (err: any) { fail(err, 'Backup export failed.'); }
+  }, [fail]);
+
+  const handleResetFactoryDefaults = useCallback(async () => {
+    if (!confirm('Reset this clinic\u2019s demo data to the original seeded dataset? Live clinical records will be refreshed.')) return;
+    try {
+      await api.resetDemoData();
+      await runBootstrap();
+      showFlash('success', 'Demo dataset restored.');
+    } catch (err: any) { fail(err, 'Reset is only available for the demo clinic.'); }
+  }, [fail, runBootstrap, showFlash]);
+
+  // ==================== selections & modals ====================
+
   const [selectedAppointment, setSelectedAppointment] = useState<Appointment | null>(null);
   const [screeningModalApt, setScreeningModalApt] = useState<Appointment | null>(null);
   const [doseModalApt, setDoseModalApt] = useState<Appointment | null>(null);
   const [bookingModalOpen, setBookingModalOpen] = useState(false);
 
-  // Sync selected appointment reference if appointments change
   const currentSelectedAppointment = appointments.find(a => a.id === selectedAppointment?.id) || selectedAppointment;
 
-  // Workflow Handlers
-  const handleCheckIn = (aptId: string) => {
-    const timeNow = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    const apt = appointments.find(a => a.id === aptId);
-    setAppointments(prev =>
-      prev.map(a => (a.id === aptId ? { ...a, workflowState: 'checked_in', checkedInAt: timeNow } : a))
-    );
+  // ==================== render gates ====================
 
-    if (apt) {
-      handleAddNotification({
-        title: `Patient Checked In (#${apt.tokenNumber})`,
-        message: `${apt.patient.name} has arrived at the reception desk. Token ${apt.tokenNumber} is now ready for preparation in ${apt.modality.name}.`,
-        category: 'workflow',
-        priority: apt.priority === 'stat' ? 'critical' : 'medium',
-        appointmentId: apt.id,
-        tokenNumber: apt.tokenNumber,
-        patientName: apt.patient.name,
-        targetTab: 'technologist',
-        actionLabel: 'View Worklist',
-      });
-    }
-  };
-
-  const handleMarkNoShow = (aptId: string) => {
-    setAppointments(prev =>
-      prev.map(a => (a.id === aptId ? { ...a, workflowState: 'no_show', cancelReason: 'Patient failed to arrive' } : a))
-    );
-  };
-
-  const handleStartPreparing = (aptId: string) => {
-    const timeNow = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    setAppointments(prev =>
-      prev.map(a => (a.id === aptId ? { ...a, workflowState: 'preparing', preparingAt: timeNow } : a))
-    );
-  };
-
-  const handleStartAcquisition = (apt: Appointment) => {
-    if (apt.screeningRequired && !apt.screeningCleared) {
-      alert('Safety Notice: Please complete the safety questionnaire before starting image acquisition.');
-      setScreeningModalApt(apt);
-      return;
-    }
-    const timeNow = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    setAppointments(prev =>
-      prev.map(a => (a.id === apt.id ? { ...a, workflowState: 'in_progress', inProgressAt: timeNow } : a))
-    );
-  };
-
-  const handleSaveScreening = (aptId: string, answers: StudyScreeningAnswer[], isCleared: boolean) => {
-    setAppointments(prev =>
-      prev.map(a =>
-        a.id === aptId
-          ? {
-              ...a,
-              screeningAnswers: answers,
-              screeningCleared: isCleared,
-            }
-          : a
-      )
-    );
-  };
-
-  const handleCompleteAcquisition = (aptId: string, doseLog: DoseLog) => {
-    const timeNow = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    const apt = appointments.find(a => a.id === aptId);
-    setAppointments(prev =>
-      prev.map(a =>
-        a.id === aptId
-          ? {
-              ...a,
-              workflowState: 'acquired',
-              acquiredAt: timeNow,
-              doseLog,
-            }
-          : a
-      )
-    );
-
-    // If contrast media was administered during acquisition, deduct 1 unit and log clinical inventory transaction
-    if (doseLog.contrastAgent) {
-      const agentName = doseLog.contrastAgent.toLowerCase();
-      const matchedItem = inventoryItems.find(
-        item =>
-          (item.category === 'contrast_ct' || item.category === 'contrast_mri') &&
-          (item.name.toLowerCase().includes(agentName) || agentName.includes(item.name.toLowerCase()) || agentName.includes(item.genericName.toLowerCase()))
+  if (bootStatus !== 'ready' || !user || !clinicSettings) {
+    if (bootStatus === 'unauthenticated') {
+      return (
+        <LoginView
+          onAuthenticated={handleAuthenticated}
+        />
       );
-
-      if (matchedItem && matchedItem.currentStock > 0) {
-        const consumedQty = 1;
-        const newStock = Math.max(0, matchedItem.currentStock - consumedQty);
-        setInventoryItems(prev =>
-          prev.map(it => (it.id === matchedItem.id ? { ...it, currentStock: newStock } : it))
-        );
-
-        const newTx: InventoryTransaction = {
-          id: `tx-${Date.now()}`,
-          itemId: matchedItem.id,
-          itemName: matchedItem.name,
-          type: 'usage_study',
-          quantity: consumedQty,
-          batchNumber: matchedItem.batches[0]?.batchNumber || 'BATCH-AUTO',
-          appointmentId: apt?.id,
-          tokenNumber: apt?.tokenNumber,
-          patientName: apt?.patient.name,
-          performedBy: doseLog.recordedBy || 'Technologist',
-          notes: `Auto-deducted during ${apt?.modality.code || 'CT'} acquisition (${doseLog.contrastVolumeMl || 0} mL administered).`,
-          timestamp: new Date().toLocaleString(),
-        };
-        setInventoryTransactions(prev => [newTx, ...prev]);
-
-        if (newStock <= matchedItem.minThreshold) {
-          handleAddNotification({
-            title: `Low Stock Warning: ${matchedItem.name}`,
-            message: `${matchedItem.name} stock has reached ${newStock} ${matchedItem.unit} (threshold: ${matchedItem.minThreshold}). Reorder recommended.`,
-            category: 'general',
-            priority: newStock === 0 ? 'critical' : 'high',
-            targetTab: 'inventory',
-            actionLabel: 'Open Inventory & Restock',
-          });
-        }
-      }
     }
 
-    if (apt) {
-      handleAddNotification({
-        title: `Acquisition Complete (#${apt.tokenNumber})`,
-        message: `${apt.modality.code} imaging completed for ${apt.patient.name}. DICOM series transferred to PACS and ready for reporting.`,
-        category: 'workflow',
-        priority: apt.priority === 'stat' ? 'high' : 'medium',
-        appointmentId: apt.id,
-        tokenNumber: apt.tokenNumber,
-        patientName: apt.patient.name,
-        targetTab: 'reporting',
-        actionLabel: 'Open Diagnostic Report',
-      });
-    }
-  };
-
-  const handleCancelStudy = (aptId: string, reason: string) => {
-    const apt = appointments.find(a => a.id === aptId);
-    setAppointments(prev =>
-      prev.map(a => (a.id === aptId ? { ...a, workflowState: 'cancelled', cancelReason: reason } : a))
+    return (
+      <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center gap-4 text-slate-600">
+        <div className="w-10 h-10 border-4 border-cyan-500/30 border-t-cyan-600 rounded-full animate-spin" />
+        <p className="text-sm">{bootError ? 'Connection problem' : 'Connecting to ADC Portal…'}</p>
+        {bootError && (
+          <>
+            <p className="text-xs text-rose-600 max-w-sm text-center">{bootError}</p>
+            <button
+              onClick={() => runBootstrap()}
+              className="text-xs font-semibold text-cyan-700 hover:text-cyan-900 underline"
+            >
+              Retry
+            </button>
+          </>
+        )}
+      </div>
     );
-    handleAddAuditLog({
-      user: 'Front Desk Admin',
-      role: 'Receptionist',
-      action: 'Cancel Examination Study',
-      module: 'Scheduling & Front Desk',
-      details: `Cancelled appointment #${apt?.tokenNumber} for ${apt?.patient?.name}. Reason: ${reason}`,
-      status: 'warning',
-    });
-  };
+  }
 
-  const handleUpdateAppointment = (aptId: string, updates: Partial<Appointment>) => {
-    setAppointments(prev =>
-      prev.map(a => (a.id === aptId ? { ...a, ...updates } : a))
-    );
-  };
-
-  const handleRejectToTech = (aptId: string, reason: string) => {
-    const apt = appointments.find(a => a.id === aptId);
-    setAppointments(prev =>
-      prev.map(a => (a.id === aptId ? { ...a, workflowState: 'preparing', rejectReason: reason } : a))
-    );
-    handleAddAuditLog({
-      user: 'Dr. Shahzad Mir, FRCR',
-      role: 'Radiologist',
-      action: 'Quality Reject to Technologist',
-      module: 'Radiology Reporting',
-      details: `Rejected study #${apt?.tokenNumber} (${apt?.service?.name}) back to Technologist. Reason: ${reason}`,
-      status: 'warning',
-    });
-
-    if (apt) {
-      handleAddNotification({
-        title: `Quality Rejection Alert (#${apt.tokenNumber})`,
-        message: `Dr. Shahzad Mir rejected study #${apt.tokenNumber} back for repeat scan/technologist review: "${reason}"`,
-        category: 'stat',
-        priority: 'high',
-        appointmentId: apt.id,
-        tokenNumber: apt.tokenNumber,
-        patientName: apt.patient.name,
-        targetTab: 'technologist',
-        actionLabel: 'View Study in Worklist',
-      });
-    }
-
-    alert(`Study rejected back to Technologist. Reason: ${reason}`);
-  };
-
-  const handleSaveReport = (aptId: string, reportData: Partial<RadiologyReport>, isFinalize: boolean) => {
-    const timeNow = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    const apt = appointments.find(a => a.id === aptId);
-
-    setAppointments(prev =>
-      prev.map(a => {
-        if (a.id !== aptId) return a;
-
-        const existingReport = a.report;
-        const updatedReport: RadiologyReport = {
-          id: existingReport?.id || `rep-${Date.now()}`,
-          appointmentId: aptId,
-          version: existingReport ? existingReport.version + (isFinalize ? 1 : 0) : 1,
-          type: isFinalize ? 'final' : 'draft',
-          clinicalHistory: reportData.clinicalHistory || '',
-          technique: reportData.technique || '',
-          comparison: reportData.comparison || '',
-          findings: reportData.findings || '',
-          impression: reportData.impression || '',
-          recommendations: reportData.recommendations || '',
-          criticalFlag: reportData.criticalFlag || false,
-          authoredBy: 'Dr. Shahzad Mir, FRCR',
-          signedBy: isFinalize ? 'Dr. Shahzad Mir, FRCR (Consultant Radiologist)' : undefined,
-          signedAt: isFinalize ? timeNow : undefined,
-          lockedAt: isFinalize ? timeNow : undefined,
-          releases: existingReport?.releases || [],
-        };
-
-        return {
-          ...a,
-          workflowState: isFinalize ? 'reported' : 'reading',
-          reportedAt: isFinalize ? timeNow : a.reportedAt,
-          readingAt: a.readingAt || timeNow,
-          report: updatedReport,
-        };
-      })
-    );
-
-    if (isFinalize) {
-      handleAddAuditLog({
-        user: 'Dr. Shahzad Mir, FRCR',
-        role: 'Radiologist',
-        action: 'Finalize & Electronically Sign Report',
-        module: 'Radiology Reporting',
-        details: `Electronically signed and verified report for patient ${apt?.patient?.name} (Token: ${apt?.tokenNumber})`,
-        status: 'success',
-      });
-
-      if (apt) {
-        handleAddNotification({
-          title: `Diagnostic Report Finalized (#${apt.tokenNumber})`,
-          message: `Dr. Shahzad Mir has signed the official diagnostic report for ${apt.patient.name} (${apt.service.name}). Ready for release/dispatch.`,
-          category: 'workflow',
-          priority: 'medium',
-          appointmentId: apt.id,
-          tokenNumber: apt.tokenNumber,
-          patientName: apt.patient.name,
-          targetTab: 'doctors',
-          actionLabel: 'Dispatch to Doctor',
-        });
-      }
-    }
-  };
-
-  const handleReleaseReport = (aptId: string, channel: 'hand' | 'email' | 'portal') => {
-    const timeNow = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    const apt = appointments.find(a => a.id === aptId);
-
-    setAppointments(prev =>
-      prev.map(a => {
-        if (a.id !== aptId || !a.report) return a;
-
-        const newRelease = {
-          id: `rel-${Date.now()}`,
-          reportId: a.report.id,
-          channel,
-          releasedAt: timeNow,
-          releasedBy: 'Reception / Portal Dispatch',
-        };
-
-        return {
-          ...a,
-          workflowState: channel === 'hand' ? 'delivered' : a.workflowState,
-          deliveredAt: channel === 'hand' ? timeNow : a.deliveredAt,
-          report: {
-            ...a.report,
-            releases: [...a.report.releases, newRelease],
-          },
-        };
-      })
-    );
-
-    handleAddAuditLog({
-      user: 'Reception / Dispatch Gateway',
-      role: 'Staff',
-      action: 'Release Diagnostic Report',
-      module: 'Report Dispatch',
-      details: `Released report for ${apt?.patient?.name} via ${channel.toUpperCase()}`,
-      status: 'success',
-    });
-
-    if (apt) {
-      handleAddNotification({
-        title: `Report Dispatched (${channel.toUpperCase()})`,
-        message: `Diagnostic report for ${apt.patient.name} (#${apt.tokenNumber}) successfully dispatched via ${channel.toUpperCase()}.`,
-        category: 'dispatch',
-        priority: 'low',
-        appointmentId: apt.id,
-        tokenNumber: apt.tokenNumber,
-        patientName: apt.patient.name,
-        targetTab: 'doctors',
-        actionLabel: 'View Dispatch Log',
-      });
-    }
-
-    alert(`Report successfully released via ${channel.toUpperCase()} dispatch.`);
-  };
-
-  const handleRecordPayment = (
-    invoiceId: string,
-    amount: number,
-    method: 'cash' | 'card' | 'bank' | 'mobile' | 'insurance',
-    reference: string
-  ) => {
-    const timeNow = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    let matchedPatientName = '';
-    let matchedToken = '';
-    let matchedAptId = '';
-
-    setInvoices(prev =>
-      prev.map(inv => {
-        if (inv.id !== invoiceId) return inv;
-
-        matchedPatientName = inv.patient?.name || '';
-        matchedToken = inv.appointmentToken || '';
-        matchedAptId = inv.appointmentId || '';
-
-        const newPayment: InvoicePayment = {
-          id: `pay-${Date.now()}`,
-          amount,
-          method,
-          reference,
-          paidAt: timeNow,
-          receivedBy: 'Billing Officer Amina',
-        };
-
-        const newPaidTotal = inv.paidTotal + amount;
-        const newBalance = Math.max(0, inv.total - newPaidTotal);
-        const newStatus = newBalance === 0 ? 'paid' : 'partial';
-
-        return {
-          ...inv,
-          paidTotal: newPaidTotal,
-          balanceDue: newBalance,
-          status: newStatus,
-          payments: [...inv.payments, newPayment],
-        };
-      })
-    );
-
-    handleAddAuditLog({
-      user: 'Billing Officer Amina',
-      role: 'Billing Officer',
-      action: 'Record POS Payment',
-      module: 'Billing & Invoicing',
-      details: `Collected payment of Rs. ${amount.toLocaleString()} via ${method.toUpperCase()} for invoice #${invoiceId}`,
-      status: 'success',
-    });
-
-    handleAddNotification({
-      title: `Payment Received (Rs. ${amount.toLocaleString()})`,
-      message: `POS settlement of Rs. ${amount.toLocaleString()} collected via ${method.toUpperCase()} for ${matchedPatientName || 'Invoice'}.`,
-      category: 'billing',
-      priority: 'low',
-      appointmentId: matchedAptId,
-      tokenNumber: matchedToken,
-      patientName: matchedPatientName,
-      targetTab: 'billing',
-      actionLabel: 'View Invoices',
-    });
-  };
-
-  const handleCreateInvoice = (
-    appointmentId: string,
-    discount: number,
-    notes: string,
-    extraItems?: InvoiceItem[],
-    initialPayment?: { amount: number; method: 'cash' | 'card' | 'bank' | 'mobile' | 'insurance'; reference: string }
-  ) => {
-    const apt = appointments.find(a => a.id === appointmentId);
-    if (!apt) return;
-
-    const timeNow = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    
-    const primaryItem: InvoiceItem = {
-      id: `item-${Date.now()}-1`,
-      serviceId: apt.service.id,
-      description: `${apt.service.name} (${apt.service.code})`,
-      quantity: 1,
-      unitPrice: apt.service.price,
-      discount: discount,
-      lineTotal: Math.max(0, apt.service.price - discount),
-    };
-
-    const allItems = [primaryItem, ...(extraItems || [])];
-    const subtotal = allItems.reduce((sum, it) => sum + (it.unitPrice * it.quantity), 0);
-    const discountTotal = allItems.reduce((sum, it) => sum + (it.discount || 0), 0);
-    const total = Math.max(0, subtotal - discountTotal);
-
-    let payments: InvoicePayment[] = [];
-    let paidTotal = 0;
-
-    if (initialPayment && initialPayment.amount > 0) {
-      payments = [
-        {
-          id: `pay-${Date.now()}`,
-          amount: initialPayment.amount,
-          method: initialPayment.method,
-          reference: initialPayment.reference || 'INITIAL-RECEIPT',
-          paidAt: timeNow,
-          receivedBy: 'Billing Officer Amina',
-        }
-      ];
-      paidTotal = initialPayment.amount;
-    }
-
-    const balanceDue = Math.max(0, total - paidTotal);
-    const status = balanceDue === 0 ? 'paid' : (paidTotal > 0 ? 'partial' : 'issued');
-
-    const newInvoice: Invoice = {
-      id: `inv-${Date.now()}`,
-      invoiceNumber: `INV-2026-${Math.floor(10000 + Math.random() * 90000)}`,
-      patientId: apt.patientId,
-      patient: apt.patient,
-      appointmentId: apt.id,
-      appointmentToken: apt.tokenNumber,
-      subtotal,
-      discountTotal,
-      taxRate: 0,
-      taxAmount: 0,
-      total,
-      paidTotal,
-      balanceDue,
-      status,
-      notes,
-      items: allItems,
-      payments,
-      createdAt: timeNow,
-      issuedAt: timeNow,
-    };
-
-    setInvoices(prev => [newInvoice, ...prev]);
-  };
-
-  const handleAddInvoiceItem = (invoiceId: string, item: InvoiceItem) => {
-    setInvoices(prev =>
-      prev.map(inv => {
-        if (inv.id !== invoiceId) return inv;
-        const newItems = [...inv.items, item];
-        const newSubtotal = newItems.reduce((sum, it) => sum + (it.unitPrice * it.quantity), 0);
-        const newDiscountTotal = newItems.reduce((sum, it) => sum + (it.discount || 0), 0);
-        const newTotal = Math.max(0, newSubtotal - newDiscountTotal);
-        const newBalance = Math.max(0, newTotal - inv.paidTotal);
-        const newStatus = newBalance === 0 ? 'paid' : (inv.paidTotal > 0 ? 'partial' : 'issued');
-        return {
-          ...inv,
-          items: newItems,
-          subtotal: newSubtotal,
-          discountTotal: newDiscountTotal,
-          total: newTotal,
-          balanceDue: newBalance,
-          status: newStatus,
-        };
-      })
-    );
-  };
-
-  const handleVoidInvoice = (invoiceId: string, reason: string) => {
-    const timeNow = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    setInvoices(prev =>
-      prev.map(inv => {
-        if (inv.id !== invoiceId) return inv;
-        return {
-          ...inv,
-          status: 'void',
-          voidedAt: timeNow,
-          notes: `${inv.notes ? inv.notes + ' | ' : ''}VOIDED: ${reason}`,
-        };
-      })
-    );
-  };
-
-  const handleCreateBooking = (newAptData: Partial<Appointment>, newPatientData?: Partial<Patient>) => {
-    let patientObj: Patient;
-
-    if (newPatientData) {
-      patientObj = newPatientData as Patient;
-      setPatients(prev => [patientObj, ...prev]);
-    } else {
-      patientObj = newAptData.patient!;
-    }
-
-    const newAppointment: Appointment = {
-      id: `apt-${Date.now()}`,
-      tokenNumber: newAptData.tokenNumber || 'DX-99',
-      patientId: patientObj.id,
-      patient: patientObj,
-      serviceId: newAptData.serviceId!,
-      service: newAptData.service!,
-      modalityId: newAptData.modalityId!,
-      modality: newAptData.modality!,
-      referrerId: newAptData.referrerId,
-      referrer: newAptData.referrer,
-      date: newAptData.date || new Date().toISOString().split('T')[0],
-      time: newAptData.time || '11:30 AM',
-      priority: newAptData.priority || 'routine',
-      workflowState: 'booked',
-      screeningRequired: newAptData.screeningRequired || false,
-      screeningCleared: newAptData.screeningCleared || false,
-      roomNumber: newAptData.roomNumber || 'Room 1',
-      notes: newAptData.notes,
-    };
-
-    setAppointments(prev => [newAppointment, ...prev]);
-
-    // Send Real-time Clinical Notification
-    if (newAppointment.priority === 'stat') {
-      handleAddNotification({
-        title: `🚨 STAT Booking Created (#${newAppointment.tokenNumber})`,
-        message: `Emergency priority study scheduled for ${patientObj.name} (${newAppointment.service.name}). Modality: ${newAppointment.modality.name}.`,
-        category: 'stat',
-        priority: 'critical',
-        appointmentId: newAppointment.id,
-        tokenNumber: newAppointment.tokenNumber,
-        patientName: patientObj.name,
-        targetTab: 'technologist',
-        actionLabel: 'Open Tech Worklist',
-      });
-    } else {
-      handleAddNotification({
-        title: `New Appointment Booked (#${newAppointment.tokenNumber})`,
-        message: `${patientObj.name} registered for ${newAppointment.service.name} at ${newAppointment.time}.`,
-        category: 'workflow',
-        priority: 'low',
-        appointmentId: newAppointment.id,
-        tokenNumber: newAppointment.tokenNumber,
-        patientName: patientObj.name,
-        targetTab: 'checkin',
-        actionLabel: 'View Reception Desk',
-      });
-    }
-
-    // Automatically generate invoice for the new booking
-    const timeNow = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    const subtotal = newAppointment.service.price;
-    const newInvoice: Invoice = {
-      id: `inv-${Date.now()}`,
-      invoiceNumber: `INV-2026-${Math.floor(10000 + Math.random() * 90000)}`,
-      patientId: newAppointment.patientId,
-      patient: newAppointment.patient,
-      appointmentId: newAppointment.id,
-      appointmentToken: newAppointment.tokenNumber,
-      subtotal,
-      discountTotal: 0,
-      taxRate: 0,
-      taxAmount: 0,
-      total: subtotal,
-      paidTotal: 0,
-      balanceDue: subtotal,
-      status: 'issued',
-      notes: 'Initial booking study invoice',
-      items: [
-        {
-          id: `item-${Date.now()}`,
-          serviceId: newAppointment.service.id,
-          description: `${newAppointment.service.name} (${newAppointment.service.code})`,
-          quantity: 1,
-          unitPrice: newAppointment.service.price,
-          discount: 0,
-          lineTotal: newAppointment.service.price,
-        },
-      ],
-      payments: [],
-      createdAt: timeNow,
-      issuedAt: timeNow,
-    };
-
-    setInvoices(prev => [newInvoice, ...prev]);
-  };
+  const role: AppRole = user.role as AppRole;
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 flex flex-col antialiased selection:bg-cyan-500 selection:text-white">
-      {/* Navigation Bar */}
+      {flash && (
+        <div
+          role="status"
+          className={`fixed top-3 left-1/2 -translate-x-1/2 z-[80] rounded-lg px-4 py-2.5 text-sm font-medium shadow-lg border ${
+            flash.kind === 'error'
+              ? 'bg-rose-50 border-rose-300 text-rose-800'
+              : 'bg-emerald-50 border-emerald-300 text-emerald-800'
+          }`}
+        >
+          {flash.message}
+        </div>
+      )}
+
       <Navbar
         activeTab={activeTab}
         setActiveTab={setActiveTab}
@@ -1064,17 +764,17 @@ export const App: React.FC = () => {
         invoices={invoices}
         inventoryItems={inventoryItems}
         role={role}
-        setRole={setRole}
         onSelectAppointment={(apt) => setSelectedAppointment(apt)}
         onOpenBookingModal={() => setBookingModalOpen(true)}
         notifications={notifications}
         onOpenNotifications={() => setNotificationCenterOpen(true)}
         staffUsers={staffUsers}
+        currentUser={user}
+        onSignOut={handleLogout}
         onExportBackup={handleExportBackup}
         onLockTerminal={() => setIsTerminalLocked(true)}
       />
 
-      {/* Main Content Area */}
       <main className="flex-1 w-full max-w-[1680px] mx-auto px-3 sm:px-4 lg:px-6 py-5">
         {activeTab === 'dashboard' && (
           <DashboardView
@@ -1120,6 +820,7 @@ export const App: React.FC = () => {
             appointments={appointments}
             templates={templates}
             selectedAppointment={currentSelectedAppointment}
+            currentUser={user}
             onSelectAppointment={(apt) => setSelectedAppointment(apt)}
             onSaveReport={handleSaveReport}
             onRejectToTech={handleRejectToTech}
@@ -1147,22 +848,13 @@ export const App: React.FC = () => {
         {activeTab === 'inventory' && (
           <InventoryView
             inventoryItems={inventoryItems}
-            setInventoryItems={setInventoryItems}
             inventoryTransactions={inventoryTransactions}
-            setInventoryTransactions={setInventoryTransactions}
             adverseReactions={adverseReactions}
-            setAdverseReactions={setAdverseReactions}
+            onCreateItem={handleCreateInventoryItem}
+            onStockMovement={handleStockMovement}
+            onCreateAdverseReaction={handleCreateAdverseReaction}
             appointments={appointments}
             role={role}
-            onNavigateToTab={(tab, appointmentId) => {
-              setActiveTab(tab as ActiveTab);
-              if (appointmentId) {
-                const apt = appointments.find(a => a.id === appointmentId);
-                if (apt) {
-                  setSelectedAppointment(apt);
-                }
-              }
-            }}
           />
         )}
 
@@ -1188,7 +880,6 @@ export const App: React.FC = () => {
             onDeleteTemplate={handleDeleteTemplate}
             onResetFactoryDefaults={handleResetFactoryDefaults}
             onExportBackup={handleExportBackup}
-            onImportBackup={handleImportBackup}
           />
         )}
 
@@ -1218,18 +909,16 @@ export const App: React.FC = () => {
             onAddDicomNode={handleAddDicomNode}
             onUpdateDicomNode={handleUpdateDicomNode}
             onDeleteDicomNode={handleDeleteDicomNode}
+            onPingDicomNode={handlePingDicomNode}
             notificationTemplates={notificationTemplates}
             onUpdateNotificationTemplate={handleUpdateNotificationTemplate}
             auditLogs={auditLogs}
-            onAddAuditLog={handleAddAuditLog}
             onResetFactoryDefaults={handleResetFactoryDefaults}
             onExportBackup={handleExportBackup}
-            onImportBackup={handleImportBackup}
           />
         )}
       </main>
 
-      {/* Modals & Overlays */}
       {screeningModalApt && (
         <ScreeningModal
           appointment={screeningModalApt}
@@ -1242,6 +931,7 @@ export const App: React.FC = () => {
       {doseModalApt && (
         <DoseCaptureModal
           appointment={doseModalApt}
+          inventoryItems={inventoryItems}
           onCompleteAcquisition={handleCompleteAcquisition}
           onClose={() => setDoseModalApt(null)}
         />
@@ -1259,7 +949,6 @@ export const App: React.FC = () => {
         />
       )}
 
-      {/* Slide-out Clinical Notification Center */}
       <NotificationCenter
         isOpen={notificationCenterOpen}
         onClose={() => setNotificationCenterOpen(false)}
@@ -1281,23 +970,20 @@ export const App: React.FC = () => {
           setSelectedAppointment(apt);
         }}
         appointments={appointments}
-        onTriggerTestAlert={handleTriggerTestAlert}
       />
 
-      {/* Security Terminal Lock Overlay */}
       <TerminalLockModal
         isOpen={isTerminalLocked}
         onUnlock={() => setIsTerminalLocked(false)}
+        userName={user.name}
         role={role}
-        setRole={setRole}
         staffUsers={staffUsers}
       />
 
-      {/* Footer */}
       <footer className="border-t border-slate-200 bg-white py-4 text-center text-xs text-slate-500">
         <div className="max-w-[1680px] mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-2">
           <span>ADC Portal © 2026 Amad Diagnostic Centre — Radiology Information System</span>
-          <span className="font-mono text-slate-600">Amad Diagnostic Centre • Islamabad</span>
+          <span className="font-mono text-slate-600">{clinicSettings.name} • {clinicSettings.city}</span>
         </div>
       </footer>
     </div>

@@ -1,67 +1,183 @@
-name: CI — Build, Test & Deliver
+name: CI — Test, Build & Deliver
 
 on:
   push:
     branches: [main]
+  pull_request:
   workflow_dispatch:
 
-# Builds and tests run HERE (GitHub Actions), never on the production VPS.
-# The built image is transferred to the VPS (file transfer only) — the VPS
-# never runs docker build / composer / npm / tests.
+# Builds and tests run HERE (GitHub Actions) — never on the hosting box.
 permissions:
   contents: read
-  packages: write
 
 jobs:
-  test:
+  api-tests:
+    name: Backend — PHP feature tests
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
+      - name: Setup PHP 8.3
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: mbstring, pdo_sqlite, sqlite3, gd, zip, intl, fileinfo, curl, openssl
+          coverage: none
+
+      - name: Install PHP dependencies
+        run: composer install --prefer-dist --no-interaction --no-progress
+
+      - name: Run API feature suite (auth, RBAC, tenant isolation, workflow, billing, inventory)
+        run: php artisan test --testsuite=Feature --stop-on-failure
+
+  spa-build:
+    name: Frontend — typecheck & production build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
       - name: Setup Node 20
         uses: actions/setup-node@v4
         with:
           node-version: '20'
           cache: 'npm'
-      - name: Install dependencies
-        run: npm install --legacy-peer-deps
-      - name: Build assets & verify bundle
+
+      - name: Install npm dependencies
+        run: npm ci --legacy-peer-deps || npm install --legacy-peer-deps
+
+      - name: Typecheck (tsc --noEmit)
+        run: npm run lint
+
+      - name: Build SPA
         run: npm run build
 
-  build:
-    needs: [test]
+      - name: Upload SPA bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: spa-dist
+          path: dist/
+          retention-days: 7
+
+  e2e:
+    name: E2E — real browser journey
     runs-on: ubuntu-latest
+    needs: [api-tests, spa-build]
     steps:
       - uses: actions/checkout@v4
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-      - name: Log in to GitHub Container Registry
-        uses: docker/login-action@v3
+
+      - name: Setup PHP 8.3
+        uses: shivammathur/setup-php@v2
         with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-      - name: Build and push image
-        uses: docker/build-push-action@v6
+          php-version: '8.3'
+          extensions: mbstring, pdo_sqlite, sqlite3, gd, zip, intl, fileinfo, curl, openssl
+          coverage: none
+
+      - name: Install PHP dependencies
+        run: composer install --prefer-dist --no-interaction --no-progress
+
+      - name: Download SPA bundle
+        uses: actions/download-artifact@v4
         with:
-          context: .
-          push: true
-          tags: |
-            ghcr.io/jerryboganda/adcportal:latest
-            ghcr.io/jerryboganda/adcportal:${{ github.sha }}
-      - name: Deliver image to VPS (transfer only — no build on VPS)
+          name: spa-dist
+          path: public/
+
+      - name: Prepare application (SQLite + seed)
         env:
-          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+          RIS_DEMO_TENANT_CODE: DEMO-2026
+          RIS_DEMO_ADMIN_EMAIL: admin@adc-e2e.test
+          RIS_DEMO_PASSWORD: E2eDemo#2026
+        run: |
+          php artisan key:generate --force
+          php artisan migrate --force
+          php artisan db:seed --force
+
+      - name: Start Laravel (serves API + SPA on one origin)
+        run: php artisan serve --host=127.0.0.1 --port=8000 &
+
+      - name: Setup Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install Playwright
+        run: |
+          npm ci --legacy-peer-deps || npm install --legacy-peer-deps
+          npx playwright install chromium --with-deps
+
+      - name: Run E2E specs
+        env:
+          E2E_BASE_URL: http://127.0.0.1:8000
+          E2E_EMAIL: admin@adc-e2e.test
+          E2E_PASSWORD: E2eDemo#2026
+        run: npx playwright test
+
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-report
+          path: playwright-report/
+
+  deploy:
+    name: Deliver to Hostinger (transfer + light commands only)
+    runs-on: ubuntu-latest
+    needs: [api-tests, spa-build, e2e]
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download SPA bundle
+        uses: actions/download-artifact@v4
+        with:
+          name: spa-dist
+          path: dist/
+
+      - name: Check deploy secrets present
+        id: secrets
+        env:
+          HOST: ${{ secrets.HOSTINGER_SSH_HOST }}
+          USER: ${{ secrets.HOSTINGER_SSH_USER }}
+          KEY: ${{ secrets.HOSTINGER_SSH_KEY }}
+        run: |
+          if [ -n "$HOST" ] && [ -n "$USER" ] && [ -n "$KEY" ]; then
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::Hostinger SSH secrets not configured — skipping deploy step."
+          fi
+
+      - name: Deploy SPA bundle + run lightweight release commands
+        if: steps.secrets.outputs.ready == 'true'
+        env:
+          HOST: ${{ secrets.HOSTINGER_SSH_HOST }}
+          USER: ${{ secrets.HOSTINGER_SSH_USER }}
+          PORT: ${{ secrets.HOSTINGER_SSH_PORT }}
+          KEY: ${{ secrets.HOSTINGER_SSH_KEY }}
+          APP_PATH: ${{ secrets.HOSTINGER_APP_PATH }}
         run: |
           mkdir -p ~/.ssh
-          printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/id_ed25519
+          printf '%s\n' "$KEY" > ~/.ssh/id_ed25519
           chmod 600 ~/.ssh/id_ed25519
-          docker pull ghcr.io/jerryboganda/adcportal:latest
-          docker save ghcr.io/jerryboganda/adcportal:latest | gzip > /tmp/adc.tar.gz
-          scp -o StrictHostKeyChecking=accept-new -o UserKnownHostsFile=/dev/null /tmp/adc.tar.gz root@185.252.233.186:/opt/docker/adc-portal/adc.tar.gz
-          ssh -o StrictHostKeyChecking=accept-new -o UserKnownHostsFile=/dev/null root@185.252.233.186 "
-            docker load < /opt/docker/adc-portal/adc.tar.gz && rm -f /opt/docker/adc-portal/adc.tar.gz
-            cd /opt/docker/adc-portal && git fetch origin main && git reset --hard origin/main
-            docker compose up -d
-            echo DELIVER_DONE
-          "
+          SSH_OPTS=(-o StrictHostKeyChecking=accept-new -o UserKnownHostsFile=/dev/null -p "${PORT:-22}")
 
+          # Upload the compiled SPA into public/ (index.html + assets/)
+          tar -C dist -czf /tmp/spa.tar.gz .
+          scp "${SSH_OPTS[@]}" /tmp/spa.tar.gz "$USER@$HOST:/tmp/adc-spa.tar.gz"
+
+          ssh "${SSH_OPTS[@]}" "$USER@$HOST" "
+            set -e
+            cd \"\${APP_PATH:-\$HOME/adcportal}\"
+
+            git pull --ff-only origin main
+
+            # Replace the SPA bundle atomically
+            rm -rf public/assets.bak
+            [ -d public/assets ] && mv public/assets public/assets.bak || true
+            tar -xzf /tmp/adc-spa.tar.gz -C public/
+            rm -f /tmp/adc-spa.tar.gz
+            [ -d public/assets.bak ] && rm -rf public/assets.bak || true
+
+            composer install --no-dev --optimize-autoloader --no-interaction
+            php artisan migrate --force
+            php artisan config:cache
+            echo DEPLOY_DONE
+          "

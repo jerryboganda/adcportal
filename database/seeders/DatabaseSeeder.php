@@ -2,27 +2,119 @@
 
 namespace Database\Seeders;
 
-// use Illuminate\Database\Console\Seeds\WithoutModelEvents;
-use Illuminate\Database\Seeder;
+use App\Models\Business;
+use App\Models\Plan;
 use App\Models\User;
-use App\Models\Role;
-use App\Models\Permission;
+use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Str;
 
+/**
+ * Platform bootstrap (SaaS):
+ *  1. plans catalog
+ *  2. platform super admin
+ *  3. demo tenant (Amad Diagnostic Centre) with full starter + demo data
+ *
+ * The legacy single-clinic seeders (UserSeeder, PermissionTableSeeder…) are
+ * superseded by TenantBootstrap, which provisions each clinic tenant.
+ */
 class DatabaseSeeder extends Seeder
 {
-    /**
-     * Seed the application's database.
-     */
     public function run(): void
     {
         $this->call(NotificationsTableSeeder::class);
         $this->call(EmailTemplates::class);
-        // Single-clinic app: Plans and PackagesName (SaaS) seeders removed.
-        $this->call(PermissionTableSeeder::class);
-        $this->call(UserSeeder::class);
-        $this->call(DefultSetting::class);
         $this->call(LanguageTableSeeder::class);
-        $this->call(RadiologySetupSeeder::class);
+        $this->call(DefultSetting::class);
+
+        $this->seedPlans();
+
+        $superAdmin = User::updateOrCreate(
+            ['email' => env('RIS_SUPER_ADMIN_EMAIL', 'platform@amaddiagnosticcentre.com.pk')],
+            [
+                'name' => 'Platform Administrator',
+                'password' => Hash::make(env('RIS_SUPER_ADMIN_PASSWORD', Str::password(24))),
+                'email_verified_at' => now(),
+                'type' => 'super_admin',
+                'active_status' => 1,
+                'business_id' => 0,
+                'created_by' => 0,
+                'department' => 'Platform Operations',
+            ]
+        );
+
+        // Demo tenant with a fully-populated clinic (only when configured).
+        $demoCode = env('RIS_DEMO_TENANT_CODE', 'DEMO-2026');
+        $demoEmail = env('RIS_DEMO_ADMIN_EMAIL', 'admin@amaddiagnosticcentre.com.pk');
+        $demoPassword = env('RIS_DEMO_PASSWORD', 'AdcDemo#2026');
+
+        $existing = Business::where('tenant_code', $demoCode)->first();
+
+        if (! $existing) {
+            $business = Business::create([
+                'name' => 'Amad Diagnostic Centre',
+                'form_type' => 'form-layout',
+                'layouts' => 'Formlayout11',
+                'theme_color' => 'color1-Formlayout11',
+                'plan_id' => Plan::where('slug', 'professional')->value('id'),
+                'subscription_status' => 'active',
+                'subscription_ends_at' => now()->addYear(),
+                'tenant_code' => $demoCode,
+                'created_by' => 0,
+            ]);
+
+            $admin = User::updateOrCreate(
+                ['email' => $demoEmail],
+                [
+                    'name' => 'Muhammad Farhan (CFO / Admin)',
+                    'password' => Hash::make($demoPassword),
+                    'email_verified_at' => now(),
+                    'type' => 'admin',
+                    'active_status' => 1,
+                    'active_business' => $business->id,
+                    'business_id' => $business->id,
+                    'created_by' => $business->id,
+                    'lang' => 'en',
+                    'department' => 'Executive Administration',
+                    'initials' => 'MF',
+                    'capabilities' => [
+                        'canSignReports' => true,
+                        'canVoidInvoices' => true,
+                        'canOverrideScreening' => true,
+                        'canEditMasters' => true,
+                        'canAccessPacs' => true,
+                    ],
+                ]
+            );
+
+            $admin->MakeRole();
+            app(TenantBootstrap::class)->run($business, $admin);
+            app(RisDemoData::class)->run($business, $admin);
+        }
+    }
+
+    private function seedPlans(): void
+    {
+        $plans = [
+            ['Starter', 'starter', 'Single-location clinic getting started with digital RIS.', 7500, 14, 6, 300],
+            ['Professional', 'professional', 'Full imaging workflow: reporting, billing, inventory and analytics.', 15000, 14, null, null],
+            ['Enterprise', 'enterprise', 'Multi-site diagnostics with PACS networking and priority support.', 35000, 30, null, null],
+        ];
+
+        foreach ($plans as [$name, $slug, $description, $price, $trial, $maxUsers, $maxStudies]) {
+            Plan::updateOrCreate(
+                ['slug' => $slug],
+                [
+                    'name' => $name,
+                    'description' => $description,
+                    'price_monthly' => $price,
+                    'currency' => 'PKR',
+                    'trial_days' => $trial,
+                    'max_users' => $maxUsers,
+                    'max_studies_per_month' => $maxStudies,
+                    'is_active' => true,
+                ]
+            );
+        }
     }
 }

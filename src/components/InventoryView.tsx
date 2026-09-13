@@ -48,11 +48,20 @@ import {
 
 interface InventoryViewProps {
   inventoryItems: InventoryItem[];
-  setInventoryItems: React.Dispatch<React.SetStateAction<InventoryItem[]>>;
+  onCreateItem: (item: Omit<InventoryItem, 'id'>) => Promise<void> | void;
   inventoryTransactions: InventoryTransaction[];
-  setInventoryTransactions: React.Dispatch<React.SetStateAction<InventoryTransaction[]>>;
+  onStockMovement: (input: {
+    itemId: string;
+    type: InventoryTransaction['type'];
+    quantity: number;
+    batchNumber?: string;
+    direction?: 'in' | 'out';
+    tokenNumber?: string;
+    patientName?: string;
+    notes?: string;
+  }) => Promise<void> | void;
   adverseReactions: AdverseReactionReport[];
-  setAdverseReactions: React.Dispatch<React.SetStateAction<AdverseReactionReport[]>>;
+  onCreateAdverseReaction: (report: Omit<AdverseReactionReport, 'id' | 'reportedAt'>) => Promise<void> | void;
   appointments: Appointment[];
   role: string;
   onNavigateToTab?: (tab: string, appointmentId?: string) => void;
@@ -62,11 +71,11 @@ type SubTab = 'contrast' | 'syringes' | 'emergency' | 'all_items' | 'movements' 
 
 export const InventoryView: React.FC<InventoryViewProps> = ({
   inventoryItems,
-  setInventoryItems,
+  onCreateItem,
   inventoryTransactions,
-  setInventoryTransactions,
+  onStockMovement,
   adverseReactions,
-  setAdverseReactions,
+  onCreateAdverseReaction,
   appointments,
   role,
   onNavigateToTab,
@@ -123,7 +132,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
   const [advSymptomsInput, setAdvSymptomsInput] = useState('Mild urticaria, transient nausea, peripheral pruritus');
   const [advTreatment, setAdvTreatment] = useState('Inj. Avil 2mL IV administered slowly + 30 min vital signs observation.');
   const [advOutcome, setAdvOutcome] = useState<AdverseOutcome>('resolved_on_site');
-  const [advSupervisor, setAdvSupervisor] = useState('Dr. Shahzad Mir, FRCR');
+  const [advSupervisor, setAdvSupervisor] = useState('');
   const [advNotes, setAdvNotes] = useState('Patient stabilized with normal blood pressure and discharged accompanied by attendant.');
 
   // High-Level KPI Computations
@@ -206,40 +215,17 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
     setIsStockInModalOpen(true);
   };
 
-  const handleConfirmStockIn = () => {
+  const handleConfirmStockIn = async () => {
     if (!selectedItemForAction || stockInQty <= 0) return;
 
-    const newBatch = {
-      batchNumber: stockInBatch.trim() || `BAT-${Date.now().toString().slice(-4)}`,
-      expiryDate: stockInExpiry,
-      quantity: stockInQty,
-      receivedDate: new Date().toISOString().split('T')[0],
-    };
-
-    setInventoryItems(prev =>
-      prev.map(item => {
-        if (item.id !== selectedItemForAction.id) return item;
-        return {
-          ...item,
-          currentStock: item.currentStock + stockInQty,
-          batches: [newBatch, ...item.batches],
-        };
-      })
-    );
-
-    const newTx: InventoryTransaction = {
-      id: `tx-${Date.now()}`,
+    await onStockMovement({
       itemId: selectedItemForAction.id,
-      itemName: selectedItemForAction.name,
       type: 'stock_in',
       quantity: stockInQty,
-      batchNumber: newBatch.batchNumber,
-      timestamp: 'Just now',
-      performedBy: role === 'admin' ? 'Naveed Akhtar (Admin)' : 'Radiology Staff',
+      batchNumber: stockInBatch.trim() || undefined,
       notes: stockInNotes || `Received stock consignment (+${stockInQty} ${selectedItemForAction.unit})`,
-    };
+    });
 
-    setInventoryTransactions(prev => [newTx, ...prev]);
     setIsStockInModalOpen(false);
     setSelectedItemForAction(null);
   };
@@ -254,49 +240,32 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
     setIsAdjustModalOpen(true);
   };
 
-  const handleConfirmAdjust = () => {
+  const handleConfirmAdjust = async () => {
     if (!selectedItemForAction || adjustQty <= 0) return;
 
     const isDeduction = ['usage_study', 'wastage', 'expired_discard'].includes(adjustType);
-    const qtyChange = isDeduction ? -adjustQty : adjustQty;
-    const finalStock = Math.max(0, selectedItemForAction.currentStock + qtyChange);
 
-    setInventoryItems(prev =>
-      prev.map(item => {
-        if (item.id !== selectedItemForAction.id) return item;
-        return {
-          ...item,
-          currentStock: finalStock,
-        };
-      })
-    );
-
-    const newTx: InventoryTransaction = {
-      id: `tx-${Date.now()}`,
+    await onStockMovement({
       itemId: selectedItemForAction.id,
-      itemName: selectedItemForAction.name,
       type: adjustType,
       quantity: adjustQty,
-      batchNumber: adjustBatch || selectedItemForAction.batches[0]?.batchNumber || 'GEN-BATCH',
-      timestamp: 'Just now',
-      performedBy: role === 'technologist' ? 'Kamran Ali (Lead Tech)' : 'Clinical Staff',
+      batchNumber: adjustBatch || selectedItemForAction.batches[0]?.batchNumber || undefined,
+      direction: isDeduction ? 'out' : 'in',
       tokenNumber: adjustPatientToken ? adjustPatientToken : undefined,
       notes: adjustNotes || `${adjustType.replace('_', ' ').toUpperCase()} recorded (${adjustQty} ${selectedItemForAction.unit})`,
-    };
+    });
 
-    setInventoryTransactions(prev => [newTx, ...prev]);
     setIsAdjustModalOpen(false);
     setSelectedItemForAction(null);
   };
 
-  const handleCreateNewSku = () => {
+  const handleCreateNewSku = async () => {
     if (!newItemName.trim() || !newItemCode.trim()) {
       alert('Please fill out the SKU Code and Item Name.');
       return;
     }
 
-    const newItem: InventoryItem = {
-      id: `inv-${Date.now()}`,
+    await onCreateItem({
       code: newItemCode.trim().toUpperCase(),
       name: newItemName.trim(),
       genericName: newItemGeneric.trim() || newItemName.trim(),
@@ -320,60 +289,40 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
         },
       ],
       notes: 'Manually created clinical inventory item.',
-    };
+    });
 
-    setInventoryItems(prev => [newItem, ...prev]);
-
-    const newTx: InventoryTransaction = {
-      id: `tx-${Date.now()}`,
-      itemId: newItem.id,
-      itemName: newItem.name,
-      type: 'stock_in',
-      quantity: newItemStock,
-      batchNumber: newItem.batches[0].batchNumber,
-      timestamp: 'Just now',
-      performedBy: 'System Administrator',
-      notes: `Initial opening inventory stock created.`,
-    };
-
-    setInventoryTransactions(prev => [newTx, ...prev]);
     setIsNewItemModalOpen(false);
     // Reset form
     setNewItemName('');
     setNewItemCode('');
   };
 
-  const handleCreateAdverseReaction = () => {
+  const handleCreateAdverseReaction = async () => {
     if (!advToken.trim() || !advPatient.trim()) {
       alert('Please enter the patient name and token number.');
       return;
     }
 
-    const report: AdverseReactionReport = {
-      id: `adv-${Date.now()}`,
+    await onCreateAdverseReaction({
       tokenNumber: advToken.trim().toUpperCase(),
       patientName: advPatient.trim(),
       modality: advModality,
       contrastAgent: advAgent,
-      batchNumber: advBatch.trim() || 'OPQ-2025-08',
-      administeredVolume: advVolume.trim() || '80 mL',
+      batchNumber: advBatch.trim(),
+      administeredVolume: advVolume.trim(),
       severity: advSeverity,
       symptoms: advSymptomsInput.split(',').map(s => s.trim()).filter(Boolean),
       treatmentGiven: advTreatment.trim(),
       outcome: advOutcome,
-      reportedBy: role === 'technologist' ? 'Kamran Ali (Lead Tech)' : 'Waqas Ahmed (CT Tech)',
-      reportedAt: 'Just now',
-      supervisingDoctor: advSupervisor.trim() || 'Dr. Shahzad Mir, FRCR',
+      supervisingDoctor: advSupervisor.trim(),
       notes: advNotes.trim(),
-    };
+    });
 
-    setAdverseReactions(prev => [report, ...prev]);
     setIsAdverseModalOpen(false);
 
     // Reset
     setAdvToken('');
     setAdvPatient('');
-    alert(`Adverse reaction report recorded successfully for ${report.patientName} (${report.tokenNumber}).`);
   };
 
   const handleExportCSV = () => {

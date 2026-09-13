@@ -210,7 +210,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       actionLabel: 'Manage Catalog',
       actionType: 'tab',
       action: () => setActiveTab('masters'),
-      metricValue: '5 Suites Configured',
+      metricValue: `${modalities.length} Modalities Configured`,
       metricSub: 'Templates & questionnaires',
       borderHover: 'hover:border-slate-400 hover:shadow-slate-500/10'
     },
@@ -344,9 +344,9 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           </div>
           <div className="mt-2 flex items-center text-[11px] text-slate-500">
             <span className="text-emerald-600 font-bold flex items-center mr-1">
-              <TrendingUp className="w-3 h-3 mr-0.5" /> 100%
+              <TrendingUp className="w-3 h-3 mr-0.5" /> {modalities.length}
             </span>
-            clinic uptime on 5 modalities
+            modalities in clinical service
           </div>
         </div>
 
@@ -385,7 +385,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 <Flame className="w-3 h-3 mr-0.5" /> {statCount} STAT urgent exams
               </span>
             ) : (
-              <span>Turnaround time under 45 mins</span>
+              <span>No STAT exams in the queue</span>
             )}
           </div>
         </div>

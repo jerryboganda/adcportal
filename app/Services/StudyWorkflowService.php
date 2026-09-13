@@ -39,6 +39,10 @@ class StudyWorkflowService
                 $appointment->cancel_reason = $payload['cancel_reason'];
             }
 
+            if (array_key_exists('reject_reason', $payload)) {
+                $appointment->reject_reason = $payload['reject_reason'];
+            }
+
             if (! empty($payload['performed_by_staff_id'])) {
                 $appointment->performed_by_staff_id = $payload['performed_by_staff_id'];
             }
@@ -56,10 +60,14 @@ class StudyWorkflowService
                 DoseLog::updateOrCreate(
                     ['appointment_id' => $appointment->id],
                     collect($payload['dose_data'])->only([
-                        'dose_value', 'dose_unit', 'contrast_agent',
-                        'contrast_volume_ml', 'technique_notes',
+                        'dose_value', 'dose_unit', 'dlp_value', 'kvp', 'mas',
+                        'slice_count', 'series_count', 'contrast_agent',
+                        'contrast_volume_ml', 'contrast_flow_rate', 'cannula_site',
+                        'saline_flush_ml', 'technique_notes', 'qc_passed',
                     ])->all() + ['recorded_by' => auth()->id()]
                 );
+
+                app(\App\Services\InventoryService::class)->deductForStudy($appointment);
             }
 
             AuditLog::record('study_state_changed', $appointment, [

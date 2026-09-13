@@ -10,6 +10,11 @@ class AuditLog extends Model
 
     protected $casts = ['changes' => 'array'];
 
+    public function user()
+    {
+        return $this->belongsTo(User::class, 'user_id');
+    }
+
     public static function record(string $action, Model $subject, ?array $changes = null): void
     {
         try {

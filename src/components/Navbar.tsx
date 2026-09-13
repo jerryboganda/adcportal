@@ -16,9 +16,10 @@ import {
   Settings,
   Flame
 } from 'lucide-react';
-import { ActiveTab, Appointment, Patient, Invoice, StaffUser, AppNotification, InventoryItem } from '../types';
+import { ActiveTab, AppRole, Appointment, Patient, Invoice, StaffUser, AppNotification, InventoryItem } from '../types';
 import { GlobalSearchBar } from './GlobalSearchBar';
 import { UserProfileMenu } from './UserProfileMenu';
+import { SessionUser } from '../services/apiService';
 
 interface NavbarProps {
   activeTab: ActiveTab;
@@ -27,11 +28,12 @@ interface NavbarProps {
   patients: Patient[];
   invoices?: Invoice[];
   inventoryItems?: InventoryItem[];
-  role: 'admin' | 'receptionist' | 'technologist' | 'radiologist' | 'patient';
-  setRole: (role: 'admin' | 'receptionist' | 'technologist' | 'radiologist' | 'patient') => void;
+  role: AppRole;
   onSelectAppointment?: (apt: Appointment) => void;
   onOpenBookingModal?: () => void;
   staffUsers?: StaffUser[];
+  currentUser: SessionUser;
+  onSignOut: () => void;
   notifications?: AppNotification[];
   onOpenNotifications?: () => void;
   onExportBackup?: () => void;
@@ -46,10 +48,11 @@ export const Navbar: React.FC<NavbarProps> = ({
   invoices = [],
   inventoryItems = [],
   role,
-  setRole,
   onSelectAppointment,
   onOpenBookingModal,
   staffUsers = [],
+  currentUser,
+  onSignOut,
   notifications = [],
   onOpenNotifications,
   onExportBackup,
@@ -161,10 +164,10 @@ export const Navbar: React.FC<NavbarProps> = ({
             {/* Comprehensive User Profile Dropdown */}
             <UserProfileMenu
               role={role}
-              setRole={setRole}
+              currentUser={currentUser}
               staffUsers={staffUsers}
-              activeTab={activeTab}
               setActiveTab={setActiveTab}
+              onSignOut={onSignOut}
               onExportBackup={onExportBackup}
               onLockTerminal={onLockTerminal}
             />

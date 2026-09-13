@@ -48,3 +48,6 @@ bun.lock
 /uploads/
 /backups/
 
+
+# Keep the example template in the repo
+!.env.example

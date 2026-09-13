@@ -202,10 +202,30 @@ if (!function_exists('getAdminAllSetting')) {
 if (!function_exists('getCompanyAllSetting')) {
     function getCompanyAllSetting($user_id = null, $business = null)
     {
-        // Single-clinic app: one settings set. Arguments kept for call-site compatibility.
-        return Cache::rememberForever('company_settings_single', function () {
-            return Setting::where('business', '!=', 0)->pluck('value', 'key')->toArray();
+        // Multi-tenant: settings are scoped to the caller's clinic, cached per tenant.
+        $businessId = $business ?: getActiveBusiness($user_id);
+
+        if ($businessId == 0) {
+            return [];
+        }
+
+        return Cache::rememberForever("company_settings_business_{$businessId}", function () use ($businessId) {
+            return Setting::where('business', $businessId)->pluck('value', 'key')->toArray();
         });
+    }
+}
+
+if (!function_exists('comapnySettingCacheForget')) {
+    function comapnySettingCacheForget($businessId = null)
+    {
+        try {
+            Cache::forget('company_settings_single'); // legacy key
+            Cache::forget('company_settings_business_'.($businessId ?: getActiveBusiness()));
+        } catch (\Exception $e) {
+            \Log::error('comapnySettingCacheForget :'.$e->getMessage());
+        }
+
+        return true;
     }
 }
 
@@ -277,21 +297,38 @@ if (!function_exists('sideMenuCacheForget')) {
 }
 
 if (!function_exists('getActiveBusiness')) {
+    /**
+     * Multi-tenant: the active tenant is the authenticated user's clinic.
+     * Console / seeding context (no auth) falls back to the first business so
+     * artisan commands keep working. Never trust a client-provided business id.
+     */
     function getActiveBusiness($user_id = null)
     {
-        // Single-clinic app: always THE clinic's id (0 until the clinic record is seeded).
-        static $businessId = null;
-        if ($businessId === null) {
-            $businessId = optional(Business::first())->id ?? 0;
+        static $cache = [];
+
+        $user = $user_id ? User::find($user_id) : Auth::user();
+
+        if ($user) {
+            $key = $user->id;
+            if (! isset($cache[$key])) {
+                $businessId = (int) ($user->business_id ?: $user->active_business ?: 0);
+                if ($businessId === 0 && $user->type === 'admin') {
+                    $businessId = (int) (Business::where('created_by', $user->id)->value('id') ?? 0);
+                }
+                $cache[$key] = $businessId;
+            }
+
+            return $cache[$key];
         }
-        return $businessId;
+
+        return (int) (Business::first()->id ?? 0);
     }
 }
 
 if (!function_exists('getBusiness')) {
     function getBusiness()
     {
-        // Single-clinic app: returns the single clinic record.
+        // Multi-tenant: the caller's own clinic record.
         static $business = null;
         if ($business === null && Auth::check()) {
             $business = Business::find(getActiveBusiness());
@@ -302,15 +339,29 @@ if (!function_exists('getBusiness')) {
 
 
 if (!function_exists('creatorId')) {
+    /**
+     * Multi-tenant: the acting user records authorship. In console/seeding
+     * context, falls back to the tenant owner (admin) of the active business.
+     */
     function creatorId()
     {
-        // Single-clinic app: everything belongs to the admin user.
-        static $adminId = null;
-        if ($adminId === null) {
-            $admin = User::where('type', 'admin')->first() ?? User::orderBy('id')->first();
-            $adminId = $admin ? $admin->id : 0;
+        if (Auth::check()) {
+            return Auth::id();
         }
-        return $adminId;
+
+        static $fallback = null;
+        if ($fallback === null) {
+            $businessId = getActiveBusiness();
+            $admin = $businessId
+                ? User::where('type', 'admin')->where(function ($q) use ($businessId) {
+                    $q->where('business_id', $businessId)->orWhere('created_by', $businessId);
+                })->first()
+                : null;
+            $admin = $admin ?? User::where('type', 'admin')->first();
+            $fallback = $admin ? $admin->id : 0;
+        }
+
+        return $fallback;
     }
 }
 

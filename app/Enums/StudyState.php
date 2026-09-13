@@ -25,7 +25,7 @@ enum StudyState: string
             self::CheckedIn => [self::Preparing, self::InProgress, self::Cancelled],
             self::Preparing => [self::InProgress, self::Cancelled],
             self::InProgress => [self::Acquired, self::Cancelled],
-            self::Acquired => [self::Reading, self::Reported],
+            self::Acquired => [self::Reading, self::Reported, self::InProgress], // InProgress = repeat/redo after rejection
             self::Reading => [self::Reported, self::Acquired], // reject back to tech
             self::Reported => [self::Delivered],
             // Addenda are handled by the reporting module, not the pipeline.

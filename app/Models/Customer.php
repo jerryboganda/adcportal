@@ -11,7 +11,8 @@ class Customer extends Model
     use HasFactory, SoftDeletes;
     protected $fillable = [
         'name','user_id','gender','dob','description','business_id','created_by',
-        'mrn','cnic','blood_group','allergies','chronic_conditions','emergency_contact'
+        'mrn','cnic','blood_group','allergies','chronic_conditions','emergency_contact',
+        'email','phone','age'
     ];
 
     protected static function booted()
