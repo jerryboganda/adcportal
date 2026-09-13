@@ -209,7 +209,9 @@ class User extends Authenticatable implements LaratrustUser,MustVerifyEmail
 
             foreach($client_role_permission as $permission_c){
                 $permission = Permission::where('name',$permission_c)->first();
-                $client_role->givePermission($permission);
+                if ($permission) {
+                    $client_role->givePermission($permission);
+                }
             }
         }
         $staff_role = Role::where('name','staff')->where('created_by',$this->id)->where('guard_name','web')->first();
@@ -224,7 +226,9 @@ class User extends Authenticatable implements LaratrustUser,MustVerifyEmail
 
             foreach($staff_role_permission as $permission_s){
                 $permission = Permission::where('name',$permission_s)->first();
-                $staff_role->givePermission($permission);
+                if ($permission) {
+                    $staff_role->givePermission($permission);
+                }
             }
         }
         $customer_role = Role::where('name','customer')->where('created_by',$this->id)->where('guard_name','web')->first();
@@ -239,7 +243,9 @@ class User extends Authenticatable implements LaratrustUser,MustVerifyEmail
 
             foreach($customer_role_permission as $permission_cu){
                 $permission = Permission::where('name',$permission_cu)->first();
-                $customer_role->givePermission($permission);
+                if ($permission) {
+                    $customer_role->givePermission($permission);
+                }
             }
         }
 
