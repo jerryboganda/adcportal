@@ -312,7 +312,7 @@ class TenantBootstrap extends Seeder
 
         foreach ($items as [$code, $name, $generic, $category, $modality, $unit, $stock, $min, $cost, $price, $supplier, $location]) {
             $item = InventoryItem::updateOrCreate(
-                ['code' => $code],
+                ['code' => $code, 'business_id' => $business->id],
                 [
                     'name' => $name,
                     'generic_name' => $generic,

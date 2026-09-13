@@ -12,7 +12,7 @@ class BillingTest extends ApiTestCase
         $svc = Service::where('code', 'US-ABD-PEL')->where('business_id', $this->businessA->id)->firstOrFail();
         $receptionist = $this->makeStaff($this->businessA, $this->adminA, 'receptionist');
 
-        return $this->actingAs($receptionist)->postJson('/api/v1/studies', [
+        $response = $this->actingAs($receptionist)->postJson('/api/v1/studies', [
             'newPatient' => ['name' => 'Billing Test Patient', 'gender' => 'female'],
             'serviceId' => $svc->id,
             'date' => now()->toDateString(),
