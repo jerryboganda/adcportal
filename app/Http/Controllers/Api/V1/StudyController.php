@@ -106,7 +106,7 @@ class StudyController extends BaseApiController
                 ->first();
 
             $appointment = Appointment::create([
-                'customer_id' => $customer->id,
+                'customer_id' => $customer->user_id,   // legacy convention: customers.user_id
                 'name' => $customer->name,
                 'email' => $customer->email,
                 'contact' => $customer->phone,

@@ -19,7 +19,7 @@ class RbacTest extends ApiTestCase
             'priority' => 'routine',
         ]);
 
-        if (! $response->isCreated()) {
+        if ($response->status() !== 201) {
             \Log::error('BOOKING-RESPONSE: '.substr($response->getContent(), 0, 2500));
         }
 

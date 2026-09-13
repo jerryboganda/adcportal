@@ -35,9 +35,7 @@ class InventoryService
         $item = InventoryItem::forClinic()
             ->when($category !== null, fn ($q) => $q->where('category', $category))
             ->get()
-            ->first(fn (InventoryItem $i) => str_contains(mb_strtolower($i->name), $agent)
-                || str_contains($agent, mb_strtolower($i->name))
-                || ($i->generic_name && str_contains($agent, mb_strtolower($i->generic_name))));
+            ->first(fn (InventoryItem $i) => $this->matchesContrast($i, $agent));
 
         if (! $item || $item->current_stock <= 0) {
             return null;
@@ -56,6 +54,34 @@ class InventoryService
                 $dose->contrast_volume_ml ?? 0
             ),
         ], performedBy: $appointment->performed_by_staff_id ?? auth()->id());
+    }
+
+    /**
+     * Fuzzy match a recorded contrast agent to a catalog SKU: any significant
+     * token of the agent string (e.g. "iohexol", "omnipaque", "350") that
+     * appears in the item's name or generic name.
+     */
+    private function matchesContrast(InventoryItem $item, string $agent): bool
+    {
+        $haystacks = array_filter([
+            mb_strtolower($item->name),
+            mb_strtolower((string) $item->generic_name),
+        ]);
+
+        $tokens = preg_split('/[^a-z0-9]+/', $agent, -1, PREG_SPLIT_NO_EMPTY) ?: [];
+
+        foreach ($tokens as $token) {
+            if (mb_strlen($token) < 4) {
+                continue;
+            }
+            foreach ($haystacks as $haystack) {
+                if ($haystack !== '' && str_contains($haystack, $token)) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
     }
 
     /**

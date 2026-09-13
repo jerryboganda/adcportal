@@ -33,7 +33,7 @@ class StudyWorkflowTest extends ApiTestCase
 
         $response = $this->actingAs($receptionist)->postJson('/api/v1/studies', $payload);
 
-        if (! $response->isCreated()) {
+        if ($response->status() !== 201) {
             \Log::error('BOOKING-RESPONSE: '.substr($response->getContent(), 0, 2500));
         }
 
@@ -162,6 +162,15 @@ class StudyWorkflowTest extends ApiTestCase
 
         $this->actingAs($tech)->postJson("/api/v1/studies/{$id}/transition", ['action' => 'checkin'])->assertOk();
         $this->actingAs($tech)->postJson("/api/v1/studies/{$id}/transition", ['action' => 'prepare'])->assertOk();
+
+        // Contrast service requires screening — clear it (all no) before acquisition.
+        $form = $this->actingAs($tech)->getJson("/api/v1/studies/{$id}/screening")->assertOk()->json('data.form');
+        $answers = collect($form['questions'])->map(fn ($q) => [
+            'questionId' => $q['id'],
+            'answerValue' => 'no',
+        ])->all();
+        $this->actingAs($tech)->postJson("/api/v1/studies/{$id}/screening", ['answers' => $answers])->assertOk();
+
         $this->actingAs($tech)->postJson("/api/v1/studies/{$id}/transition", ['action' => 'start'])->assertOk();
         $this->actingAs($tech)->postJson("/api/v1/studies/{$id}/transition", [
             'action' => 'complete',

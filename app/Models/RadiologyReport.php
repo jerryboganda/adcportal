@@ -48,7 +48,7 @@ class RadiologyReport extends Model
 
     public function releases()
     {
-        return $this->hasMany(ReportRelease::class);
+        return $this->hasMany(ReportRelease::class, 'report_id');
     }
 
     public function parentReport()
