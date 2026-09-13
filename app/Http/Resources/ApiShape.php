@@ -45,12 +45,12 @@ class ApiShape
         return (string) $value;
     }
 
-    public static function time(?$dt): ?string
+    public static function time($dt): ?string
     {
         return $dt ? Carbon::parse($dt)->format('h:i A') : null;
     }
 
-    public static function dateTime(?$dt): ?string
+    public static function dateTime($dt): ?string
     {
         return $dt ? Carbon::parse($dt)->format('d M, h:i A') : null;
     }
