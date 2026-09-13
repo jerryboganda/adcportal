@@ -45,7 +45,7 @@ jobs:
           set -o pipefail
           php artisan test --testsuite=Feature --stop-on-failure 2>&1 | tee /tmp/phpunit.log || {
             grep -a "BOOKING-RESPONSE" /tmp/phpunit.log | head -2 | sed 's/^/::error::booking /' || true
-            grep -aA 8 "FAILED " /tmp/phpunit.log | head -40 | grep -aE "FAILED |Undefined array|Expected response|at /home|→|SQLSTATE|Error:" | head -12 | sed 's/^/::error::phpunit /' || true
+            grep -aA 8 "FAILED " /tmp/phpunit.log | head -40 | grep -aE "FAILED |Undefined array|Expected response|Failed asserting|SQLSTATE|at /home|Error:" | head -12 | sed 's/^/::error::phpunit /' || true
             grep -a "BOOKING-RESPONSE" storage/logs/laravel.log 2>/dev/null | tail -1 | cut -c1-3000 | sed 's/^/::error::booking /' || true
             grep -aE "\.ERROR:" storage/logs/laravel.log 2>/dev/null | grep -av BOOKING | tail -3 | cut -c1-2000 | sed 's/^/::error::laravel /' || true
             exit 1
