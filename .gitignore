@@ -41,10 +41,19 @@ bun.lock
 /vendor/
 /public/storage/
 /storage/*.key
-/storage/app/private/
-/storage/framework/
-/storage/logs/
-/bootstrap/cache/
+/storage/app/private/*
+/storage/app/public/*
+!/storage/app/private/.gitignore
+!/storage/app/public/.gitignore
+/storage/framework/*
+!/storage/framework/cache/
+!/storage/framework/sessions/
+!/storage/framework/views/
+!/storage/framework/testing/
+/storage/logs/*
+!/storage/logs/.gitignore
+/bootstrap/cache/*
+!/bootstrap/cache/.gitignore
 /uploads/
 /backups/
 
