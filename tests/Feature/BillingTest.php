@@ -18,7 +18,13 @@ class BillingTest extends ApiTestCase
             'date' => now()->toDateString(),
             'time' => '11:00 AM',
             'priority' => 'routine',
-        ])->assertCreated()->json('data');
+        ]);
+
+        if (! $response->isCreated()) {
+            fwrite(STDERR, 'BOOKING-RESPONSE: '.substr($response->getContent(), 0, 1500));
+        }
+
+        return $response->assertCreated()->json('data');
     }
 
     public function test_payments_update_status_and_balance(): void
