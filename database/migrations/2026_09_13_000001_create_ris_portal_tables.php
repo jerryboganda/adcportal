@@ -83,7 +83,7 @@ return new class extends Migration
         // ---------------- Clinical inventory ----------------
         Schema::create('ris_inventory_items', function (Blueprint $table) {
             $table->id();
-            $table->string('code', 50)->unique();
+            $table->string('code', 50);
             $table->string('name');
             $table->string('generic_name')->nullable();
             $table->string('category', 30); // contrast_ct|contrast_mri|cannula_syringes|ppe_safety|pharmacy_emergency|general_consumable
@@ -100,6 +100,7 @@ return new class extends Migration
             $table->boolean('is_billable')->default(false);
             $table->text('notes')->nullable();
             $table->unsignedBigInteger('business_id')->default(0)->index();
+            $table->unique(['business_id', 'code']);
             $table->timestamps();
         });
 
