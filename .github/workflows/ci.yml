@@ -43,13 +43,17 @@ jobs:
       - name: Run API feature suite (auth, RBAC, tenant isolation, workflow, billing, inventory)
         run: |
           set -o pipefail
-          php artisan test --testsuite=Feature --stop-on-failure 2>&1 | tee /tmp/phpunit.log || {
-            grep -a "BOOKING-RESPONSE" /tmp/phpunit.log | head -2 | sed 's/^/::error::booking /' || true
-            grep -aA 8 "FAILED " /tmp/phpunit.log | head -40 | grep -aE "FAILED |BadMethodCall|Undefined array|Expected response|Failed asserting|SQLSTATE|at /home|Error:" | head -12 | sed 's/^/::error::phpunit /' || true
-            grep -a "BOOKING-RESPONSE" storage/logs/laravel.log 2>/dev/null | tail -1 | cut -c1-3000 | sed 's/^/::error::booking /' || true
-            grep -aE "\.ERROR:" storage/logs/laravel.log 2>/dev/null | grep -av BOOKING | tail -3 | cut -c1-2000 | sed 's/^/::error::laravel /' || true
-            exit 1
-          }
+          php artisan test --testsuite=Feature 2>&1 | tee /tmp/phpunit.log || echo "TESTS FAILED — see failure detail step"
+
+      - name: Failure detail (fresh annotation budget)
+        if: failure()
+        run: |
+          grep -aE "FAILED " /tmp/phpunit.log | head -14 | sed 's/^/::error::result /' || true
+          grep -aA 10 "FAILED " /tmp/phpunit.log | grep -aE "BadMethodCall|Undefined array|Expected response|Failed asserting|SQLSTATE|RuntimeException|Error:|▕" | head -14 | sed 's/^/::error::detail /' || true
+          grep -a "BOOKING FAILED" /tmp/phpunit.log | head -2 | cut -c1-1500 | sed 's/^/::error::booking /' || true
+          grep -a "BOOKING-RESPONSE" storage/logs/laravel.log 2>/dev/null | tail -1 | cut -c1-1500 | sed 's/^/::error::bookinglog /' || true
+          grep -aE "\.ERROR:" storage/logs/laravel.log 2>/dev/null | grep -av BOOKING | tail -4 | cut -c1-1500 | sed 's/^/::error::laravel /' || true
+          exit 1
 
   spa-build:
     name: Frontend — typecheck & production build
