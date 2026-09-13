@@ -170,6 +170,9 @@ class StaffUserController extends BaseApiController
 
         if ($role && ! $user->hasRole($roleName)) {
             $user->addRole($role);
+            if (method_exists($user, 'flushCache')) {
+                $user->flushCache();
+            }
         }
     }
 

@@ -113,6 +113,11 @@ class TenantBootstrap extends Seeder
                 $admin->addRole($adminRole);
             }
         }
+
+        // Laratrust caches roles/permissions per user — flush after every attach.
+        if (method_exists($admin, 'flushCache')) {
+            $admin->flushCache();
+        }
     }
 
     // ==================== masters ====================

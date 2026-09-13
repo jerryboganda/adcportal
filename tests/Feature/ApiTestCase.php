@@ -60,6 +60,9 @@ abstract class ApiTestCase extends TestCase
 
         $admin->MakeRole();
         app(TenantBootstrap::class)->run($business, $admin);
+        if (method_exists($admin, 'flushCache')) {
+            $admin->flushCache();
+        }
 
         // Self-diagnosing fixture: surface RBAC wiring problems with exact state.
         if (! $admin->hasRole('admin')) {
@@ -102,6 +105,9 @@ abstract class ApiTestCase extends TestCase
 
         if ($role) {
             $user->addRole($role);
+            if (method_exists($user, 'flushCache')) {
+                $user->flushCache();
+            }
             if (! $user->hasRole($roleName)) {
                 throw new \RuntimeException("addRole({$roleName}) did not attach to user {$user->id}");
             }
