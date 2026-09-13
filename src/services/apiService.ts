@@ -483,7 +483,7 @@ export async function createInventoryTransaction(input: {
   return { transaction: data.data.transaction, item: data.data.item };
 }
 
-export async function createAdverseReaction(input: Omit<AdverseReactionReport, 'id' | 'reportedAt'>): Promise<AdverseReactionReport> {
+export async function createAdverseReaction(input: Omit<AdverseReactionReport, 'id' | 'reportedAt' | 'reportedBy'>): Promise<AdverseReactionReport> {
   const { data } = await http.post('/inventory/adverse-reactions', {
     appointmentId: input.appointmentId ? Number(input.appointmentId) : undefined,
     tokenNumber: input.tokenNumber,
