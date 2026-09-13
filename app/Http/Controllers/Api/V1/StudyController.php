@@ -99,12 +99,19 @@ class StudyController extends BaseApiController
 
             $requiresScreening = $service->requires_screening || $service->contrast_type !== 'none';
 
+            $room = Room::forClinic($this->tenantId())
+                ->where('modality_id', $service->modality_id)
+                ->where('is_active', true)
+                ->orderBy('id')
+                ->first();
+
             $appointment = Appointment::create([
                 'customer_id' => $customer->id,
                 'name' => $customer->name,
                 'email' => $customer->email,
                 'contact' => $customer->phone,
                 'service_id' => $service->id,
+                'location_id' => $room?->location_id ?? 0,   // legacy NOT NULL column
                 'referrer_id' => $validated['referrerId'] ?? null,
                 'date' => $validated['date'],
                 'time' => $this->normalizeTime($validated['time']),
@@ -112,13 +119,7 @@ class StudyController extends BaseApiController
                 'workflow_state' => StudyState::Booked->value,
                 'screening_required' => $requiresScreening,
                 'screening_cleared' => false,
-                'room_number' => optional(
-                    Room::forClinic($this->tenantId())
-                        ->where('modality_id', $service->modality_id)
-                        ->where('is_active', true)
-                        ->orderBy('id')
-                        ->first()
-                )->name ?? 'Room 1',
+                'room_number' => $room?->name ?? 'Room 1',
                 'notes' => $validated['notes'] ?? null,
                 'business_id' => $this->tenantId(),
                 'created_by' => Auth::id(),
