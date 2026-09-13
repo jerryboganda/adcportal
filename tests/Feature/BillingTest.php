@@ -20,7 +20,9 @@ class BillingTest extends ApiTestCase
             'priority' => 'routine',
         ]);
 
-        \Log::error('BOOKING-RESPONSE-STATUS: '.$response->status().' BODY: '.substr($response->getContent(), 0, 2200));
+        if ($response->status() !== 201) {
+            $this->fail('BOOKING FAILED ['.$response->status().']: '.substr($response->getContent(), 0, 1600));
+        }
 
         return $response->assertCreated()->json('data');
     }
