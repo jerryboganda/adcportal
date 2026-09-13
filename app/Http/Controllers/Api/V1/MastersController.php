@@ -173,7 +173,7 @@ class MastersController extends BaseApiController
     {
         $category = \App\Models\Category::firstOrCreate(
             ['name' => 'Radiology', 'business_id' => $this->tenantId()],
-            ['type' => 'service', 'created_by' => auth()->id()]
+            ['created_by' => auth()->id()]
         );
 
         return $category->id;

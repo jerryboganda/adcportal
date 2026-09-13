@@ -20,10 +20,36 @@ export function onUnauthorized(handler: () => void): void {
   unauthorizedHandler = handler;
 }
 
+let csrfRefresh: Promise<void> | null = null;
+
+/** Fetch a fresh CSRF token cookie; concurrent callers share one request. */
+function refreshCsrf(): Promise<void> {
+  csrfRefresh = csrfRefresh ?? axios.get('/sanctum/csrf-cookie', { withCredentials: true })
+    .then(() => undefined)
+    .finally(() => {
+      csrfRefresh = null;
+    });
+
+  return csrfRefresh;
+}
+
 http.interceptors.response.use(
   response => response,
-  error => {
+  async error => {
     const status = error?.response?.status;
+
+    // Session/CSRF token went stale server-side (deploy, DB rebuild, idle
+    // expiry). Refresh the token cookie and replay the original request once.
+    if (status === 419 && error?.config && !(error.config as any).__csrfRetried) {
+      (error.config as any).__csrfRetried = true;
+      try {
+        await refreshCsrf();
+      } catch {
+        // fall through — the replay will fail with a clear error
+      }
+      return http.request(error.config);
+    }
+
     if (status === 401 && unauthorizedHandler) {
       unauthorizedHandler();
     }
@@ -53,9 +79,9 @@ http.interceptors.response.use(
 /** Laravel CSRF cookie (required before the first login POST). */
 export async function initCsrf(): Promise<void> {
   try {
-    await axios.get('/sanctum/csrf-cookie', { withCredentials: true });
+    await refreshCsrf();
   } catch {
     // Same-origin deployments behind nginx serve this directly; a failure
-    // only surfaces later as a 419 with a clear retry.
+    // only surfaces later as a 419, which the interceptor auto-heals.
   }
 }

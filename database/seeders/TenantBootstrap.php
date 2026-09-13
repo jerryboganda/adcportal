@@ -14,6 +14,7 @@ use App\Models\ScreeningQuestion;
 use App\Models\Service;
 use App\Models\Setting;
 use App\Models\User;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -28,6 +29,10 @@ class TenantBootstrap extends Seeder
 {
     public function run(Business $business, User $admin): void
     {
+        // `db:seed` runs inside Model::unguarded() (Laravel SeedCommand) — re-enable
+        // mass-assignment protection so seeders behave like the rest of the app.
+        Model::reguard();
+
         $this->seedRoles($admin);
         $this->seedMasters($business, $admin);
         $this->seedClinicProfile($business, $admin);
@@ -182,7 +187,7 @@ class TenantBootstrap extends Seeder
     {
         $category = \App\Models\Category::firstOrCreate(
             ['name' => 'Radiology', 'business_id' => $business->id],
-            ['type' => 'service', 'created_by' => $admin->id]
+            ['created_by' => $admin->id]
         );
 
         return $category->id;

@@ -69,9 +69,9 @@ class RisDemoData extends Seeder
                 'receptionist' => 'receptionist',
                 default => 'receptionist',
             };
-            $role = \App\Models\Role::where('name', $roleName)->where('guard_name', 'web')->where('created_by', $admin->id)->first();
-            if ($role && ! $user->hasRole($roleName)) {
-                $user->addRole($role);
+            $roleModel = \App\Models\Role::where('name', $roleName)->where('guard_name', 'web')->where('created_by', $admin->id)->first();
+            if ($roleModel && ! $user->hasRole($roleName)) {
+                $user->addRole($roleModel);
             }
 
             $staffUsers[$role] = $user;

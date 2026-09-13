@@ -22,23 +22,23 @@ use Illuminate\Support\Facades\Route;
 | authenticated user's clinic.
 */
 
-Route::get('/health', function () {
-    try {
-        Illuminate\Support\Facades\DB::select('select 1');
-        $db = 'ok';
-    } catch (Throwable) {
-        $db = 'down';
-    }
-
-    return response()->json([
-        'ok' => $db === 'ok',
-        'db' => $db,
-        'time' => now()->toIso8601String(),
-        'version' => 'v2-saas',
-    ]);
-});
-
 Route::prefix('v1')->group(function () {
+
+    Route::get('/health', function () {
+        try {
+            Illuminate\Support\Facades\DB::select('select 1');
+            $db = 'ok';
+        } catch (\Throwable) {
+            $db = 'down';
+        }
+
+        return response()->json([
+            'ok' => $db === 'ok',
+            'db' => $db,
+            'time' => now()->toIso8601String(),
+            'version' => 'v2-saas',
+        ]);
+    });
 
 // ---------- public ----------
 

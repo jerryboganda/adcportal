@@ -5,6 +5,7 @@ namespace Database\Seeders;
 use App\Models\Business;
 use App\Models\Plan;
 use App\Models\User;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
@@ -22,10 +23,13 @@ class DatabaseSeeder extends Seeder
 {
     public function run(): void
     {
+        // `db:seed` runs inside Model::unguarded() (Laravel SeedCommand) — restore
+        // mass-assignment protection for everything this seeder (and its children) do.
+        Model::reguard();
+
         $this->call(NotificationsTableSeeder::class);
         $this->call(EmailTemplates::class);
         $this->call(LanguageTableSeeder::class);
-        $this->call(DefultSetting::class);
 
         $this->seedPlans();
 
@@ -97,6 +101,9 @@ class DatabaseSeeder extends Seeder
             app(TenantBootstrap::class)->run($business, $admin);
             app(RisDemoData::class)->run($business, $admin);
         }
+
+        // Legacy platform settings need an admin user to exist (demo admin above).
+        $this->call(DefultSetting::class);
     }
 
     private function seedPlans(): void
