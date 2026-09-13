@@ -85,7 +85,7 @@ class BillingTest extends ApiTestCase
         $this->actingAs($billing)
             ->postJson("/api/v1/invoices/{$invoice['id']}/void", ['reason' => 'test'])
             ->assertOk()
-            ->assertJsonPath('invoice.status', 'void');
+            ->assertJsonPath('data.invoice.status', 'void');
     }
 
     public function test_invoice_numbering_is_sequential_per_tenant(): void
