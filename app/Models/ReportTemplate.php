@@ -23,7 +23,6 @@ class ReportTemplate extends Model
         return $query->where('business_id', $businessId ?? getActiveBusiness())
             ->when($creatorId !== null && $creatorId !== false, fn ($q) => $q->where('created_by', $creatorId));
     }
-    }
 
     public function serviceData()
     {

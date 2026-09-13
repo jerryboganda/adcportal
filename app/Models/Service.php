@@ -25,7 +25,6 @@ class Service extends Model
         return $query->where('business_id', $businessId ?? getActiveBusiness())
             ->when($creatorId !== null && $creatorId !== false, fn ($q) => $q->where('created_by', $creatorId));
     }
-    }
 
     /** Effective slot length in minutes (normalized column, legacy fallback). */
     public function slotMinutes(): int

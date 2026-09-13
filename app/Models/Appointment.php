@@ -18,7 +18,6 @@ class Appointment extends Model
         return $query->where('business_id', $businessId ?? getActiveBusiness())
             ->when($creatorId !== null && $creatorId !== false, fn ($q) => $q->where('created_by', $creatorId));
     }
-    }
 
     /** Eager-load map for list/dashboard rendering (kills N+1). */
     public static $eager = ['CustomerData.customer', 'StaffData.user', 'ServiceData', 'LocationData', 'StatusData'];
