@@ -27,8 +27,16 @@ jobs:
       - name: Install PHP dependencies
         run: |
           set -o pipefail
-          composer install --prefer-dist --no-interaction --no-progress 2>&1 | tee /tmp/composer.log || {
-            grep -E "Problem [0-9]|Fatal error|syntax error|ParseError|Error|Script .* handling|returned a non-zero" /tmp/composer.log | head -8 | sed 's/^/::error::composer /'
+          composer install --no-scripts --prefer-dist --no-interaction --no-progress 2>&1 | tee /tmp/composer.log || {
+            tail -n 12 /tmp/composer.log | sed 's/^/::error::composer /'
+            exit 1
+          }
+
+      - name: Bootstrap packages (package:discover)
+        run: |
+          set -o pipefail
+          php artisan package:discover --ansi 2>&1 | tee /tmp/discover.log || {
+            tail -n 15 /tmp/discover.log | sed 's/^/::error::discover /'
             exit 1
           }
 
