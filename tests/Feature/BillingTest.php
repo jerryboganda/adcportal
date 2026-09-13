@@ -21,7 +21,7 @@ class BillingTest extends ApiTestCase
         ]);
 
         if ($response->status() !== 201) {
-            $this->fail('BOOKING FAILED ['.$response->status().']: '.substr($response->getContent(), 0, 1600));
+            $this->fail('BOOKING FAILED ['.$response->status().']: '.substr(str_replace([chr(10), chr(13)], ' ', $response->getContent()), 0, 1600));
         }
 
         return $response->assertCreated()->json('data');
