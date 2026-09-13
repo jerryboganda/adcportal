@@ -97,7 +97,9 @@ class User extends Authenticatable implements LaratrustUser,MustVerifyEmail
     public function portalRole(): string
     {
         // Map the app's role names onto the React SPA role vocabulary.
-        return match ($this->getRoleNames()->first()) {
+        $primary = $this->getRoles()[0] ?? null;
+
+        return match ($primary) {
             'radiologist' => 'radiologist',
             'technician' => 'technologist',
             'receptionist' => 'receptionist',

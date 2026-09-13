@@ -21,7 +21,8 @@ class BillingTest extends ApiTestCase
         ]);
 
         if (! $response->isCreated()) {
-            fwrite(STDERR, 'BOOKING-RESPONSE: '.substr($response->getContent(), 0, 1500));
+            echo 'BOOKING-RESPONSE: '.substr($response->getContent(), 0, 2000)."
+";
         }
 
         return $response->assertCreated()->json('data');

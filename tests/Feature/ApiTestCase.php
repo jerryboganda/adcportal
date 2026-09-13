@@ -72,7 +72,7 @@ abstract class ApiTestCase extends TestCase
         }
         if (! $admin->isAbleTo('appointment create')) {
             throw new \RuntimeException('owner lacks appointment create; roles=['
-                .$admin->getRoleNames()->implode(',').'] permissions=['
+                .implode(',', $admin->getRoles()).'] permissions=['
                 .$admin->allPermissions()->pluck('name')->implode(',').']');
         }
 
