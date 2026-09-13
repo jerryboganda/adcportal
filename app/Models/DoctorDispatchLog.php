@@ -6,6 +6,8 @@ use Illuminate\Database\Eloquent\Model;
 
 class DoctorDispatchLog extends Model
 {
+    protected \$table = 'ris_doctor_dispatches';
+
     protected $fillable = [
         'appointment_id',
         'token_number',

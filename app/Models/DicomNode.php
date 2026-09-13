@@ -6,6 +6,8 @@ use Illuminate\Database\Eloquent\Model;
 
 class DicomNode extends Model
 {
+    protected \$table = 'ris_dicom_nodes';
+
     protected $fillable = [
         'node_name',
         'ae_title',

@@ -46,7 +46,8 @@ jobs:
           php artisan test --testsuite=Feature --stop-on-failure 2>&1 | tee /tmp/phpunit.log || {
             grep -a "BOOKING-RESPONSE" /tmp/phpunit.log | head -2 | sed 's/^/::error::booking /' || true
             grep -aE "→ |pivot=|Expected response status|Unable to|SQLSTATE|Undefined|TypeError|Call to" /tmp/phpunit.log | head -6 | sed 's/^/::error::phpunit /' || true
-            grep -aE "\.ERROR:" storage/logs/laravel.log 2>/dev/null | tail -3 | cut -c1-3000 | sed 's/^/::error::laravel /' || true
+            grep -a "BOOKING-RESPONSE" storage/logs/laravel.log 2>/dev/null | tail -1 | cut -c1-3000 | sed 's/^/::error::booking /' || true
+            grep -aE "\.ERROR:" storage/logs/laravel.log 2>/dev/null | grep -av BOOKING | tail -3 | cut -c1-2000 | sed 's/^/::error::laravel /' || true
             exit 1
           }
 
