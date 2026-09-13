@@ -20,9 +20,7 @@ class BillingTest extends ApiTestCase
             'priority' => 'routine',
         ]);
 
-        if (! $response->isCreated()) {
-            \Log::error('BOOKING-RESPONSE: '.substr($response->getContent(), 0, 2500));
-        }
+        \Log::error('BOOKING-RESPONSE-STATUS: '.$response->status().' BODY: '.substr($response->getContent(), 0, 2200));
 
         return $response->assertCreated()->json('data');
     }
