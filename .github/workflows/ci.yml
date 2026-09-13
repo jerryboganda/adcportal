@@ -44,7 +44,7 @@ jobs:
         run: |
           set -o pipefail
           php artisan test --testsuite=Feature --stop-on-failure 2>&1 | tee /tmp/phpunit.log || {
-            grep -aE "RuntimeException|Expected response status|Unable to|SQLSTATE|Undefined|TypeError|Call to" /tmp/phpunit.log | head -8 | sed 's/^/::error::phpunit /'
+            grep -aE "→ |pivot=|Expected response status|Unable to|SQLSTATE|Undefined|TypeError|Call to" /tmp/phpunit.log | head -8 | sed 's/^/::error::phpunit /'
             exit 1
           }
 
