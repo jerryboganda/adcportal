@@ -186,7 +186,8 @@ export const PatientPortalView: React.FC<PatientPortalViewProps> = ({
         notes: bookNotes ? `[Portal Booking]: ${bookNotes}` : '[Self-Service Online Booking]',
       });
 
-      setBookingSuccessToken(created?.tokenNumber ?? null);
+      const token = (created && typeof created === 'object' && 'tokenNumber' in created) ? created.tokenNumber : null;
+      setBookingSuccessToken(token ?? null);
       setTimeout(() => {
         setIsBookingOpen(false);
         setBookingSuccessToken(null);

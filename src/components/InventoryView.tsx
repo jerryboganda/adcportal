@@ -61,7 +61,7 @@ interface InventoryViewProps {
     notes?: string;
   }) => Promise<void> | void;
   adverseReactions: AdverseReactionReport[];
-  onCreateAdverseReaction: (report: Omit<AdverseReactionReport, 'id' | 'reportedAt'>) => Promise<void> | void;
+  onCreateAdverseReaction: (report: Omit<AdverseReactionReport, 'id' | 'reportedAt' | 'reportedBy'>) => Promise<void> | void;
   appointments: Appointment[];
   role: string;
   onNavigateToTab?: (tab: string, appointmentId?: string) => void;
@@ -304,6 +304,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
     }
 
     await onCreateAdverseReaction({
+      appointmentId: undefined,
       tokenNumber: advToken.trim().toUpperCase(),
       patientName: advPatient.trim(),
       modality: advModality,

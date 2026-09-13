@@ -628,7 +628,7 @@ export const App: React.FC = () => {
     } catch (err: any) { fail(err, 'Stock movement failed.'); }
   }, [fail]);
 
-  const handleCreateAdverseReaction = useCallback(async (reaction: Omit<AdverseReactionReport, 'id' | 'reportedAt'>) => {
+  const handleCreateAdverseReaction = useCallback(async (reaction: Omit<AdverseReactionReport, 'id' | 'reportedAt' | 'reportedBy'>) => {
     try {
       const created = await api.createAdverseReaction(reaction);
       setAdverseReactions(prev => [created, ...prev]);

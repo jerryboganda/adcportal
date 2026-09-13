@@ -266,6 +266,9 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
         modalityCode: nodeModality || undefined,
         isWorklistSCP: nodeIsWorklist,
         isStorageSCP: nodeIsStorage,
+        status: 'unreachable',
+        lastPingTime: undefined,
+        lastPingLatencyMs: undefined,
       });
     }
     setNodeModalOpen(false);
