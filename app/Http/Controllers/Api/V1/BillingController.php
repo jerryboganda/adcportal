@@ -166,7 +166,7 @@ class BillingController extends BaseApiController
                 number_format((float) $validated['amount'], 2),
                 strtoupper($validated['method']),
                 $invoice->invoice_number,
-                $validated['reference'] ? ' (ref: '.$validated['reference'].')' : '',
+                ($validated['reference'] ?? '') !== '' ? ' (ref: '.$validated['reference'].')' : '',
             ),
             'amount' => $validated['amount'],
             'method' => $validated['method'],
