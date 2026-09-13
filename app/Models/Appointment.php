@@ -137,6 +137,12 @@ class Appointment extends Model
         return $this->belongsTo(Referrer::class, 'referrer_id', 'id');
     }
 
+    /** Snake-friendly alias used by the API eager-load map. */
+    public function referrer()
+    {
+        return $this->belongsTo(Referrer::class, 'referrer_id', 'id');
+    }
+
     public function StatusData()
     {
         return $this->hasOne(CustomStatus::class, 'id', 'appointment_status');
