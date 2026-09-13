@@ -51,18 +51,7 @@ class DatabaseSeeder extends Seeder
         $existing = Business::where('tenant_code', $demoCode)->first();
 
         if (! $existing) {
-            $business = Business::create([
-                'name' => 'Amad Diagnostic Centre',
-                'form_type' => 'form-layout',
-                'layouts' => 'Formlayout11',
-                'theme_color' => 'color1-Formlayout11',
-                'plan_id' => Plan::where('slug', 'professional')->value('id'),
-                'subscription_status' => 'active',
-                'subscription_ends_at' => now()->addYear(),
-                'tenant_code' => $demoCode,
-                'created_by' => 0,
-            ]);
-
+            // Owner first - businesses.created_by references users.
             $admin = User::updateOrCreate(
                 ['email' => $demoEmail],
                 [
@@ -71,9 +60,6 @@ class DatabaseSeeder extends Seeder
                     'email_verified_at' => now(),
                     'type' => 'admin',
                     'active_status' => 1,
-                    'active_business' => $business->id,
-                    'business_id' => $business->id,
-                    'created_by' => $business->id,
                     'lang' => 'en',
                     'department' => 'Executive Administration',
                     'initials' => 'MF',
@@ -86,6 +72,26 @@ class DatabaseSeeder extends Seeder
                     ],
                 ]
             );
+
+            $business = Business::firstOrCreate(
+                ['tenant_code' => $demoCode],
+                [
+                    'name' => 'Amad Diagnostic Centre',
+                    'form_type' => 'form-layout',
+                    'layouts' => 'Formlayout11',
+                    'theme_color' => 'color1-Formlayout11',
+                    'plan_id' => Plan::where('slug', 'professional')->value('id'),
+                    'subscription_status' => 'active',
+                    'subscription_ends_at' => now()->addYear(),
+                    'created_by' => $admin->id,
+                ]
+            );
+
+            $admin->forceFill([
+                'active_business' => $business->id,
+                'business_id' => $business->id,
+                'created_by' => $business->id,
+            ])->save();
 
             $admin->MakeRole();
             app(TenantBootstrap::class)->run($business, $admin);

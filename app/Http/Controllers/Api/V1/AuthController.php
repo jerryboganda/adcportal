@@ -93,18 +93,7 @@ class AuthController extends BaseApiController
             $plan = Plan::where('slug', $validated['plan'] ?? 'starter')->where('is_active', true)->first()
                 ?? Plan::where('is_active', true)->orderBy('price_monthly')->first();
 
-            $business = Business::create([
-                'name' => $validated['clinic_name'],
-                'form_type' => 'form-layout',
-                'layouts' => 'Formlayout11',
-                'theme_color' => 'color1-Formlayout11',
-                'plan_id' => $plan?->id,
-                'subscription_status' => 'trialing',
-                'trial_ends_at' => now()->addDays($plan?->trial_days ?? 14),
-                'tenant_code' => strtoupper(Str::random(3)).'-'.random_int(1000, 9999),
-                'created_by' => 0,
-            ]);
-
+            // The owner must exist first: businesses.created_by has an FK to users.
             $admin = User::create([
                 'name' => $validated['name'],
                 'email' => $validated['email'],
@@ -113,9 +102,6 @@ class AuthController extends BaseApiController
                 'email_verified_at' => now(),
                 'type' => 'admin',
                 'active_status' => 1,
-                'active_business' => $business->id,
-                'business_id' => $business->id,
-                'created_by' => $business->id,
                 'lang' => 'en',
                 'initials' => mb_strtoupper(mb_substr($validated['name'], 0, 1)),
                 'department' => 'Administration',
@@ -127,6 +113,24 @@ class AuthController extends BaseApiController
                     'canAccessPacs' => true,
                 ],
             ]);
+
+            $business = Business::create([
+                'name' => $validated['clinic_name'],
+                'form_type' => 'form-layout',
+                'layouts' => 'Formlayout11',
+                'theme_color' => 'color1-Formlayout11',
+                'plan_id' => $plan?->id,
+                'subscription_status' => 'trialing',
+                'trial_ends_at' => now()->addDays($plan?->trial_days ?? 14),
+                'tenant_code' => strtoupper(Str::random(3)).'-'.random_int(1000, 9999),
+                'created_by' => $admin->id,
+            ]);
+
+            $admin->forceFill([
+                'active_business' => $business->id,
+                'business_id' => $business->id,
+                'created_by' => $business->id,
+            ])->save();
 
             // Tenant-scoped role + permission wiring (laratrust, per-clinic).
             $admin->MakeRole();
