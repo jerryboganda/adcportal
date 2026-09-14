@@ -296,6 +296,18 @@ if (!function_exists('sideMenuCacheForget')) {
     }
 }
 
+if (!function_exists('flush_active_business_cache')) {
+    /**
+     * Reset the per-process active-business memoization. HTTP requests start
+     * with fresh process state naturally; tests and long-running workers
+     * must call this when identity or tenant context changes.
+     */
+    function flush_active_business_cache(): void
+    {
+        \App\Support\RuntimeContext::reset();
+    }
+}
+
 if (!function_exists('getActiveBusiness')) {
     /**
      * Multi-tenant: the active tenant is the authenticated user's clinic.
@@ -307,13 +319,11 @@ if (!function_exists('getActiveBusiness')) {
      */
     function getActiveBusiness($user_id = null)
     {
-        static $cache = [];
-
         $user = $user_id ? User::find($user_id) : Auth::user();
 
         if ($user) {
             $key = $user->id.'|'.($user_id ? 'b' : 'r');
-            if (! isset($cache[$key])) {
+            if (! isset(\App\Support\RuntimeContext::$activeBusiness[$key])) {
                 if ($user->isPlatformAdmin()) {
                     $businessId = (int) (app()->bound('session') ? session('support_context') : 0);
                 } else {
@@ -322,10 +332,10 @@ if (!function_exists('getActiveBusiness')) {
                         $businessId = (int) (Business::where('created_by', $user->id)->value('id') ?? 0);
                     }
                 }
-                $cache[$key] = $businessId;
+                \App\Support\RuntimeContext::$activeBusiness[$key] = $businessId;
             }
 
-            return $cache[$key];
+            return \App\Support\RuntimeContext::$activeBusiness[$key];
         }
 
         return (int) (Business::first()->id ?? 0);

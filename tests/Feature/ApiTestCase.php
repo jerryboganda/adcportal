@@ -25,6 +25,11 @@ abstract class ApiTestCase extends TestCase
     {
         parent::setUp();
 
+        // Tests reuse one PHP process: drop all per-request runtime
+        // memoization so nothing leaks between RefreshDatabase rebuilds.
+        \App\Services\TenantAuthorizer::flushAll();
+        flush_active_business_cache();
+
         [$this->businessA, $this->adminA] = $this->makeTenant('Alpha Diagnostic Centre');
         [$this->businessB, $this->adminB] = $this->makeTenant('Beta Imaging Centre');
     }
@@ -57,6 +62,15 @@ abstract class ApiTestCase extends TestCase
             'active_business' => $business->id,
             'created_by' => $business->id,
         ])->save();
+
+        // Mirror production (register/provision): the owner holds a membership.
+        \App\Models\TenantMembership::create([
+            'user_id' => $admin->id,
+            'business_id' => $business->id,
+            'role' => 'admin',
+            'is_default' => true,
+            'status' => 'active',
+        ]);
 
         $admin->MakeRole();
         app(TenantBootstrap::class)->run($business, $admin);
@@ -116,6 +130,16 @@ abstract class ApiTestCase extends TestCase
         } else {
             throw new \RuntimeException("role {$roleName} (created_by={$owner->id}) not found");
         }
+
+        // Mirror production: StaffUserController::store always records the
+        // tenant membership alongside the account.
+        \App\Models\TenantMembership::create([
+            'user_id' => $user->id,
+            'business_id' => $business->id,
+            'role' => $portalRole,
+            'is_default' => false,
+            'status' => 'active',
+        ]);
 
         return $user;
     }

@@ -11,14 +11,20 @@ use Illuminate\Database\Eloquent\Model;
  */
 class UsageCounter extends Model
 {
+    public const CREATED_AT = null;
+
     public const UPDATED_AT = null;
 
     protected $fillable = ['business_id', 'metric', 'period', 'value', 'updated_at'];
 
     protected $casts = ['updated_at' => 'datetime'];
 
-    /** Idempotent-ish atomic increment: exactly one row per (tenant, metric, period). */
-    public static function increment(int $businessId, string $metric, int $by = 1, ?string $period = null): void
+    /** Atomic increment: exactly one row per (tenant, metric, period).
+     *
+     * Named `add` — `increment` collides with Eloquent's non-static
+     * Model::increment() and fatals the class at load time.
+     */
+    public static function add(int $businessId, string $metric, int $by = 1, ?string $period = null): void
     {
         try {
             $period ??= now()->format('Y-m');

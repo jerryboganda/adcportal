@@ -116,9 +116,9 @@ class TenantLifecycleTest extends ApiTestCase
         $this->assertNotNull($tenant->data_retention_until);
         $this->assertTrue($tenant->data_retention_until->isFuture());
 
-        // Interactive logins revoked for tenant users.
-        $this->assertFalse($staff->fresh()->is_enable_login);
-        $this->assertFalse($this->adminA->fresh()->is_enable_login);
+        // Interactive logins revoked for tenant users (SQLite returns 0/1 ints).
+        $this->assertSame(0, (int) $staff->fresh()->is_enable_login);
+        $this->assertSame(0, (int) $this->adminA->fresh()->is_enable_login);
 
         // Retention export captured.
         $exports = Storage::disk('local')->files('tenant-exports');
@@ -189,20 +189,30 @@ class TenantLifecycleTest extends ApiTestCase
 
     public function test_provisioning_via_lifecycle_service_is_transactional_on_failure(): void
     {
-        // Duplicate admin email forces the transaction to roll back mid-provision.
-        $this->makeTenant('Rollback Probe');
-        $existing = User::where('type', 'admin')->first();
-
-        $this->expectException(\Illuminate\Database\UniqueConstraintViolationException::class);
+        // Inject a deterministic mid-provision failure (users.email has no
+        // DB-level unique index, so a duplicate email alone won't throw).
+        User::creating(function ($user) {
+            if ($user->email === 'boom.mid-provision@test.local') {
+                throw new \RuntimeException('simulated provision failure');
+            }
+        });
 
         try {
             app(TenantLifecycleService::class)->provision('Should Roll Back', [
-                'name' => 'Dup Owner',
-                'email' => $existing->email,
+                'name' => 'Doomed Owner',
+                'email' => 'boom.mid-provision@test.local',
                 'password' => 'Secret#12345',
             ]);
+            $this->fail('Provisioning should have thrown.');
+        } catch (\RuntimeException $e) {
+            $this->assertSame('simulated provision failure', $e->getMessage());
         } finally {
-            $this->assertDatabaseMissing('businesses', ['name' => 'Should Roll Back']);
+            User::flushEventListeners();
         }
+
+        // The transaction rolled back: no tenant, no membership, no owner.
+        $this->assertDatabaseMissing('businesses', ['name' => 'Should Roll Back']);
+        $this->assertDatabaseMissing('users', ['email' => 'boom.mid-provision@test.local']);
+        $this->assertDatabaseMissing('tenant_lifecycle_events', ['event' => 'tenant_created']);
     }
 }

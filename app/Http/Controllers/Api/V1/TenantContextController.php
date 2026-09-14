@@ -66,10 +66,10 @@ class TenantContextController extends BaseApiController
             'active_business' => $membership->business_id,
         ])->save();
 
-        TenantAuthorizer::flushUser($user->id);
-        if (method_exists($user, 'flushCache')) {
-            $user->flushCache();
-        }
+        // Drop per-process memoization so every later request/worker job in
+        // this process resolves the NEW tenant context from the database.
+        TenantAuthorizer::flushAll();
+        flush_active_business_cache();
 
         AuditLog::record('tenant_switched', $user, [
             'summary' => "Switched active clinic context to business #{$membership->business_id}.",
@@ -88,6 +88,9 @@ class TenantContextController extends BaseApiController
 
         SupportSessionService::enter($user, (int) $validated['businessId']);
 
+        TenantAuthorizer::flushAll();
+        flush_active_business_cache();
+
         return $this->ok(['user' => ApiShape::currentUser($user->fresh())]);
     }
 
@@ -98,6 +101,9 @@ class TenantContextController extends BaseApiController
         abort_unless($user->isPlatformAdmin(), 403, 'Support sessions are restricted to platform staff.');
 
         SupportSessionService::leaveContext();
+
+        TenantAuthorizer::flushAll();
+        flush_active_business_cache();
 
         return $this->ok(['user' => ApiShape::currentUser($user->fresh())]);
     }

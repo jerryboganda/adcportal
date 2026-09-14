@@ -73,6 +73,17 @@ class TenantAuthorizer
         }
     }
 
+    /**
+     * Drop ALL memoized decisions. The cache is per-request by lifecycle
+     * (every HTTP request starts with fresh process state), but tests and
+     * long-running workers reuse the process — they must call this when the
+     * database identity/context changes (ApiTestCase::setUp, tenant switch).
+     */
+    public static function flushAll(): void
+    {
+        self::$cache = [];
+    }
+
     /** Union of permissions from a user's tenant roles — or ALL tenant roles for support. */
     private static function tenantPermissions(int $businessId, ?int $userId): array
     {

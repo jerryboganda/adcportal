@@ -70,7 +70,7 @@ class ReportController extends BaseApiController
                 $this->signReport($report, $validated['signAs'] ?? 'final');
             }
 
-            UsageCounter::increment($this->tenantId(), 'reports');
+            UsageCounter::add($this->tenantId(), 'reports');
 
             return $report;
         });

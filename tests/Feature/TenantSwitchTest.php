@@ -94,6 +94,10 @@ class TenantSwitchTest extends ApiTestCase
 
         $this->actingAs($user)->postJson('/api/v1/tenant/switch', ['businessId' => $this->businessB->id])->assertOk();
 
+        // Real requests re-resolve the user from the session (fresh model);
+        // mirror that in the test before the next request.
+        $user = $user->fresh();
+
         // After switching, the session is inside B: zero A data anywhere.
         $bootstrap = $this->actingAs($user)->getJson('/api/v1/bootstrap')->assertOk()->decodeResponseJson();
         foreach ($bootstrap->json('data.studies') as $study) {
@@ -120,7 +124,7 @@ class TenantSwitchTest extends ApiTestCase
         $this->actingAs($user)->postJson('/api/v1/tenant/switch', ['businessId' => $this->businessB->id])->assertOk();
 
         // A-specific IDs must 404 from the B context (no existence leak).
-        $this->actingAs($user)->putJson("/api/v1/studies/{$studyId}", ['priority' => 'stat'])->assertStatus(404);
+        $this->actingAs($user->fresh())->putJson("/api/v1/studies/{$studyId}", ['priority' => 'stat'])->assertStatus(404);
     }
 
     public function test_privileges_do_not_travel_across_tenants(): void
@@ -129,11 +133,23 @@ class TenantSwitchTest extends ApiTestCase
         // must NOT hold radiologist powers that belong to tenant A only.
         [$user] = $this->multiTenantRadiologist();
 
+        // A study owned by tenant B (the destination tenant) so the request
+        // passes model binding and reaches the PERMISSION layer.
+        $this->actingAs($this->adminB)->postJson('/api/v1/studies', [
+            'newPatient' => ['name' => 'B Owned Patient'],
+            'serviceId' => $this->businessB->services()->first()->id,
+            'date' => now()->toDateString(),
+            'time' => '09:45 AM',
+            'priority' => 'routine',
+        ])->assertStatus(201);
+        $bStudyId = \App\Models\Appointment::where('business_id', $this->businessB->id)->latest('id')->value('id');
+
         $this->actingAs($user)->postJson('/api/v1/tenant/switch', ['businessId' => $this->businessB->id])->assertOk();
 
         // 'report create' is a radiologist permission — in B the user is a
-        // receptionist, so signing off a report must be refused.
-        $this->actingAs($user)->postJson("/api/v1/studies/1/reports", [
+        // receptionist, so authoring a report must be refused EVEN though the
+        // study itself is inside the user's active tenant.
+        $this->actingAs($user->fresh())->postJson("/api/v1/studies/{$bStudyId}/reports", [
             'findings' => 'x', 'impression' => 'y',
         ])->assertStatus(403);
     }
@@ -147,7 +163,7 @@ class TenantSwitchTest extends ApiTestCase
 
         $this->actingAs($user)->getJson('/api/v1/memberships')->assertOk();
         $this->actingAs($user)->postJson('/api/v1/tenant/switch', ['businessId' => $this->businessB->id])->assertOk();
-        $this->actingAs($user)->getJson('/api/v1/bootstrap')->assertOk();
+        $this->actingAs($user->fresh())->getJson('/api/v1/bootstrap')->assertOk();
     }
 
     public function test_platform_staff_cannot_use_tenant_switching(): void

@@ -151,8 +151,12 @@ class PlatformTenantController extends PlatformController
             'phone' => (string) ($l->phone ?? ''),
         ])->all();
 
+        // PHI boundary: the platform sees control-plane events only — the
+        // tenant's clinical audit trail (which contains patient context)
+        // stays inside the tenant plane.
         $audit = AuditLog::query()
             ->where('business_id', $tenant->id)
+            ->whereIn('action', \App\Models\AuditLog::PLATFORM_ACTIONS)
             ->with('user:id,name')
             ->orderByDesc('id')->limit(30)->get()
             ->map(fn ($l) => ApiShape::platformAuditEntry($l))->all();
@@ -269,12 +273,14 @@ class PlatformTenantController extends PlatformController
         ]);
     }
 
-    public function audit(Business $tenant): JsonResponse
+    public function tenantAudit(Business $tenant): JsonResponse
     {
         $this->denyUnlessCapability('audit.view');
 
+        // PHI boundary: platform audit view = control-plane events only.
         $logs = AuditLog::query()
             ->where('business_id', $tenant->id)
+            ->whereIn('action', \App\Models\AuditLog::PLATFORM_ACTIONS)
             ->with('user:id,name')
             ->orderByDesc('id')->limit(200)->get();
 

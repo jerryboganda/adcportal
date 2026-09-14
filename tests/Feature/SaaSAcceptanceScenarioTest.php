@@ -93,12 +93,20 @@ class SaaSAcceptanceScenarioTest extends ApiTestCase
             ->getJson('/api/v1/platform/tenants/'.$this->businessB->id)
             ->assertOk()
             ->decodeResponseJson();
-        $this->assertStringNotContainsString('Beta Private Patient', $tenant360->json(), 'Tenant 360 must use operational metadata, not patient records.');
+        $this->assertStringNotContainsString('Beta Private Patient', json_encode($tenant360->json()), 'Tenant 360 must use operational metadata, not patient records.');
 
         // ============ 5. Cross-tenant attacks: Alpha → Beta ============
         // 5a. Direct resource ID manipulation.
         $this->actingAs($alphaOwner)->putJson("/api/v1/studies/{$betaStudy->id}", ['priority' => 'stat'])->assertStatus(404);
-        $this->actingAs($alphaRadiologist)->putJson("/api/v1/studies/{$betaStudy->id}", ['priority' => 'stat'])->assertStatus(404);
+
+        // A radiologist lacks 'appointment edit' entirely, so the permission
+        // layer refuses with 403 before ownership — equally existence-safe
+        // (identical response for nonexistent and foreign studies).
+        $radiologistStatus = $this->actingAs($alphaRadiologist)
+            ->putJson("/api/v1/studies/{$betaStudy->id}", ['priority' => 'stat'])
+            ->getStatusCode();
+        $this->assertContains($radiologistStatus, [403, 404]);
+
         $this->actingAs($alphaOwner)->postJson("/api/v1/studies/{$betaStudy->id}/reports", [
             'findings' => 'intrusion', 'impression' => 'intrusion',
         ])->assertStatus(404);
@@ -178,14 +186,19 @@ class SaaSAcceptanceScenarioTest extends ApiTestCase
             ->assertOk();
 
         // ============ 9. Break-glass support session, audited ============
-        $this->actingAs($this->superAdmin)->postJson('/api/v1/platform/support-sessions', [
+        $opened = $this->actingAs($this->superAdmin)->postJson('/api/v1/platform/support-sessions', [
             'businessId' => $this->businessB->id,
             'reason' => 'Acceptance: verifying controlled support access',
-        ])->assertStatus(201);
+        ])->assertStatus(201)->decodeResponseJson();
+        $supportSessionId = $opened->json('data.session.id');
 
         $this->actingAs($this->superAdmin)->postJson('/api/v1/tenant/enter', ['businessId' => $this->businessB->id])->assertOk();
         $this->actingAs($this->superAdmin)->getJson('/api/v1/bootstrap')->assertOk(); // operational access inside Beta
         $this->actingAs($this->superAdmin)->postJson('/api/v1/tenant/leave')->assertOk();
+
+        // Closing the grant entirely is a separate, audited edge.
+        $this->actingAs($this->superAdmin)->postJson("/api/v1/platform/support-sessions/{$supportSessionId}/end", ['note' => 'Acceptance complete.'])
+            ->assertOk();
 
         $this->assertDatabaseHas('audit_logs', ['business_id' => $this->businessB->id, 'action' => 'support_session_started']);
         $this->assertDatabaseHas('audit_logs', ['business_id' => $this->businessB->id, 'action' => 'support_session_ended']);
@@ -216,6 +229,15 @@ class SaaSAcceptanceScenarioTest extends ApiTestCase
         // Membership registry exists for the tenant's users (control-plane record).
         $this->assertTrue(TenantMembership::where('business_id', $this->businessA->id)->exists());
         $this->assertTrue(SupportSession::count() === 0); // no standing grants
-        $this->assertTrue(AuditLog::count() > 0);
+
+        // One write action ⇒ one audited, tenant-attributed record.
+        $this->actingAs($this->adminA)->postJson('/api/v1/studies', [
+            'newPatient' => ['name' => 'Audit Probe Patient'],
+            'serviceId' => $this->businessA->services()->first()->id,
+            'date' => now()->toDateString(),
+            'time' => '01:00 PM',
+            'priority' => 'routine',
+        ])->assertStatus(201);
+        $this->assertTrue(AuditLog::where('business_id', $this->businessA->id)->count() > 0);
     }
 }

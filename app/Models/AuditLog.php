@@ -6,6 +6,16 @@ use Illuminate\Database\Eloquent\Model;
 
 class AuditLog extends Model
 {
+    /** Control-plane-relevant actions — the ONLY audit entries exposed to platform staff. */
+    public const PLATFORM_ACTIONS = [
+        'tenant_created', 'tenant_provisioned', 'tenant_imported', 'tenant_activated', 'tenant_suspended',
+        'tenant_reactivated', 'tenant_offboarding_started', 'tenant_terminated', 'tenant_data_destroyed',
+        'subscription_updated', 'subscription_expired', 'tenant_features_updated', 'tenant_data_exported',
+        'tenant_updated', 'tenant_registered', 'provisioning_retried',
+        'support_session_started', 'support_session_ended',
+        'plan_created', 'plan_updated', 'platform_user_created', 'platform_user_updated',
+    ];
+
     protected $fillable = ['user_id', 'business_id', 'action', 'subject_type', 'subject_id', 'changes', 'ip'];
 
     protected $casts = ['changes' => 'array'];

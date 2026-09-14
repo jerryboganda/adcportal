@@ -17,20 +17,23 @@ class Customer extends Model
 
     protected static function booted()
     {
-        static::creating(function (Customer $customer) {
-            if (empty($customer->mrn)) {
-                $customer->mrn = static::nextMrn();
+        static::creating(function (Customer $patient) {
+            if (empty($patient->mrn)) {
+                $patient->mrn = static::nextMrn((int) $patient->business_id);
             }
         });
     }
 
-    /** MRN-{seq} — collision-safe via retry loop. */
-    public static function nextMrn(): string
+    /**
+     * MRN-{random} — collision-safe via retry loop WITHIN the tenant: MRNs
+     * are clinically unique per tenant, never across tenants (a shared
+     * global namespace would imply cross-tenant patient matching).
+     */
+    public static function nextMrn(int $businessId): string
     {
         do {
-            $max = (int) static::withTrashed()->max('id') + 1;
             $candidate = 'MRN-'.str_pad((string) random_int(1, 999999), 6, '0', STR_PAD_LEFT);
-        } while (static::withTrashed()->where('mrn', $candidate)->exists());
+        } while (static::withTrashed()->where('business_id', $businessId)->where('mrn', $candidate)->exists());
 
         return $candidate;
     }

@@ -158,7 +158,7 @@ Route::middleware(['auth', 'platform'])->prefix('platform')->group(function () {
     Route::patch('/tenants/{tenant}', [PlatformTenantController::class, 'updateSubscription'])->whereNumber('tenant');
     Route::put('/tenants/{tenant}/features', [PlatformTenantController::class, 'updateFeatures'])->whereNumber('tenant');
     Route::get('/tenants/{tenant}/usage', [PlatformTenantController::class, 'usage'])->whereNumber('tenant');
-    Route::get('/tenants/{tenant}/audit', [PlatformTenantController::class, 'audit'])->whereNumber('tenant');
+    Route::get('/tenants/{tenant}/audit', [PlatformTenantController::class, 'tenantAudit'])->whereNumber('tenant');
     Route::get('/tenants/{tenant}/export', [PlatformTenantController::class, 'export'])->whereNumber('tenant');
     Route::post('/tenants/{tenant}/activate', [PlatformTenantController::class, 'activate'])->whereNumber('tenant');
     Route::post('/tenants/{tenant}/suspend', [PlatformTenantController::class, 'suspend'])->whereNumber('tenant');

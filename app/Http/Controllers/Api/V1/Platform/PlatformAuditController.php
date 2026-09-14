@@ -19,19 +19,10 @@ class PlatformAuditController extends PlatformController
     {
         $this->denyUnlessCapability('audit.view');
 
-        $platformActions = [
-            'tenant_created', 'tenant_provisioned', 'tenant_activated', 'tenant_suspended',
-            'tenant_reactivated', 'tenant_offboarding_started', 'tenant_terminated',
-            'subscription_updated', 'tenant_features_updated', 'tenant_data_exported',
-            'support_session_started', 'support_session_ended',
-            'plan_created', 'plan_updated', 'platform_user_created', 'platform_user_updated',
-            'tenant_updated', 'tenant_registered', 'subscription_expired',
-        ];
-
         $query = AuditLog::query()
             ->with('user:id,name')
-            ->where(function ($q) use ($platformActions) {
-                $q->whereIn('action', $platformActions)
+            ->where(function ($q) {
+                $q->whereIn('action', \App\Models\AuditLog::PLATFORM_ACTIONS)
                     ->orWhereIn('user_id', User::query()->whereIn('type', ['super_admin', 'platform_admin'])->select('id'));
             });
 

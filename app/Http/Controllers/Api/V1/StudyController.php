@@ -136,7 +136,7 @@ class StudyController extends BaseApiController
             $appointment->forceFill(['token_number' => $this->nextToken($service->modality?->code ?? 'ST', $validated['date'])])->save();
 
             // Usage metering rides inside the same transaction as the study.
-            UsageCounter::increment($this->tenantId(), 'studies');
+            UsageCounter::add($this->tenantId(), 'studies');
 
             return [$appointment, $this->issueBookingInvoice($appointment, $service)];
         });

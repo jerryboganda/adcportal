@@ -29,7 +29,7 @@ class EntitlementAndUsageTest extends ApiTestCase
         ]);
     }
 
-    private function bookStudy(): \Illuminate\Http\TestResponse
+    private function bookStudy()
     {
         $service = $this->businessA->services()->first();
 
@@ -135,6 +135,11 @@ class EntitlementAndUsageTest extends ApiTestCase
 
     public function test_public_plan_catalog_is_available_without_auth(): void
     {
+        Plan::create([
+            'name' => 'Public Plan', 'slug' => 'public-plan-'.uniqid(), 'price_monthly' => 1234,
+            'currency' => 'PKR', 'trial_days' => 3, 'is_active' => true,
+        ]);
+
         $this->getJson('/api/v1/plans')
             ->assertOk()
             ->assertJsonStructure(['data' => ['plans' => [['id', 'name', 'priceMonthly']]]]);

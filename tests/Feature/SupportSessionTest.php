@@ -127,13 +127,19 @@ class SupportSessionTest extends ApiTestCase
     {
         $support = $this->supportUser();
 
-        $this->actingAs($support)->postJson('/api/v1/platform/support-sessions', [
+        $created = $this->actingAs($support)->postJson('/api/v1/platform/support-sessions', [
             'businessId' => $this->businessA->id,
             'reason' => 'Ticket 99 — audit trail verification',
-        ])->assertStatus(201);
+        ])->assertStatus(201)->decodeResponseJson();
+        $sessionId = $created->json('data.session.id');
 
         $this->actingAs($support)->postJson('/api/v1/tenant/enter', ['businessId' => $this->businessA->id])->assertOk();
         $this->actingAs($support)->postJson('/api/v1/tenant/leave')->assertOk();
+
+        // Leaving the context drops tenant access; closing the session ends
+        // the grant entirely — and both edges are audited.
+        $this->actingAs($support)->postJson("/api/v1/platform/support-sessions/{$sessionId}/end", ['note' => 'Resolved.'])
+            ->assertOk();
 
         $this->assertDatabaseHas('audit_logs', ['business_id' => $this->businessA->id, 'action' => 'support_session_started']);
         $this->assertDatabaseHas('audit_logs', ['business_id' => $this->businessA->id, 'action' => 'support_session_ended']);

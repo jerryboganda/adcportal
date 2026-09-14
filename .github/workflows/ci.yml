@@ -43,7 +43,9 @@ jobs:
       - name: Run API feature suite (auth, RBAC, tenant isolation, workflow, billing, inventory)
         run: |
           set -o pipefail
-          php artisan test --testsuite=Feature 2>&1 | tee /tmp/phpunit.log || echo "TESTS FAILED — see failure detail step"
+          # NOTE: no `|| echo` here — a failing suite MUST fail this step and
+          # the job (the old swallow made the backend job unable to fail).
+          php artisan test --testsuite=Feature 2>&1 | tee /tmp/phpunit.log
 
       - name: Failure detail (fresh annotation budget)
         if: failure()
@@ -147,7 +149,8 @@ jobs:
           E2E_PASSWORD: E2eDemo#2026
         run: |
           set -o pipefail
-          npx playwright test 2>&1 | tee /tmp/e2e.log || echo "E2E FAILED — see detail step"
+          # No `|| echo` — a failing E2E run MUST fail this step and the job.
+          npx playwright test 2>&1 | tee /tmp/e2e.log
 
       - name: E2E failure detail (fresh annotation budget)
         if: failure()
