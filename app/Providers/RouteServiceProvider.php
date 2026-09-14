@@ -58,5 +58,21 @@ class RouteServiceProvider extends ServiceProvider
         RateLimiter::for('booking', function (Request $request) {
             return Limit::perMinute(10)->by($request->ip());
         });
+
+        // Noisy-neighbor guard: one aggregate API budget per ACTIVE tenant.
+        // Keyed on the server-resolved active business (never a client id),
+        // so switched members and support sessions count against the clinic
+        // they are operating on — not their home one.
+        RateLimiter::for('tenant', function (Request $request) {
+            $user = $request->user();
+            if (! $user) {
+                return Limit::none();
+            }
+
+            $tenantKey = getActiveBusiness() ?: 'u'.$user->id;
+
+            return Limit::perMinute((int) config('ris.tenant_api_rate_limit_per_minute', 2400))
+                ->by('tenant:'.$tenantKey);
+        });
     }
 }

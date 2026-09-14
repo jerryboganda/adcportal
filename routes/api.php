@@ -66,7 +66,9 @@ Route::middleware(['auth'])->group(function () {
 
 // ---------- authenticated tenant plane ----------
 
-Route::middleware(['auth', 'tenant.active'])->group(function () {
+// `throttle:tenant` = aggregate per-active-tenant API budget (noisy-neighbor
+// guard); the per-user `throttle:api` from the api group still applies below it.
+Route::middleware(['auth', 'tenant.active', 'throttle:tenant'])->group(function () {
     Route::post('/logout', [AuthController::class, 'logout']);
     Route::post('/verify-password', [AuthController::class, 'verifyPassword']);
     Route::get('/bootstrap', [BootstrapController::class, 'index']);

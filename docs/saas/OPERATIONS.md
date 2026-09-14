@@ -26,6 +26,18 @@
 - `GET /up` — framework health.
 - Platform overview surfaces failed-job count (`failed_jobs`) and queue posture; queue driver is `sync` by design at this scale.
 
+## Rate-limit posture (noisy-neighbor guard)
+
+| Limiter | Scope | Budget |
+|---|---|---|
+| `api` | per authenticated user (IP when anonymous) | 60/min |
+| `tenant` | aggregate per **active** tenant (all users of one clinic share it) | 2400/min, `RIS_TENANT_API_RATE_LIMIT_PER_MINUTE` |
+| `login` | per email+IP | 5/min, 30/h |
+| `register` | per IP | 6/h |
+| `booking` (legacy public form) | per IP | 10/min |
+
+The `tenant` limiter keys on the server-resolved active business (`getActiveBusiness()`): switched members and support sessions consume the budget of the clinic they are operating on, never their home one. Exceeding it returns HTTP 429 for that tenant only; neighbours are unaffected. Public routes never consume tenant budget.
+
 ## Deploy
 
 CI (`GitHub Actions`) is the only compute path: tests → SPA build → gated Hostinger delivery (`git pull`, `composer install --no-dev`, `migrate --force`, `config:cache`). See `DEPLOYMENT_GUIDE.md` + AGENTS.md compute rule.

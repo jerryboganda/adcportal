@@ -88,4 +88,18 @@ return [
 
     'support_session_max_minutes' => 240,
 
+    /*
+    |--------------------------------------------------------------------------
+    | Per-tenant API rate limit (noisy-neighbor guard)
+    |--------------------------------------------------------------------------
+    |
+    | Aggregate requests/minute budget shared by ALL users of one active
+    | tenant (switched members and support sessions count against the
+    | tenant being operated). Exceeding it returns 429 for that tenant
+    | only. The per-user `api` limiter (60/min) still applies underneath.
+    |
+    */
+
+    'tenant_api_rate_limit_per_minute' => env('RIS_TENANT_API_RATE_LIMIT_PER_MINUTE', 2400),
+
 ];
