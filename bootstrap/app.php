@@ -18,6 +18,7 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->alias([
             'APILog' => \App\Http\Middleware\APILog::class,
             'tenant.active' => EnsureTenantActive::class,
+            'platform' => \App\Http\Middleware\EnsurePlatformAccess::class,
         ]);
 
         // Append middleware to the 'web' group

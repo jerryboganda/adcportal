@@ -13,6 +13,7 @@ use Illuminate\Support\Facades\Schedule;
 Schedule::command('sanctum:prune-expired --hours=24')->hourly();
 Schedule::command('model:prune')->daily()->when(fn () => config('queue.default') !== 'sync');
 Schedule::command('app:appointment-reminder')->everyFiveMinutes();
+Schedule::command('ris:subscription-sweep')->dailyAt('03:10');
 Schedule::call(function () {
     // Trim API log files to last 30 days
     $log = storage_path('logs/api.log');

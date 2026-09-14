@@ -1,0 +1,20 @@
+# SAAS_GAP_MATRIX — gaps found and their disposition
+
+| # | Component | Current state (evidence) | Expected SaaS state | Gap severity | Disposition |
+|---|-----------|--------------------------|---------------------|--------------|-------------|
+| 1 | Super admin UX | Same clinic dashboard for `super_admin`; no router in SPA | Dedicated control plane | CRITICAL | Fixed: platform bootstrap branch + `PlatformConsole` (overview/tenants 360/plans/usage/support/users/audit) |
+| 2 | Platform API | 4 routes, authz inside controller, no capability model | Capability-guarded control plane API | HIGH | Fixed: `EnsurePlatformAccess` middleware + `PlatformAuthorizer` capabilities (`ris.platform_roles`) |
+| 3 | Plan limits | Stored, never enforced (`max_users`, `max_studies_per_month` unused in code) | Server-side enforcement | HIGH | Fixed: `EntitlementService::enforce` on study booking + staff creation (403 `quota_exceeded`) |
+| 4 | Entitlements / features | `plans.features` JSON unread | Feature flags: default → plan → tenant override; API-enforced | HIGH | Fixed: `FeatureResolver` + `denyFeatureUnlessEnabled` on inventory/dicom/dispatch writes |
+| 5 | Usage metering | None | Tenant-attributed, transactional meters | HIGH | Fixed: `usage_counters` (studies, reports) incremented in the domain transaction; storage computed by `StorageMeter` (real file sizes, tenant-keyed cache) |
+| 6 | Tenant lifecycle | Status set by hand; trials never auto-expired; no offboarding | Lifecycle engine + sweep | HIGH | Fixed: `TenantLifecycleService` + `ris:subscription-sweep` (daily) + offboarding export + retention window + `ris:tenant-destroy` operator command |
+| 7 | Multi-tenant users | Impossible (1 user = 1 `business_id`) | Global identity + memberships + explicit switching | HIGH | Fixed: `tenant_memberships` + `POST /tenant/switch` + tenant-scoped authorization (see `AUTHORIZATION_MODEL.md`) |
+| 8 | Platform roles | Single `super_admin` type | Distinct platform roles (ops/billing/support/auditor) | MEDIUM | Fixed: `users.platform_role` + capability map; last-super-admin protection |
+| 9 | Break-glass support | None (super admin had NO tenant access at all — platform staff could operate nothing clinically) | Audited, expiring support sessions | HIGH | Fixed: `support_sessions` + enter/leave context + full audit |
+| 10 | Business::users() bug | Missing relation used by platform list → runtime exception | — | HIGH (latent crash) | Fixed: relation added; regression covered by platform tests |
+| 11 | Audit attribution | `audit_logs` had no tenant column; platform actions invisible | Tenant-attributed + platform audit stream | MEDIUM | Fixed: `audit_logs.business_id` + `GET /platform/audit` + lifecycle event registry |
+| 12 | Login for terminated tenants | Login always succeeded | Terminated/offboarding blocked at login; suspended/expired land on gate | MEDIUM | Fixed in `AuthController@login` + SPA `SubscriptionGateView` (402 handling) |
+| 13 | SPA routing/gating | All 10 tabs for every role | Role + entitlement-gated surfaces | MEDIUM | Fixed: `ROLE_TABS` gating + entitlement-gated inventory/doctors tabs + platform console branch |
+| 14 | Legacy single-tenant data | Businesses existed without control-plane records | First-class tenant registry | MEDIUM | Fixed: expand-migration backfills memberships + lifecycle history + usage baselines (no data loss) |
+
+Not gaps (verified as already correct): pooled `business_id` scoping on all domain tables; server-side tenant resolution (client business ids never trusted); per-tenant laratrust roles; tenant-scoped settings caches; export isolation; polling-only realtime (no cross-tenant channels); no search engine to isolate (client-side filtering of tenant-scoped payloads); sync queue (no async boundary to isolate).

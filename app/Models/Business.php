@@ -23,11 +23,17 @@ class Business extends Model
         'trial_ends_at',
         'subscription_ends_at',
         'tenant_code',
+        'offboarded_at',
+        'terminated_at',
+        'data_retention_until',
     ];
 
     protected $casts = [
         'trial_ends_at' => 'datetime',
         'subscription_ends_at' => 'datetime',
+        'offboarded_at' => 'datetime',
+        'terminated_at' => 'datetime',
+        'data_retention_until' => 'datetime',
     ];
 
     public function plan()
@@ -117,5 +123,46 @@ class Business extends Model
     public function services()
     {
         return $this->hasMany(Service::class, 'business_id');
+    }
+
+    public function users()
+    {
+        return $this->hasMany(User::class, 'business_id');
+    }
+
+    public function memberships()
+    {
+        return $this->hasMany(TenantMembership::class, 'business_id');
+    }
+
+    public function lifecycleEvents()
+    {
+        return $this->hasMany(TenantLifecycleEvent::class, 'business_id')->orderByDesc('created_at')->orderByDesc('id');
+    }
+
+    public function featureOverrides()
+    {
+        return $this->hasMany(TenantFeatureOverride::class, 'business_id');
+    }
+
+    public function supportSessions()
+    {
+        return $this->hasMany(SupportSession::class, 'business_id');
+    }
+
+    public function usageCounters()
+    {
+        return $this->hasMany(UsageCounter::class, 'business_id');
+    }
+
+    /** Lifecycle statuses a tenant passes through (control-plane registry). */
+    public const LIFECYCLE_STATUSES = [
+        'provisioning', 'trialing', 'active', 'suspended', 'expired', 'offboarding', 'terminated',
+    ];
+
+    /** Tenants still in provisioning or past lifecycle end are not usable. */
+    public function isTerminated(): bool
+    {
+        return $this->subscription_status === 'terminated';
     }
 }

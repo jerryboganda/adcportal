@@ -39,6 +39,7 @@ class InventoryController extends BaseApiController
     public function storeItem(Request $request): JsonResponse
     {
         $this->denyUnless('setting manage');
+        $this->denyFeatureUnlessEnabled('inventory');
 
         $validated = $this->validateItem($request);
 
@@ -83,6 +84,7 @@ class InventoryController extends BaseApiController
         ]);
 
         $this->denyUnless('study acquire');
+        $this->denyFeatureUnlessEnabled('inventory');
 
         $item = InventoryItem::forClinic($this->tenantId())->findOrFail($validated['itemId']);
 

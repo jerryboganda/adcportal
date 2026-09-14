@@ -12,6 +12,9 @@ use App\Models\ScreeningQuestion;
 use App\Models\Service;
 use App\Models\StudyScreeningAnswer;
 use App\Models\User;
+use App\Models\Business;
+use App\Models\UsageCounter;
+use App\Services\EntitlementService;
 use App\Services\StudyWorkflowService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -55,6 +58,11 @@ class StudyController extends BaseApiController
     public function store(Request $request): JsonResponse
     {
         $this->denyUnless('appointment create');
+
+        // Plan entitlement: monthly study volume is enforced server-side.
+        if ($business = Business::find($this->tenantId())) {
+            EntitlementService::enforce($business, 'studies', 'monthly study volume');
+        }
 
         $validated = $request->validate([
             'patientId' => ['nullable', 'integer'],
@@ -126,6 +134,9 @@ class StudyController extends BaseApiController
             ]);
 
             $appointment->forceFill(['token_number' => $this->nextToken($service->modality?->code ?? 'ST', $validated['date'])])->save();
+
+            // Usage metering rides inside the same transaction as the study.
+            UsageCounter::increment($this->tenantId(), 'studies');
 
             return [$appointment, $this->issueBookingInvoice($appointment, $service)];
         });

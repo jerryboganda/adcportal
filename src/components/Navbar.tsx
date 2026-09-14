@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useMemo } from 'react';
 import {
   LayoutDashboard,
   UserCheck,
@@ -16,10 +16,23 @@ import {
   Settings,
   Flame
 } from 'lucide-react';
-import { ActiveTab, AppRole, Appointment, Patient, Invoice, StaffUser, AppNotification, InventoryItem } from '../types';
+import { ActiveTab, AppRole, Appointment, Patient, Invoice, StaffUser, AppNotification, InventoryItem, Entitlements } from '../types';
 import { GlobalSearchBar } from './GlobalSearchBar';
 import { UserProfileMenu } from './UserProfileMenu';
 import { SessionUser } from '../services/apiService';
+
+/**
+ * Tab visibility is derived from the SERVER-ISSUED role (never picked
+ * client-side) plus the tenant's server-enforced module entitlements.
+ */
+const ROLE_TABS: Record<string, ActiveTab[]> = {
+  admin: ['dashboard', 'checkin', 'technologist', 'reporting', 'billing', 'queue', 'inventory', 'masters', 'doctors', 'settings'],
+  radiologist: ['dashboard', 'reporting', 'queue', 'settings'],
+  technologist: ['dashboard', 'technologist', 'queue', 'settings'],
+  receptionist: ['dashboard', 'checkin', 'billing', 'queue', 'settings'],
+  billing: ['dashboard', 'billing', 'queue', 'settings'],
+  patient: ['dashboard'],
+};
 
 interface NavbarProps {
   activeTab: ActiveTab;
@@ -29,11 +42,13 @@ interface NavbarProps {
   invoices?: Invoice[];
   inventoryItems?: InventoryItem[];
   role: AppRole;
+  entitlements?: Entitlements | null;
   onSelectAppointment?: (apt: Appointment) => void;
   onOpenBookingModal?: () => void;
   staffUsers?: StaffUser[];
   currentUser: SessionUser;
   onSignOut: () => void;
+  onSwitchTenant?: (businessId: number) => void;
   notifications?: AppNotification[];
   onOpenNotifications?: () => void;
   onExportBackup?: () => void;
@@ -48,11 +63,13 @@ export const Navbar: React.FC<NavbarProps> = ({
   invoices = [],
   inventoryItems = [],
   role,
+  entitlements,
   onSelectAppointment,
   onOpenBookingModal,
   staffUsers = [],
   currentUser,
   onSignOut,
+  onSwitchTenant,
   notifications = [],
   onOpenNotifications,
   onExportBackup,
@@ -68,18 +85,33 @@ export const Navbar: React.FC<NavbarProps> = ({
   const unreadCount = unreadNotifications.length;
   const hasCriticalNotif = unreadNotifications.some(n => n.priority === 'critical' || n.category === 'stat');
 
-  const navItems = [
-    { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
-    { id: 'checkin', label: 'Reception Desk', icon: UserCheck, badge: waitingCount, badgeColor: 'bg-cyan-500' },
-    { id: 'technologist', label: 'Tech Worklist', icon: Activity, badge: statCount > 0 ? `${statCount} STAT` : undefined, badgeColor: 'bg-rose-500 animate-pulse' },
-    { id: 'reporting', label: 'Radiology Reports', icon: FileText, badge: readingCount, badgeColor: 'bg-purple-500' },
-    { id: 'billing', label: 'Billing & POS', icon: CreditCard },
-    { id: 'queue', label: 'Live Queue TV', icon: Tv },
-    { id: 'inventory', label: 'Consumables & Contrast', icon: Boxes, badge: lowStockCount > 0 ? `${lowStockCount} Low` : undefined, badgeColor: 'bg-amber-500' },
-    { id: 'masters', label: 'Catalog & Forms', icon: Database },
-    { id: 'doctors', label: 'Doctor Network', icon: Stethoscope },
-    { id: 'settings', label: 'Settings', icon: Settings },
-  ];
+  const navItems = useMemo(() => {
+    const all = [
+      { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
+      { id: 'checkin', label: 'Reception Desk', icon: UserCheck, badge: waitingCount, badgeColor: 'bg-cyan-500' },
+      { id: 'technologist', label: 'Tech Worklist', icon: Activity, badge: statCount > 0 ? `${statCount} STAT` : undefined, badgeColor: 'bg-rose-500 animate-pulse' },
+      { id: 'reporting', label: 'Radiology Reports', icon: FileText, badge: readingCount, badgeColor: 'bg-purple-500' },
+      { id: 'billing', label: 'Billing & POS', icon: CreditCard },
+      { id: 'queue', label: 'Live Queue TV', icon: Tv },
+      { id: 'inventory', label: 'Consumables & Contrast', icon: Boxes, badge: lowStockCount > 0 ? `${lowStockCount} Low` : undefined, badgeColor: 'bg-amber-500' },
+      { id: 'masters', label: 'Catalog & Forms', icon: Database },
+      { id: 'doctors', label: 'Doctor Network', icon: Stethoscope },
+      { id: 'settings', label: 'Settings', icon: Settings },
+    ];
+    const allowed = ROLE_TABS[role] ?? ROLE_TABS.admin;
+    const moduleDisabled = (id: string) =>
+      (id === 'inventory' && entitlements?.features && entitlements.features.inventory === false) ||
+      (id === 'doctors' && entitlements?.features && entitlements.features.dispatch === false);
+    return all.filter(item => allowed.includes(item.id as ActiveTab) && !moduleDisabled(item.id));
+  }, [role, entitlements, waitingCount, statCount, readingCount, lowStockCount]);
+
+  // If the persisted/active tab is not permitted in this role+tenant context,
+  // snap back to the first allowed tab (never render an ungated surface).
+  useEffect(() => {
+    if (navItems.length > 0 && !navItems.some(item => item.id === activeTab)) {
+      setActiveTab(navItems[0].id as ActiveTab);
+    }
+  }, [activeTab, navItems, setActiveTab]);
 
   return (
     <header className="bg-white border-b border-slate-200 sticky top-0 z-40 shadow-xs">
@@ -170,6 +202,7 @@ export const Navbar: React.FC<NavbarProps> = ({
               onSignOut={onSignOut}
               onExportBackup={onExportBackup}
               onLockTerminal={onLockTerminal}
+              onSwitchTenant={onSwitchTenant}
             />
           </div>
         </div>

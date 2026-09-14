@@ -37,6 +37,7 @@ class User extends Authenticatable implements LaratrustUser,MustVerifyEmail
         'password',
         'remember_token',
         'type',
+        'platform_role',
         'active_status',
         'active_business',
         'avatar',
@@ -96,8 +97,15 @@ class User extends Authenticatable implements LaratrustUser,MustVerifyEmail
 
     public function portalRole(): string
     {
-        // Map the app's role names onto the React SPA role vocabulary.
-        $primary = $this->getRoles()[0] ?? null;
+        // Map the app's role names onto the React SPA role vocabulary. Roles are
+        // evaluated for the ACTIVE tenant only, so a multi-tenant member always
+        // carries the role their current membership grants.
+        $activeBusiness = (int) (function_exists('getActiveBusiness') ? getActiveBusiness($this->id) : ($this->business_id ?: $this->active_business ?: 0));
+        $roles = $activeBusiness > 0
+            ? \App\Services\TenantAuthorizer::roleNamesFor($this, $activeBusiness)
+            : $this->getRoles();
+
+        $primary = $roles[0] ?? null;
 
         return match ($primary) {
             'radiologist' => 'radiologist',
@@ -107,6 +115,23 @@ class User extends Authenticatable implements LaratrustUser,MustVerifyEmail
             'customer' => 'patient',
             default => 'admin',
         };
+    }
+
+    /** Platform (control-plane) identity: vendor staff, never tenant staff. */
+    public function isPlatformAdmin(): bool
+    {
+        return \App\Services\PlatformAuthorizer::isPlatformAdmin($this);
+    }
+
+    /** Control-plane capability list ('*' = unrestricted for super admin). */
+    public function platformCapabilities(): array
+    {
+        return \App\Services\PlatformAuthorizer::capabilities($this);
+    }
+
+    public function memberships()
+    {
+        return $this->hasMany(TenantMembership::class);
     }
 
     public static $not_edit_role = [

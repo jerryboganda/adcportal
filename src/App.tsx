@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { ShieldAlert } from 'lucide-react';
 import {
   ActiveTab,
   AdverseReactionReport,
@@ -23,6 +24,7 @@ import {
   Service,
   StaffUser,
   StudyScreeningAnswer,
+  Entitlements,
 } from './types';
 import {
   AppRole,
@@ -46,12 +48,14 @@ import { DoseCaptureModal } from './components/DoseCaptureModal';
 import { NewBookingModal } from './components/NewBookingModal';
 import { NotificationCenter } from './components/NotificationCenter';
 import { TerminalLockModal } from './components/TerminalLockModal';
+import { PlatformConsole } from './components/PlatformConsole';
+import { SubscriptionGateView } from './components/SubscriptionGateView';
 
 import * as api from './services/apiService';
 import { SessionUser } from './services/apiService';
 import { onUnauthorized, initCsrf } from './services/api';
 
-type BootStatus = 'loading' | 'unauthenticated' | 'ready';
+type BootStatus = 'loading' | 'unauthenticated' | 'ready' | 'platform' | 'gated';
 
 const ACTIVE_TAB_KEY = 'polytronx_ris_active_tab_v2';
 
@@ -59,6 +63,7 @@ export const App: React.FC = () => {
   const [bootStatus, setBootStatus] = useState<BootStatus>('loading');
   const [bootError, setBootError] = useState<string | null>(null);
   const [user, setUser] = useState<SessionUser | null>(null);
+  const [gateInfo, setGateInfo] = useState<{ status: string; message: string } | null>(null);
   const [flash, setFlash] = useState<{ kind: 'error' | 'success'; message: string } | null>(null);
 
   // ==================== domain state (hydrated from the API) ====================
@@ -72,6 +77,7 @@ export const App: React.FC = () => {
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [staffUsers, setStaffUsers] = useState<StaffUser[]>([]);
   const [clinicSettings, setClinicSettings] = useState<ClinicProfileSettings | null>(null);
+  const [entitlements, setEntitlements] = useState<Entitlements | null>(null);
   const [dicomNodes, setDicomNodes] = useState<DicomNodeConfig[]>([]);
   const [notificationTemplates, setNotificationTemplates] = useState<api.NotificationTemplateT[]>([]);
   const [auditLogs, setAuditLogs] = useState<AuditLogEntry[]>([]);
@@ -96,9 +102,19 @@ export const App: React.FC = () => {
   const runBootstrap = useCallback(async () => {
     setBootStatus('loading');
     setBootError(null);
+    setGateInfo(null);
     try {
       await initCsrf();
       const payload = await api.bootstrap();
+
+      // Control plane: platform staff without an active support session get
+      // the SaaS console, never a clinic dashboard.
+      if (payload.user.isPlatformAdmin && !payload.user.supportSession) {
+        setUser(payload.user);
+        setBootStatus('platform');
+        return;
+      }
+
       setUser(payload.user);
       setAppointments(payload.studies);
       setInvoices(payload.invoices);
@@ -110,6 +126,7 @@ export const App: React.FC = () => {
       setTemplates(payload.templates);
       setStaffUsers(payload.staff);
       setClinicSettings(payload.clinicSettings);
+      setEntitlements(payload.entitlements ?? null);
       setDicomNodes(payload.dicomNodes);
       setNotificationTemplates(payload.notificationTemplates);
       setAuditLogs(payload.auditLogs);
@@ -122,6 +139,19 @@ export const App: React.FC = () => {
     } catch (err: any) {
       if (err?.status === 401) {
         setBootStatus('unauthenticated');
+      } else if (err?.status === 402) {
+        // Tenant not subscribable — resolve identity via /me (never gated)
+        // and show the subscription gate with the server's message.
+        try {
+          const fresh = await api.me();
+          setUser(fresh);
+        } catch {
+          // identity unresolvable — fall back to login
+          setBootStatus('unauthenticated');
+          return;
+        }
+        setGateInfo({ status: err?.raw?.subscriptionStatus ?? 'expired', message: err?.message ?? 'This clinic subscription is not active.' });
+        setBootStatus('gated');
       } else {
         setBootError(err?.message ?? 'Failed to reach the server.');
         setBootStatus('unauthenticated');
@@ -157,9 +187,40 @@ export const App: React.FC = () => {
       // Session may already be gone — clearing local state is enough.
     }
     setUser(null);
+    setGateInfo(null);
     setBootStatus('unauthenticated');
     setActiveTab('dashboard');
   }, []);
+
+  const handleSwitchTenant = useCallback(async (businessId: number) => {
+    try {
+      const fresh = await api.switchTenant(businessId);
+      setUser(fresh);
+      await runBootstrap();
+    } catch (err: any) {
+      showFlash('error', err?.message ?? 'Tenant switch failed.');
+    }
+  }, [runBootstrap, showFlash]);
+
+  const handleEnterSupportTenant = useCallback(async (businessId: number) => {
+    try {
+      const fresh = await api.enterSupportContext(businessId);
+      setUser(fresh);
+      await runBootstrap();
+    } catch (err: any) {
+      showFlash('error', err?.message ?? 'Failed to enter the clinic context.');
+    }
+  }, [runBootstrap, showFlash]);
+
+  const handleLeaveSupportTenant = useCallback(async () => {
+    try {
+      const fresh = await api.leaveSupportContext();
+      setUser(fresh);
+      await runBootstrap();
+    } catch (err: any) {
+      showFlash('error', err?.message ?? 'Failed to leave the clinic context.');
+    }
+  }, [runBootstrap, showFlash]);
 
   // ==================== shared helpers ====================
 
@@ -702,6 +763,36 @@ export const App: React.FC = () => {
 
   // ==================== render gates ====================
 
+  if (user && bootStatus === 'platform') {
+    return (
+      <>
+        {flash && (
+          <div role="status" className={`fixed top-3 left-1/2 -translate-x-1/2 z-[80] rounded-lg px-4 py-2.5 text-sm font-medium shadow-lg border ${flash.kind === 'error' ? 'bg-rose-50 border-rose-300 text-rose-800' : 'bg-emerald-50 border-emerald-300 text-emerald-800'}`}>
+            {flash.message}
+          </div>
+        )}
+        <PlatformConsole
+          user={user}
+          onSignOut={handleLogout}
+          onEnterTenant={handleEnterSupportTenant}
+          notify={showFlash}
+        />
+      </>
+    );
+  }
+
+  if (bootStatus === 'gated' && user && gateInfo) {
+    return (
+      <SubscriptionGateView
+        user={user}
+        status={gateInfo.status}
+        message={gateInfo.message}
+        onSwitchTenant={handleSwitchTenant}
+        onSignOut={handleLogout}
+      />
+    );
+  }
+
   if (bootStatus !== 'ready' || !user || !clinicSettings) {
     if (bootStatus === 'unauthenticated') {
       return (
@@ -747,6 +838,24 @@ export const App: React.FC = () => {
         </div>
       )}
 
+      {user.supportSession && (
+        <div className="bg-rose-600 text-white">
+          <div className="mx-auto flex max-w-[1680px] flex-wrap items-center gap-2 px-3 py-1.5 text-xs font-semibold">
+            <ShieldAlert size={13} />
+            <span>
+              BREAK-GLASS SUPPORT SESSION — operating inside <strong>{user.businessName}</strong> · reason: {user.supportSession.reason} ·
+              expires {user.supportSession.expiresAt ? new Date(user.supportSession.expiresAt).toLocaleTimeString() : 'soon'}. All actions are audited.
+            </span>
+            <button
+              onClick={handleLeaveSupportTenant}
+              className="ml-auto rounded border border-white/40 px-2 py-0.5 text-[11px] font-bold hover:bg-white/10"
+            >
+              Exit to platform console
+            </button>
+          </div>
+        </div>
+      )}
+
       <Navbar
         activeTab={activeTab}
         setActiveTab={setActiveTab}
@@ -755,6 +864,7 @@ export const App: React.FC = () => {
         invoices={invoices}
         inventoryItems={inventoryItems}
         role={role}
+        entitlements={entitlements}
         onSelectAppointment={(apt) => setSelectedAppointment(apt)}
         onOpenBookingModal={() => setBookingModalOpen(true)}
         notifications={notifications}
@@ -762,6 +872,7 @@ export const App: React.FC = () => {
         staffUsers={staffUsers}
         currentUser={user}
         onSignOut={handleLogout}
+        onSwitchTenant={handleSwitchTenant}
         onExportBackup={handleExportBackup}
         onLockTerminal={() => setIsTerminalLocked(true)}
       />

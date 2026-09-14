@@ -430,3 +430,209 @@ export type ActiveTab =
   | 'doctors'
   | 'settings';
 
+// ==================== SaaS platform (control plane) ====================
+
+export type SubscriptionStatus =
+  | 'provisioning'
+  | 'trialing'
+  | 'active'
+  | 'suspended'
+  | 'expired'
+  | 'offboarding'
+  | 'terminated';
+
+export type PlatformRole = 'super_admin' | 'ops' | 'billing' | 'support' | 'auditor';
+
+export interface Plan {
+  id: string;
+  name: string;
+  slug: string;
+  description: string;
+  priceMonthly: number;
+  currency: string;
+  trialDays: number;
+  maxUsers?: number | null;
+  maxStudiesPerMonth?: number | null;
+  maxStorageMb?: number | null;
+  maxLocations?: number | null;
+  features?: Record<string, boolean>;
+  isActive: boolean;
+  subscribers?: number;
+}
+
+export interface TenantMembership {
+  businessId: number;
+  businessName: string;
+  role: string;
+  isDefault: boolean;
+  subscriptionStatus: SubscriptionStatus;
+}
+
+export interface SupportSessionInfo {
+  id: string;
+  businessId: number;
+  reason: string;
+  startedAt?: string;
+  expiresAt?: string;
+  endedAt?: string;
+  isActive: boolean;
+}
+
+export interface Entitlements {
+  plan: Plan | null;
+  subscriptionStatus: SubscriptionStatus;
+  trialEndsAt?: string | null;
+  subscriptionEndsAt?: string | null;
+  limits: {
+    maxUsers?: number | null;
+    maxStudiesPerMonth?: number | null;
+    maxStorageMb?: number | null;
+    maxLocations?: number | null;
+  };
+  usage: {
+    users: number;
+    studiesThisMonth: number;
+    storageBytes: number;
+    locations: number;
+  };
+  features: Record<string, boolean>;
+}
+
+export interface TenantCounts {
+  users: number;
+  studies: number;
+}
+
+export interface TenantRecord {
+  id: string;
+  name: string;
+  slug: string;
+  tenantCode: string;
+  subscriptionStatus: SubscriptionStatus;
+  plan: Plan | null;
+  trialEndsAt?: string | null;
+  subscriptionEndsAt?: string | null;
+  isActive: boolean;
+  createdAt?: string;
+  counts: TenantCounts;
+}
+
+export interface TenantLifecycleEntry {
+  id: string;
+  event: string;
+  fromStatus?: string | null;
+  toStatus?: string | null;
+  actorId?: string | null;
+  details?: { summary?: string; exportPath?: string } | null;
+  at?: string;
+}
+
+export interface TenantUserRecord {
+  id: string;
+  name: string;
+  email: string;
+  role: string;
+  isAdmin: boolean;
+  active: boolean;
+  loginEnabled: boolean;
+  lastLogin?: string | null;
+}
+
+export interface TenantMembershipRecord {
+  id: string;
+  userId: string;
+  userName?: string;
+  role: string;
+  isDefault: boolean;
+}
+
+export interface TenantFacilityRecord {
+  id: string;
+  name: string;
+  address: string;
+  phone: string;
+}
+
+export interface PlatformAuditEntry {
+  id: string;
+  at?: string;
+  actorName: string;
+  action: string;
+  actionLabel: string;
+  module: string;
+  subjectType: string;
+  subjectId: string;
+  tenantId?: string | null;
+  details: string;
+  ipAddress: string;
+  status: 'success' | 'warning' | 'danger';
+}
+
+export interface Tenant360 extends TenantRecord {
+  patientCount: number;
+  dicomNodeCount: number;
+  lifecycle: TenantLifecycleEntry[];
+  users: TenantUserRecord[];
+  memberships: TenantMembershipRecord[];
+  facilities: TenantFacilityRecord[];
+  entitlements: Entitlements;
+  featureOverrides: { feature: string; enabled: boolean }[];
+  audit: PlatformAuditEntry[];
+  supportSessions: (SupportSessionInfo & { platformUserName?: string })[];
+}
+
+export interface PlatformOverviewStats {
+  tenants: {
+    total: number;
+    active: number;
+    trialing: number;
+    suspended: number;
+    expired: number;
+    provisioning: number;
+    offboarding: number;
+    terminated: number;
+    needsAttention: number;
+  };
+  commercial: {
+    contractedMonthlyValue: number;
+    currency: string;
+    trialsExpiringIn7Days: number;
+    newTenantsLast30Days: number;
+  };
+  usage: {
+    studiesThisMonth: number;
+    reportsThisMonth: number;
+    users: number;
+    storageBytes: number;
+  };
+  operations: {
+    activeSupportSessions: number;
+    failedJobs: number;
+    recentLifecycleEvents: { id: string; tenantId: string; event: string; toStatus?: string | null; at?: string }[];
+  };
+}
+
+export interface PlatformUserRecord {
+  id: string;
+  name: string;
+  email: string;
+  type: 'super_admin' | 'platform_admin';
+  role: PlatformRole;
+  capabilities: string[];
+  isActive: boolean;
+  lastLogin?: string | null;
+}
+
+export interface PlatformSupportSessionRecord extends SupportSessionInfo {
+  platformUserName?: string;
+  tenantName?: string;
+  tenantCode?: string;
+}
+
+export interface UsageSummary {
+  limits: Entitlements['limits'];
+  current: Entitlements['usage'];
+  monthly: Record<string, Record<string, number>>;
+}
+
+

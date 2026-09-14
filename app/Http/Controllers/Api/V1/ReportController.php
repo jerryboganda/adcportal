@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api\V1;
 use App\Http\Resources\ApiShape;
 use App\Models\Appointment;
 use App\Models\RadiologyReport;
+use App\Models\UsageCounter;
 use App\Services\StudyWorkflowService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -68,6 +69,8 @@ class ReportController extends BaseApiController
             if (! empty($validated['signNow'])) {
                 $this->signReport($report, $validated['signAs'] ?? 'final');
             }
+
+            UsageCounter::increment($this->tenantId(), 'reports');
 
             return $report;
         });

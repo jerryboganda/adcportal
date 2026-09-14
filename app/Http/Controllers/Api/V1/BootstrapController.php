@@ -30,7 +30,18 @@ class BootstrapController extends BaseApiController
     public function index(): JsonResponse
     {
         $user = auth()->user();
+
+        // Control plane: platform staff WITHOUT an active support-session
+        // tenant context get the platform bootstrap — never a clinical payload.
+        if ($user->isPlatformAdmin() && $this->tenantId() === 0) {
+            return $this->ok([
+                'user' => ApiShape::currentUser($user),
+                'platform' => true,
+            ]);
+        }
+
         $tenantId = $this->tenantId();
+        $tenant = \App\Models\Business::find($tenantId);
 
         // Patient-role users only need their own slice.
         if ($user->portalRole() === 'patient') {
@@ -84,6 +95,7 @@ class BootstrapController extends BaseApiController
                 ->map(fn ($t) => ApiShape::inventoryTransaction($t))->all(),
             'adverseReactions' => AdverseReaction::where('business_id', $tenantId)->orderByDesc('id')->get()
                 ->map(fn ($r) => ApiShape::adverseReaction($r))->all(),
+            'entitlements' => $tenant ? \App\Services\EntitlementService::payload($tenant) : null,
         ]);
     }
 
@@ -125,7 +137,10 @@ class BootstrapController extends BaseApiController
     {
         $userIds = User::where('business_id', $tenantId)->pluck('id');
 
-        return \App\Models\AuditLog::whereIn('user_id', $userIds)
+        return \App\Models\AuditLog::query()
+            ->where(fn ($q) => $q
+                ->where('business_id', $tenantId)
+                ->orWhereIn('user_id', $userIds))
             ->orderByDesc('id')
             ->limit(500)
             ->get()

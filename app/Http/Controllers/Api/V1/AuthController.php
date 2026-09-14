@@ -39,6 +39,24 @@ class AuthController extends BaseApiController
             return response()->json(['message' => 'This account is disabled. Contact your clinic administrator.'], 403);
         }
 
+        // Terminated / offboarding tenants lose even interactive access;
+        // suspended/expired tenants may still sign in and reach the gate view.
+        if (! $user->isPlatformAdmin()) {
+            $businessId = (int) ($user->business_id ?: $user->active_business ?: 0);
+            $business = $businessId ? Business::find($businessId) : null;
+
+            if ($business && in_array($business->subscription_status, ['terminated', 'offboarding'], true)) {
+                Auth::logout();
+
+                return response()->json([
+                    'message' => $business->subscription_status === 'terminated'
+                        ? 'This clinic account has been terminated.'
+                        : 'This clinic account is being offboarded. Access is no longer available.',
+                    'subscriptionStatus' => $business->subscription_status,
+                ], 403);
+            }
+        }
+
         $user->forceFill(['last_login_at' => now()])->save();
 
         $this->audit('login', $user, ['summary' => "Signed in from {$request->ip()}"]);
@@ -79,8 +97,9 @@ class AuthController extends BaseApiController
     }
 
     /**
-     * Public tenant signup: creates the clinic (trialing), its admin user,
-     * default roles/settings and starter masters. Throttled at route level.
+     * Public tenant signup: provisions the clinic (trialing) through the
+     * tenant lifecycle engine — owner admin, roles/masters bootstrap,
+     * membership — then signs the new owner in. Throttled at route level.
      */
     public function register(Request $request): JsonResponse
     {
@@ -93,22 +112,13 @@ class AuthController extends BaseApiController
             'plan' => ['nullable', 'string', 'exists:plans,slug'],
         ]);
 
-        $tenant = DB::transaction(function () use ($validated, $request) {
-            $plan = Plan::where('slug', $validated['plan'] ?? 'starter')->where('is_active', true)->first()
-                ?? Plan::where('is_active', true)->orderBy('price_monthly')->first();
-
-            // The owner must exist first: businesses.created_by has an FK to users.
-            $admin = User::create([
+        $result = app(\App\Services\TenantLifecycleService::class)->provision(
+            $validated['clinic_name'],
+            [
                 'name' => $validated['name'],
                 'email' => $validated['email'],
-                'password' => $validated['password'],
                 'mobile_no' => $validated['phone'] ?? null,
-                'email_verified_at' => now(),
-                'type' => 'admin',
-                'active_status' => 1,
-                'lang' => 'en',
-                'initials' => mb_strtoupper(mb_substr($validated['name'], 0, 1)),
-                'department' => 'Administration',
+                'password' => $validated['password'],
                 'capabilities' => [
                     'canSignReports' => true,
                     'canVoidInvoices' => true,
@@ -116,32 +126,11 @@ class AuthController extends BaseApiController
                     'canEditMasters' => true,
                     'canAccessPacs' => true,
                 ],
-            ]);
+            ],
+            planSlug: $validated['plan'] ?? 'starter',
+        );
 
-            $business = Business::create([
-                'name' => $validated['clinic_name'],
-                'form_type' => 'form-layout',
-                'layouts' => 'Formlayout11',
-                'theme_color' => 'color1-Formlayout11',
-                'plan_id' => $plan?->id,
-                'subscription_status' => 'trialing',
-                'trial_ends_at' => now()->addDays($plan?->trial_days ?? 14),
-                'tenant_code' => strtoupper(Str::random(3)).'-'.random_int(1000, 9999),
-                'created_by' => $admin->id,
-            ]);
-
-            $admin->forceFill([
-                'active_business' => $business->id,
-                'business_id' => $business->id,
-                'created_by' => $business->id,
-            ])->save();
-
-            // Tenant-scoped role + permission wiring (laratrust, per-clinic).
-            $admin->MakeRole();
-            app(\Database\Seeders\TenantBootstrap::class)->run($business, $admin);
-
-            return $business;
-        });
+        $tenant = $result['business'];
 
         $this->audit('tenant_registered', $tenant, ['summary' => "New clinic registered: {$tenant->name}"]);
 

@@ -299,8 +299,11 @@ if (!function_exists('sideMenuCacheForget')) {
 if (!function_exists('getActiveBusiness')) {
     /**
      * Multi-tenant: the active tenant is the authenticated user's clinic.
-     * Console / seeding context (no auth) falls back to the first business so
-     * artisan commands keep working. Never trust a client-provided business id.
+     * Platform staff hold no tenant context of their own — a tenant context
+     * exists only while a verified break-glass support session is active
+     * (server-side session value, never a client-supplied id). Console /
+     * seeding context (no auth) falls back to the first business so artisan
+     * commands keep working.
      */
     function getActiveBusiness($user_id = null)
     {
@@ -309,11 +312,15 @@ if (!function_exists('getActiveBusiness')) {
         $user = $user_id ? User::find($user_id) : Auth::user();
 
         if ($user) {
-            $key = $user->id;
+            $key = $user->id.'|'.($user_id ? 'b' : 'r');
             if (! isset($cache[$key])) {
-                $businessId = (int) ($user->business_id ?: $user->active_business ?: 0);
-                if ($businessId === 0 && $user->type === 'admin') {
-                    $businessId = (int) (Business::where('created_by', $user->id)->value('id') ?? 0);
+                if ($user->isPlatformAdmin()) {
+                    $businessId = (int) (app()->bound('session') ? session('support_context') : 0);
+                } else {
+                    $businessId = (int) ($user->business_id ?: $user->active_business ?: 0);
+                    if ($businessId === 0 && $user->type === 'admin') {
+                        $businessId = (int) (Business::where('created_by', $user->id)->value('id') ?? 0);
+                    }
                 }
                 $cache[$key] = $businessId;
             }

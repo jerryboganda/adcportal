@@ -7,6 +7,7 @@ import {
   Lock,
   Download,
   Building,
+  SwitchCamera,
 } from 'lucide-react';
 import { ActiveTab, AppRole, StaffUser, UserPresenceStatus } from '../types';
 import { SessionUser } from '../services/apiService';
@@ -19,6 +20,7 @@ interface UserProfileMenuProps {
   onSignOut: () => void;
   onExportBackup?: () => void;
   onLockTerminal?: () => void;
+  onSwitchTenant?: (businessId: number) => void;
 }
 
 /**
@@ -33,6 +35,7 @@ export const UserProfileMenu: React.FC<UserProfileMenuProps> = ({
   onSignOut,
   onExportBackup,
   onLockTerminal,
+  onSwitchTenant,
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [presenceStatus, setPresenceStatus] = useState<UserPresenceStatus>('available');
@@ -245,6 +248,40 @@ export const UserProfileMenu: React.FC<UserProfileMenuProps> = ({
               </div>
             </div>
           </div>
+
+          {/* Tenant switcher — only when this identity legitimately belongs to
+              more than one clinic; the server re-verifies every switch. */}
+          {onSwitchTenant && currentUser.memberships.length > 1 && (
+            <div className="p-2 space-y-0.5">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block px-2 py-1">
+                Your clinics
+              </span>
+              {currentUser.memberships.map(m => {
+                const isCurrent = m.businessId === currentUser.businessId;
+                return (
+                  <button
+                    key={m.businessId}
+                    onClick={() => {
+                      if (isCurrent) return;
+                      setIsOpen(false);
+                      onSwitchTenant(m.businessId);
+                    }}
+                    className={`w-full flex items-center justify-between px-3 py-2 text-xs font-semibold rounded-lg transition-colors cursor-pointer ${
+                      isCurrent
+                        ? 'bg-cyan-50 text-cyan-800'
+                        : 'text-slate-700 hover:text-cyan-800 hover:bg-slate-50'
+                    }`}
+                  >
+                    <span className="flex items-center space-x-2 truncate">
+                      <SwitchCamera className="w-4 h-4 text-slate-500 shrink-0" />
+                      <span className="truncate">{m.businessName}</span>
+                    </span>
+                    <span className="text-[10px] uppercase text-slate-400">{isCurrent ? 'current' : m.role}</span>
+                  </button>
+                );
+              })}
+            </div>
+          )}
 
           {/* Quick RIS Actions & Settings */}
           <div className="p-2 space-y-0.5">

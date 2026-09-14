@@ -9,6 +9,7 @@ import {
   DicomNodeConfig,
   DoctorDispatchLog,
   DoseLog,
+  Entitlements,
   InventoryItem,
   InventoryTransaction,
   Invoice,
@@ -16,6 +17,12 @@ import {
   InvoicePayment,
   Modality,
   Patient,
+  Plan,
+  PlatformAuditEntry,
+  PlatformOverviewStats,
+  PlatformRole,
+  PlatformSupportSessionRecord,
+  PlatformUserRecord,
   RadiologyReport,
   Referrer,
   ReportTemplate,
@@ -24,6 +31,11 @@ import {
   StaffRole,
   StaffUser,
   StudyScreeningAnswer,
+  SupportSessionInfo,
+  Tenant360,
+  TenantMembership,
+  TenantRecord,
+  UsageSummary,
 } from '../types';
 
 /**
@@ -40,10 +52,15 @@ export interface SessionUser extends StaffUser {
   businessName: string;
   subscriptionStatus: string;
   isPlatformAdmin: boolean;
+  platformRole?: PlatformRole | null;
+  memberships: TenantMembership[];
+  supportSession?: SupportSessionInfo | null;
 }
 
 export interface BootstrapPayload {
   user: SessionUser;
+  platform?: boolean;
+  entitlements?: Entitlements | null;
   studies: Appointment[];
   invoices: Invoice[];
   patients: Patient[];
@@ -109,6 +126,11 @@ function normalizeInvoice(raw: any): Invoice {
 
 export async function login(email: string, password: string): Promise<SessionUser> {
   const { data } = await http.post('/login', { email, password });
+  return data.data.user;
+}
+
+export async function me(): Promise<SessionUser> {
+  const { data } = await http.get('/me');
   return data.data.user;
 }
 
@@ -604,28 +626,153 @@ export async function exportBackup(): Promise<Record<string, unknown>> {
   return data.data;
 }
 
-// ==================== platform admin ====================
+// ==================== tenant context ====================
 
-export interface TenantRecord {
-  id: string;
-  name: string;
-  slug: string;
-  tenantCode: string | null;
-  subscriptionStatus: string;
-  plan: { id: string; name: string; priceMonthly: number; currency: string } | null;
-  trialEndsAt: string | null;
-  subscriptionEndsAt: string | null;
-  isActive: boolean;
-  createdAt: string;
-  counts: { users: number; studies: number };
+export async function fetchMemberships(): Promise<TenantMembership[]> {
+  const { data } = await http.get('/memberships');
+  return data.data.memberships ?? [];
 }
 
-export async function fetchTenants(): Promise<TenantRecord[]> {
-  const { data } = await http.get('/platform/tenants');
+export async function switchTenant(businessId: number): Promise<SessionUser> {
+  const { data } = await http.post('/tenant/switch', { businessId });
+  return data.data.user;
+}
+
+export async function enterSupportContext(businessId: number): Promise<SessionUser> {
+  const { data } = await http.post('/tenant/enter', { businessId });
+  return data.data.user;
+}
+
+export async function leaveSupportContext(): Promise<SessionUser> {
+  const { data } = await http.post('/tenant/leave');
+  return data.data.user;
+}
+
+// ==================== plans (public) ====================
+
+export async function fetchPublicPlans(): Promise<Plan[]> {
+  const { data } = await http.get('/plans');
+  return data.data.plans ?? [];
+}
+
+// ==================== platform control plane ====================
+
+export async function fetchPlatformOverview(): Promise<PlatformOverviewStats> {
+  const { data } = await http.get('/platform/overview');
+  return data.data.stats;
+}
+
+export async function fetchPlatformTenants(params?: { q?: string; status?: string; planId?: string }): Promise<TenantRecord[]> {
+  const { data } = await http.get('/platform/tenants', { params });
   return data.data.tenants ?? [];
 }
 
-export async function updateTenant(id: string, updates: { subscriptionStatus?: string; planId?: string | null; isActive?: boolean }): Promise<TenantRecord> {
-  const { data } = await http.put(`/platform/tenants/${id}`, updates);
+export async function provisionTenant(input: {
+  name: string;
+  adminName: string;
+  adminEmail: string;
+  adminPhone?: string;
+  planId?: string | null;
+  trialDays?: number | null;
+}): Promise<{ tenant: TenantRecord; initialAdminPassword: string | null }> {
+  const { data } = await http.post('/platform/tenants', {
+    name: input.name,
+    adminName: input.adminName,
+    adminEmail: input.adminEmail,
+    adminPhone: input.adminPhone ?? undefined,
+    planId: input.planId ? Number(input.planId) : undefined,
+    trialDays: input.trialDays ?? undefined,
+  });
+  return { tenant: data.data.tenant, initialAdminPassword: data.data.initialAdminPassword };
+}
+
+export async function fetchTenant360(id: string): Promise<Tenant360> {
+  const { data } = await http.get(`/platform/tenants/${id}`);
   return data.data.tenant;
+}
+
+export async function updateTenantSubscription(id: string, updates: { planId?: string | null; subscriptionEndsAt?: string | null; trialEndsAt?: string | null }): Promise<TenantRecord> {
+  const { data } = await http.patch(`/platform/tenants/${id}`, updates);
+  return data.data.tenant;
+}
+
+export type TenantLifecycleAction = 'activate' | 'suspend' | 'reactivate' | 'offboard' | 'terminate' | 'provision-retry';
+
+export async function tenantLifecycleAction(id: string, action: TenantLifecycleAction, payload?: { reason?: string; confirmCode?: string }): Promise<TenantRecord> {
+  const { data } = await http.post(`/platform/tenants/${id}/${action}`, payload ?? {});
+  return data.data.tenant;
+}
+
+export async function updateTenantFeatures(id: string, overrides: Record<string, boolean>): Promise<{ features: Record<string, boolean>; overrides: { feature: string; enabled: boolean }[] }> {
+  const { data } = await http.put(`/platform/tenants/${id}/features`, { overrides });
+  return { features: data.data.features, overrides: data.data.overrides };
+}
+
+export async function fetchTenantUsage(id: string): Promise<UsageSummary> {
+  const { data } = await http.get(`/platform/tenants/${id}/usage`);
+  return data.data.usage;
+}
+
+export async function fetchTenantAudit(id: string): Promise<PlatformAuditEntry[]> {
+  const { data } = await http.get(`/platform/tenants/${id}/audit`);
+  return data.data.audit ?? [];
+}
+
+export async function exportTenantData(id: string): Promise<Record<string, unknown>> {
+  const { data } = await http.get(`/platform/tenants/${id}/export`);
+  return data.data.export;
+}
+
+export async function fetchPlatformPlans(): Promise<Plan[]> {
+  const { data } = await http.get('/platform/plans');
+  return data.data.plans ?? [];
+}
+
+export async function createPlatformPlan(input: Partial<Plan> & { name: string; priceMonthly: number; currency: string; trialDays: number }): Promise<Plan> {
+  const { data } = await http.post('/platform/plans', input);
+  return data.data.plan;
+}
+
+export async function updatePlatformPlan(id: string, input: Partial<Plan>): Promise<Plan> {
+  const { data } = await http.patch(`/platform/plans/${id}`, input);
+  return data.data.plan;
+}
+
+export async function fetchPlatformUsers(): Promise<PlatformUserRecord[]> {
+  const { data } = await http.get('/platform/users');
+  return data.data.users ?? [];
+}
+
+export async function createPlatformUser(input: { name: string; email: string; password: string; role: PlatformRole }): Promise<PlatformUserRecord> {
+  const { data } = await http.post('/platform/users', input);
+  return data.data.user;
+}
+
+export async function updatePlatformUser(id: string, updates: { role?: PlatformRole; isActive?: boolean }): Promise<PlatformUserRecord> {
+  const { data } = await http.patch(`/platform/users/${id}`, updates);
+  return data.data.user;
+}
+
+export async function fetchSupportSessions(): Promise<PlatformSupportSessionRecord[]> {
+  const { data } = await http.get('/platform/support-sessions');
+  return data.data.sessions ?? [];
+}
+
+export async function startSupportSession(input: { businessId: string; reason: string; minutes?: number }): Promise<PlatformSupportSessionRecord> {
+  const { data } = await http.post('/platform/support-sessions', {
+    businessId: Number(input.businessId),
+    reason: input.reason,
+    minutes: input.minutes,
+  });
+  return data.data.session;
+}
+
+export async function endSupportSession(id: string, note?: string): Promise<PlatformSupportSessionRecord> {
+  const { data } = await http.post(`/platform/support-sessions/${id}/end`, { note });
+  return data.data.session;
+}
+
+export async function fetchPlatformAudit(params?: { action?: string; tenantId?: string }): Promise<PlatformAuditEntry[]> {
+  const { data } = await http.get('/platform/audit', { params });
+  return data.data.audit ?? [];
 }

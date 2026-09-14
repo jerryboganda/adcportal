@@ -3,7 +3,10 @@
 namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Resources\ApiShape;
+use App\Models\Business;
+use App\Models\TenantMembership;
 use App\Models\User;
+use App\Services\EntitlementService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -35,6 +38,11 @@ class StaffUserController extends BaseApiController
 
         $validated = $this->validated($request, required: true);
 
+        // Plan entitlement: user seats are enforced server-side.
+        if ($business = Business::find($this->tenantId())) {
+            EntitlementService::enforce($business, 'users', 'user seat');
+        }
+
         $user = User::create([
             'name' => $validated['name'],
             'email' => $validated['email'],
@@ -52,6 +60,14 @@ class StaffUserController extends BaseApiController
         ]);
 
         $this->assignRole($user, $validated['role']);
+
+        TenantMembership::create([
+            'user_id' => $user->id,
+            'business_id' => $this->tenantId(),
+            'role' => $validated['role'],
+            'is_default' => false,
+            'status' => 'active',
+        ]);
 
         $this->audit('user_created', $user, [
             'summary' => "Provisioned user account for {$user->name} ({$validated['role']})",

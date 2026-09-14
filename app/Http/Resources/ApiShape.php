@@ -24,6 +24,8 @@ use App\Models\ScreeningQuestion;
 use App\Models\Service;
 use App\Models\Setting;
 use App\Models\StudyScreeningAnswer;
+use App\Models\SupportSession;
+use App\Models\TenantMembership;
 use App\Models\User;
 use App\Models\DoseLog;
 use App\Models\Plan;
@@ -368,12 +370,56 @@ class ApiShape
     {
         $business = $u->business_id ? Business::find($u->business_id) : null;
 
+        $memberships = $u->isPlatformAdmin() ? [] : TenantMembership::query()
+            ->where('user_id', $u->id)
+            ->where('status', 'active')
+            ->with('business:id,name,subscription_status')
+            ->orderByDesc('is_default')
+            ->get()
+            ->map(fn ($m) => self::membership($m))
+            ->all();
+
+        $supportSession = null;
+        if ($u->isPlatformAdmin() && function_exists('getActiveBusiness') && getActiveBusiness($u->id) > 0) {
+            $session = \App\Services\SupportSessionService::activeFor($u);
+            if ($session) {
+                $supportSession = self::supportSession($session);
+            }
+        }
+
         return [
             ...self::staffUser($u),
             'businessId' => (int) getActiveBusiness($u->id),
             'businessName' => $business?->name ?? $u->name,
             'subscriptionStatus' => $business?->subscription_status ?? 'active',
-            'isPlatformAdmin' => $u->type === 'super_admin',
+            'isPlatformAdmin' => $u->isPlatformAdmin(),
+            'platformRole' => $u->type === 'super_admin' ? 'super_admin' : $u->platform_role,
+            'memberships' => $memberships,
+            'supportSession' => $supportSession,
+        ];
+    }
+
+    public static function membership(TenantMembership $m): array
+    {
+        return [
+            'businessId' => (int) $m->business_id,
+            'businessName' => $m->business?->name ?? '',
+            'role' => $m->role,
+            'isDefault' => (bool) $m->is_default,
+            'subscriptionStatus' => $m->business?->subscription_status ?? 'unknown',
+        ];
+    }
+
+    public static function supportSession(SupportSession $s): array
+    {
+        return [
+            'id' => self::id($s->id),
+            'businessId' => (int) $s->business_id,
+            'reason' => $s->reason,
+            'startedAt' => $s->started_at?->toIso8601String(),
+            'expiresAt' => $s->expires_at?->toIso8601String(),
+            'endedAt' => $s->ended_at?->toIso8601String(),
+            'isActive' => $s->isActive(),
         ];
     }
 
@@ -571,6 +617,25 @@ class ApiShape
         'tenant_registered' => ['Platform', 'Clinic Tenant Registered', 'success'],
         'login' => ['Security', 'Staff Sign-In', 'success'],
         'logout' => ['Security', 'Staff Sign-Out', 'success'],
+        'appointment_created' => ['Reception & Booking', 'Study Booked', 'success'],
+        'tenant_switched' => ['Security', 'Clinic Context Switched', 'success'],
+        'tenant_provisioned' => ['Platform', 'Tenant Provisioned', 'success'],
+        'tenant_activated' => ['Platform', 'Tenant Activated', 'success'],
+        'tenant_suspended' => ['Platform', 'Tenant Suspended', 'warning'],
+        'tenant_reactivated' => ['Platform', 'Tenant Reactivated', 'success'],
+        'tenant_offboarding_started' => ['Platform', 'Tenant Offboarding Started', 'warning'],
+        'tenant_terminated' => ['Platform', 'Tenant Terminated', 'warning'],
+        'subscription_updated' => ['Platform', 'Subscription Updated', 'success'],
+        'subscription_expired' => ['Platform', 'Subscription Expired', 'warning'],
+        'tenant_features_updated' => ['Platform', 'Tenant Feature Overrides Updated', 'success'],
+        'tenant_data_exported' => ['Platform', 'Tenant Data Exported', 'success'],
+        'support_session_started' => ['Platform Support', 'Break-Glass Session Opened', 'warning'],
+        'support_session_ended' => ['Platform Support', 'Break-Glass Session Closed', 'success'],
+        'plan_created' => ['Platform', 'Plan Created', 'success'],
+        'plan_updated' => ['Platform', 'Plan Updated', 'success'],
+        'platform_user_created' => ['Platform Access', 'Platform User Created', 'success'],
+        'platform_user_updated' => ['Platform Access', 'Platform User Updated', 'success'],
+        'tenant_updated' => ['Platform', 'Tenant Updated', 'success'],
     ];
 
     public static function auditEntry(AuditLog $log): array
@@ -601,6 +666,29 @@ class ApiShape
         ];
     }
 
+    /** Control-plane audit entry: actor, tenant attribution, machine action. */
+    public static function platformAuditEntry(AuditLog $log): array
+    {
+        [$module, $label, $status] = self::AUDIT_MODULES[$log->action] ?? ['Platform', ucfirst(str_replace('_', ' ', $log->action)), 'success'];
+
+        $changes = $log->changes ?? [];
+
+        return [
+            'id' => self::id($log->id),
+            'at' => $log->created_at?->toIso8601String(),
+            'actorName' => optional($log->user)->name ?? 'System',
+            'action' => $log->action,
+            'actionLabel' => $label,
+            'module' => $module,
+            'subjectType' => (string) $log->subject_type,
+            'subjectId' => self::id($log->subject_id),
+            'tenantId' => $log->business_id ? self::id($log->business_id) : null,
+            'details' => (string) ($changes['summary'] ?? ''),
+            'ipAddress' => (string) ($log->ip ?? ''),
+            'status' => $status,
+        ];
+    }
+
     public static function plan(Plan $p): array
     {
         return [
@@ -612,6 +700,9 @@ class ApiShape
             'currency' => $p->currency,
             'trialDays' => (int) $p->trial_days,
             'maxUsers' => $p->max_users,
+            'maxStudiesPerMonth' => $p->max_studies_per_month,
+            'maxStorageMb' => $p->max_storage_mb,
+            'maxLocations' => $p->max_locations,
             'isActive' => (bool) $p->is_active,
         ];
     }

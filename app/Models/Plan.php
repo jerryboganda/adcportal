@@ -15,6 +15,8 @@ class Plan extends Model
         'trial_days',
         'max_users',
         'max_studies_per_month',
+        'max_storage_mb',
+        'max_locations',
         'features',
         'is_active',
     ];

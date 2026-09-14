@@ -79,6 +79,7 @@ class SettingsController extends BaseApiController
     public function storeDicomNode(Request $request): JsonResponse
     {
         $this->denyUnless('setting manage');
+        $this->denyFeatureUnlessEnabled('dicom');
 
         $validated = $request->validate([
             'nodeName' => ['required', 'string', 'max:255'],
@@ -106,6 +107,7 @@ class SettingsController extends BaseApiController
     public function updateDicomNode(Request $request, DicomNode $node): JsonResponse
     {
         $this->denyUnless('setting manage');
+        $this->denyFeatureUnlessEnabled('dicom');
 
         if ($node->business_id !== $this->tenantId()) {
             abort(404);
@@ -133,6 +135,7 @@ class SettingsController extends BaseApiController
     public function destroyDicomNode(DicomNode $node): JsonResponse
     {
         $this->denyUnless('setting manage');
+        $this->denyFeatureUnlessEnabled('dicom');
 
         if ($node->business_id !== $this->tenantId()) {
             abort(404);
@@ -152,6 +155,7 @@ class SettingsController extends BaseApiController
     public function pingDicomNode(DicomNode $node): JsonResponse
     {
         $this->denyUnless('setting manage');
+        $this->denyFeatureUnlessEnabled('dicom');
 
         if ($node->business_id !== $this->tenantId()) {
             abort(404);
@@ -197,10 +201,14 @@ class SettingsController extends BaseApiController
     {
         $this->denyUnless('user logs history');
 
-        // Clinic scope: only logs authored by this clinic's staff.
+        // Clinic scope: logs attributed to this tenant directly, or authored
+        // by this clinic's staff (legacy rows predate business attribution).
         $userIds = \App\Models\User::where('business_id', $this->tenantId())->pluck('id');
 
-        $logs = AuditLog::whereIn('user_id', $userIds)
+        $logs = AuditLog::query()
+            ->where(fn ($q) => $q
+                ->where('business_id', $this->tenantId())
+                ->orWhereIn('user_id', $userIds))
             ->orderByDesc('id')
             ->limit(500)
             ->get();
@@ -303,6 +311,7 @@ class SettingsController extends BaseApiController
     public function storeDispatch(Request $request): JsonResponse
     {
         $this->denyUnless('report release');
+        $this->denyFeatureUnlessEnabled('dispatch');
 
         $validated = $request->validate([
             'appointmentId' => ['required', 'integer'],

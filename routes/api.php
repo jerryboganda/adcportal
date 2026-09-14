@@ -6,20 +6,26 @@ use App\Http\Controllers\Api\V1\BillingController;
 use App\Http\Controllers\Api\V1\BootstrapController;
 use App\Http\Controllers\Api\V1\InventoryController;
 use App\Http\Controllers\Api\V1\MastersController;
-use App\Http\Controllers\Api\V1\PlatformAdminController;
+use App\Http\Controllers\Api\V1\Platform\PlatformAuditController;
+use App\Http\Controllers\Api\V1\Platform\PlatformOverviewController;
+use App\Http\Controllers\Api\V1\Platform\PlatformPlanController;
+use App\Http\Controllers\Api\V1\Platform\PlatformSupportSessionController;
+use App\Http\Controllers\Api\V1\Platform\PlatformTenantController;
+use App\Http\Controllers\Api\V1\Platform\PlatformUserController;
 use App\Http\Controllers\Api\V1\ReportController;
 use App\Http\Controllers\Api\V1\SettingsController;
 use App\Http\Controllers\Api\V1\StaffUserController;
 use App\Http\Controllers\Api\V1\StudyController;
+use App\Http\Controllers\Api\V1\TenantContextController;
 use Illuminate\Support\Facades\Route;
 
 /*
 |--------------------------------------------------------------------------
 | API v1 — React SPA contract (/api/v1)
 |--------------------------------------------------------------------------
-| Same-origin Sanctum SPA cookie sessions. Every protected route is
-| permission-checked inside the controller and tenant-scoped to the
-| authenticated user's clinic.
+| Same-origin Sanctum SPA cookie sessions. Tenant routes are permission-
+| checked inside the controller (tenant-scoped), platform routes carry the
+| `platform` guard with explicit control-plane capabilities.
 */
 
 Route::prefix('v1')->group(function () {
@@ -45,10 +51,22 @@ Route::prefix('v1')->group(function () {
 Route::post('/login', [AuthController::class, 'login'])->middleware('throttle:login');
 Route::post('/register', [AuthController::class, 'register'])->middleware('throttle:6,60');
 
-// ---------- authenticated ----------
+// Public plan catalog (signup + subscription gate views).
+Route::get('/plans', [PlatformPlanController::class, 'publicIndex']);
+
+// ---------- authenticated: identity + context (never tenant-gated) ----------
+
+Route::middleware(['auth'])->group(function () {
+    Route::get('/me', [AuthController::class, 'me']);
+    Route::get('/memberships', [TenantContextController::class, 'memberships']);
+    Route::post('/tenant/switch', [TenantContextController::class, 'switchTenant']);
+    Route::post('/tenant/enter', [TenantContextController::class, 'enter']);
+    Route::post('/tenant/leave', [TenantContextController::class, 'leave']);
+});
+
+// ---------- authenticated tenant plane ----------
 
 Route::middleware(['auth', 'tenant.active'])->group(function () {
-    Route::get('/me', [AuthController::class, 'me']);
     Route::post('/logout', [AuthController::class, 'logout']);
     Route::post('/verify-password', [AuthController::class, 'verifyPassword']);
     Route::get('/bootstrap', [BootstrapController::class, 'index']);
@@ -125,11 +143,46 @@ Route::middleware(['auth', 'tenant.active'])->group(function () {
     Route::post('/notifications/mark-all-read', [AppNotificationController::class, 'markAllRead']);
     Route::delete('/notifications/{id}', [AppNotificationController::class, 'destroy'])->whereNumber('id');
     Route::delete('/notifications', [AppNotificationController::class, 'clear']);
+});
 
-    // Platform admin (super admin only)
-    Route::get('/platform/tenants', [PlatformAdminController::class, 'tenants']);
-    Route::put('/platform/tenants/{tenant}', [PlatformAdminController::class, 'updateTenant'])->whereNumber('tenant');
-    Route::get('/platform/plans', [PlatformAdminController::class, 'plans']);
-    Route::get('/platform/stats', [PlatformAdminController::class, 'platformStats']);
+// ---------- platform control plane (SaaS vendor) ----------
+
+Route::middleware(['auth', 'platform'])->prefix('platform')->group(function () {
+    // Overview / stats
+    Route::get('/overview', [PlatformOverviewController::class, 'index']);
+
+    // Tenants: directory, provisioning, 360 view, lifecycle
+    Route::get('/tenants', [PlatformTenantController::class, 'index']);
+    Route::post('/tenants', [PlatformTenantController::class, 'store']);
+    Route::get('/tenants/{tenant}', [PlatformTenantController::class, 'show'])->whereNumber('tenant');
+    Route::patch('/tenants/{tenant}', [PlatformTenantController::class, 'updateSubscription'])->whereNumber('tenant');
+    Route::put('/tenants/{tenant}/features', [PlatformTenantController::class, 'updateFeatures'])->whereNumber('tenant');
+    Route::get('/tenants/{tenant}/usage', [PlatformTenantController::class, 'usage'])->whereNumber('tenant');
+    Route::get('/tenants/{tenant}/audit', [PlatformTenantController::class, 'audit'])->whereNumber('tenant');
+    Route::get('/tenants/{tenant}/export', [PlatformTenantController::class, 'export'])->whereNumber('tenant');
+    Route::post('/tenants/{tenant}/activate', [PlatformTenantController::class, 'activate'])->whereNumber('tenant');
+    Route::post('/tenants/{tenant}/suspend', [PlatformTenantController::class, 'suspend'])->whereNumber('tenant');
+    Route::post('/tenants/{tenant}/reactivate', [PlatformTenantController::class, 'reactivate'])->whereNumber('tenant');
+    Route::post('/tenants/{tenant}/offboard', [PlatformTenantController::class, 'offboard'])->whereNumber('tenant');
+    Route::post('/tenants/{tenant}/terminate', [PlatformTenantController::class, 'terminate'])->whereNumber('tenant');
+    Route::post('/tenants/{tenant}/provision-retry', [PlatformTenantController::class, 'retryProvisioning'])->whereNumber('tenant');
+
+    // Plans
+    Route::get('/plans', [PlatformPlanController::class, 'index']);
+    Route::post('/plans', [PlatformPlanController::class, 'store']);
+    Route::patch('/plans/{plan}', [PlatformPlanController::class, 'update'])->whereNumber('plan');
+
+    // Platform staff
+    Route::get('/users', [PlatformUserController::class, 'index']);
+    Route::post('/users', [PlatformUserController::class, 'store']);
+    Route::patch('/users/{user}', [PlatformUserController::class, 'update'])->whereNumber('user');
+
+    // Break-glass support sessions
+    Route::get('/support-sessions', [PlatformSupportSessionController::class, 'index']);
+    Route::post('/support-sessions', [PlatformSupportSessionController::class, 'store']);
+    Route::post('/support-sessions/{session}/end', [PlatformSupportSessionController::class, 'end'])->whereNumber('session');
+
+    // Platform audit stream
+    Route::get('/audit', [PlatformAuditController::class, 'index']);
 });
 });

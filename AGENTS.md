@@ -21,19 +21,42 @@ exposing `/api/v1` (Sanctum cookie sessions) + **React/Vite SPA frontend**.
 
 - **Tenancy**: a tenant = one clinic row in `businesses`; every domain table is
   `business_id`-scoped. `getActiveBusiness()` resolves the tenant from the
-  authenticated user — never trust client-provided business ids.
+  authenticated user — never trust client-provided business ids. Multi-tenant
+  members hold `tenant_memberships` rows and switch explicitly via
+  `POST /api/v1/tenant/switch` (server-verified). Platform staff hold no
+  tenant context except inside an audited break-glass support session.
 - **Auth**: Laravel session cookies (Sanctum SPA mode, same-origin). Roles
   (admin/radiologist/technician/receptionist/billing) are per-tenant laratrust
-  roles; the React app receives its role + capability flags from the server and
-  must never pick roles client-side.
+  roles; permission checks are TENANT-SCOPED via `App\Services\TenantAuthorizer`
+  (a user's privileges in one clinic never apply in another). The React app
+  receives its role + capability flags from the server and must never pick
+  roles client-side.
+- **Control plane**: `/api/v1/platform/*` is guarded by the `platform`
+  middleware (`App\Http\Middleware\EnsurePlatformAccess`) with explicit
+  capabilities mapped from `users.platform_role` in `config/ris.php`
+  (super_admin = all). The SPA renders the separate Platform Console for
+  platform identities (`isPlatformAdmin`), never a clinic dashboard. Platform
+  bootstrap payloads carry operational metadata only — no patient PHI.
+- **Entitlements**: quotas (study volume, user seats) and module features
+  (inventory/dicom/dispatch) are enforced SERVER-SIDE by
+  `App\Services\EntitlementService` + `App\Services\FeatureResolver`
+  (precedence: tenant override → plan features → config default). The SPA only
+  mirrors what the server decides.
+- **Lifecycle**: `App\Services\TenantLifecycleService` owns provisioning,
+  activation, suspension, expiry sweep (`ris:subscription-sweep`, scheduled),
+  offboarding (export + retention clock) and termination (typed confirmation).
+  Clinical data is never auto-deleted; `ris:tenant-destroy` is the explicit,
+  operator-only destruction command after the retention window.
 - **API contract**: `app/Http/Resources/ApiShape.php` is the single source of
   truth for the frontend TypeScript contract (`src/types.ts`). Keep them in sync.
 - **SPA serving**: the Vite build (`dist/`) is deployed into `public/`;
   `routes/web.php` serves it for `/` and deep links; `/api/v1` + `/sanctum`
   go to Laravel. Root `.htaccess` routes static assets into `public/`.
 - **SaaS billing**: plans + subscription status enforced by
-  `EnsureTenantActive` middleware. Activation is manual by the super admin —
-  no payment gateway is wired (do not fake payment success).
+  `EnsureTenantActive` middleware. Activation is manual by the platform
+  administrator — no payment gateway is wired (do not fake payment success).
+- **Docs**: the SaaS architecture set lives in `docs/saas/` (audit, gap
+  matrix, tenancy model, authorization, lifecycle, operations, evidence).
 
 ## Deployment & Data Safety
 
