@@ -50,7 +50,7 @@ class StoreBookingRequest extends FormRequest
     public function messages(): array
     {
         return [
-            'contact.regex' => __('Please add mobile number with country code. (ex. +92)'),
+            'contact.regex' => __('Please add mobile number with country code. (ex. +44)'),
             'duration.date_format' => __('Please select a valid time slot.'),
             'appointment_date.date_format' => __('Please select a valid date.'),
         ];

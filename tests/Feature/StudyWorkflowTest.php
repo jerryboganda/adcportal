@@ -21,7 +21,7 @@ class StudyWorkflowTest extends ApiTestCase
         $payload = array_merge([
             'newPatient' => [
                 'name' => 'Test Patient',
-                'phone' => '+92 300 0000000',
+                'phone' => '+44 7843 985126',
                 'age' => 30,
                 'gender' => 'male',
             ],
@@ -154,6 +154,8 @@ class StudyWorkflowTest extends ApiTestCase
     public function test_contrast_acquisition_auto_deducts_inventory(): void
     {
         $item = InventoryItem::where('code', 'CT-OMNI-350-100')->where('business_id', $this->businessA->id)->firstOrFail();
+        // Starter catalog ships unstocked — stock the item for this deduction test.
+        $item->update(['current_stock' => 10]);
         $stockBefore = $item->current_stock;
 
         $study = $this->book(['serviceId' => $this->service('CT-CHEST-HR')->id]);

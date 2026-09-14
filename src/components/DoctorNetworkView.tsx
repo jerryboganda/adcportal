@@ -130,9 +130,9 @@ export const DoctorNetworkView: React.FC<DoctorNetworkViewProps> = ({
     } else {
       setEditingDoctor(null);
       setDocName('');
-      setDocClinic('Islamabad Medical Center');
+      setDocClinic('');
       setDocSpecialty('General Medicine');
-      setDocPhone('+92 300 ');
+      setDocPhone('');
       setDocEmail('');
     }
     setDoctorModalOpen(true);
@@ -169,7 +169,7 @@ export const DoctorNetworkView: React.FC<DoctorNetworkViewProps> = ({
   const handleOpenDispatchModal = (apt: Appointment) => {
     setDispatchApt(apt);
     const doctor = referrers.find(r => r.id === apt.referrerId);
-    setDispatchRecipient(doctor?.phone || doctor?.email || '+92 300 5551234');
+    setDispatchRecipient(doctor?.phone || doctor?.email || '');
     setDispatchChannel('whatsapp');
     setDispatchModalOpen(true);
   };
@@ -372,7 +372,7 @@ export const DoctorNetworkView: React.FC<DoctorNetworkViewProps> = ({
                       </a>
                       {doctor.email && (
                         <a
-                          href={`mailto:${doctor.email}?subject=Patient%20Referral%20Updates%20-%20Amad%20Diagnostic%20Centre`}
+                          href={`mailto:${doctor.email}?subject=Patient%20Referral%20Updates%20-%20PolytronX%20-%20RIS`}
                           className="py-1.5 px-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-[11px] font-semibold border border-slate-200 flex items-center justify-center transition-colors"
                           title="Send Email"
                         >
@@ -718,7 +718,7 @@ export const DoctorNetworkView: React.FC<DoctorNetworkViewProps> = ({
               <Award className="w-4 h-4 text-amber-600" />
               <span>Top Referring Clinical Institutions</span>
             </h3>
-            <p className="text-xs text-slate-500">Hospital and private clinic ranking based on examination referrals in Islamabad / Rawalpindi.</p>
+            <p className="text-xs text-slate-500">Hospital and private clinic ranking based on examination referrals.</p>
 
             <div className="space-y-3 pt-2">
               {referrers.map((doc, idx) => (
@@ -785,7 +785,7 @@ export const DoctorNetworkView: React.FC<DoctorNetworkViewProps> = ({
                   type="text"
                   value={docClinic}
                   onChange={e => setDocClinic(e.target.value)}
-                  placeholder="e.g. Islamabad Medical Center"
+                  placeholder="e.g. City Medical Center"
                   className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-slate-800 focus:ring-1 focus:ring-sky-500"
                 />
               </div>
@@ -798,7 +798,7 @@ export const DoctorNetworkView: React.FC<DoctorNetworkViewProps> = ({
                     required
                     value={docPhone}
                     onChange={e => setDocPhone(e.target.value)}
-                    placeholder="+92 300 1234567"
+                    placeholder="Referrer contact number"
                     className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-slate-800 font-mono"
                   />
                 </div>
@@ -898,7 +898,7 @@ export const DoctorNetworkView: React.FC<DoctorNetworkViewProps> = ({
               <div className="p-3 bg-sky-50/60 rounded-xl border border-sky-100 text-slate-700 space-y-1 font-mono text-[11px]">
                 <span className="text-slate-400 block font-sans font-semibold">Message Preview:</span>
                 <p>
-                  "Dr. {dispatchApt.referrer?.name || 'Doctor'}, the official Radiology Report for your patient {dispatchApt.patient.name} ({dispatchApt.service?.name || 'Radiology Study'}) has been finalized and verified by Amad Diagnostic Centre. The report is available for collection or secure portal access."
+                  "Dr. {dispatchApt.referrer?.name || 'Doctor'}, the official Radiology Report for your patient {dispatchApt.patient.name} ({dispatchApt.service?.name || 'Radiology Study'}) has been finalized and verified by PolytronX - RIS. The report is available for collection or secure portal access."
                 </p>
               </div>
 
@@ -930,7 +930,7 @@ export const DoctorNetworkView: React.FC<DoctorNetworkViewProps> = ({
             <div className="flex items-center justify-between pb-3 border-b border-slate-200">
               <div>
                 <h3 className="font-bold text-slate-900 text-base">Doctor Referral Settlement Sheet</h3>
-                <p className="text-xs text-slate-500">Amad Diagnostic Centre • Referral Accounting Department</p>
+                <p className="text-xs text-slate-500">PolytronX - RIS • Referral Accounting Department</p>
               </div>
               <div className="flex items-center space-x-2">
                 <button
@@ -993,7 +993,7 @@ export const DoctorNetworkView: React.FC<DoctorNetworkViewProps> = ({
             </div>
 
             <div className="pt-3 border-t border-slate-200 flex justify-between items-center text-xs">
-              <span className="text-slate-500">Authorized by ADC Accounts Division</span>
+              <span className="text-slate-500">Authorized by PolytronX - RIS Accounts Division</span>
               <button
                 onClick={() => setSettlementDoctor(null)}
                 className="px-4 py-2 bg-slate-200 text-slate-800 rounded-lg font-bold hover:bg-slate-300 cursor-pointer"

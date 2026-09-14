@@ -1,15 +1,20 @@
 import React from 'react';
 import { Printer, X, Download, ShieldCheck, Building2, Phone, Mail, FileText, CheckCircle2, AlertCircle } from 'lucide-react';
-import { Invoice } from '../types';
+import { Invoice, ClinicProfileSettings } from '../types';
 import { generateInvoicePdf } from '../utils/pdfGenerator';
 
 interface PrintableInvoiceModalProps {
   invoice: Invoice | null;
+  clinicSettings?: ClinicProfileSettings;
   onClose: () => void;
 }
 
-export const PrintableInvoiceModal: React.FC<PrintableInvoiceModalProps> = ({ invoice, onClose }) => {
+export const PrintableInvoiceModal: React.FC<PrintableInvoiceModalProps> = ({ invoice, clinicSettings, onClose }) => {
   if (!invoice) return null;
+
+  const clinic = clinicSettings;
+  const clinicAddress = [clinic?.address?.trim(), clinic?.city?.trim()].filter(Boolean).join(', ');
+  const clinicContact = [clinic?.phone?.trim() ? `Phone: ${clinic.phone.trim()}` : '', clinic?.email?.trim()].filter(Boolean).join(' • ');
 
   const handlePrint = () => {
     window.print();
@@ -43,7 +48,7 @@ export const PrintableInvoiceModal: React.FC<PrintableInvoiceModalProps> = ({ in
 
           <div className="flex items-center space-x-2">
             <button
-              onClick={() => generateInvoicePdf(invoice)}
+              onClick={() => generateInvoicePdf(invoice, clinicSettings)}
               className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold flex items-center space-x-1.5 border border-slate-700 transition-colors cursor-pointer"
               title="Save as PDF"
             >
@@ -75,22 +80,24 @@ export const PrintableInvoiceModal: React.FC<PrintableInvoiceModalProps> = ({ in
             <div>
               <div className="flex items-center space-x-2.5">
                 <div className="w-9 h-9 rounded-lg bg-slate-900 text-white font-black text-lg flex items-center justify-center tracking-wider">
-                  ADC
+                  PX
                 </div>
                 <div>
                   <h1 className="text-lg font-black text-slate-900 tracking-tight leading-none uppercase">
-                    Amad Diagnostic Centre
+                    {clinic?.name?.trim() || 'PolytronX - RIS'}
                   </h1>
                   <p className="text-[11px] text-slate-600 font-semibold tracking-wide mt-0.5">
-                    Radiology & Advanced Diagnostic Imaging
+                    {clinic?.headerTagline?.trim() || 'Radiology & Advanced Diagnostic Imaging'}
                   </p>
                 </div>
               </div>
               <div className="mt-3 text-[11px] text-slate-600 space-y-0.5">
-                <p>Plot 14-B, Executive Sector, Islamabad, Pakistan</p>
-                <p>Phone: +92 51 2223344, +92 51 2223345 • UAN: 111-232-232</p>
-                <p>Email: billing@amaddiagnosticcentre.com.pk • Web: portal.amaddiagnosticcentre.com.pk</p>
-                <p className="font-mono text-[10px] text-slate-500 pt-0.5">NTN: 8492019-3 | STRN: 3277876123456 | IHRA Reg #: IHRA-ISB-RAD-0441</p>
+                {clinicAddress && <p>{clinicAddress}</p>}
+                {clinicContact && <p>{clinicContact}</p>}
+                {clinic?.website?.trim() && <p>Web: {clinic.website.trim()}</p>}
+                {clinic?.taxId?.trim() && (
+                  <p className="font-mono text-[10px] text-slate-500 pt-0.5">Tax ID: {clinic.taxId.trim()}</p>
+                )}
               </div>
             </div>
 
@@ -255,7 +262,7 @@ export const PrintableInvoiceModal: React.FC<PrintableInvoiceModalProps> = ({ in
                   *INV-{invoice.invoiceNumber}*
                 </div>
                 <div className="text-[10px] text-slate-500">
-                  <span>Authorized by ADC Electronic Health Records System</span>
+                  <span>Authorized by PolytronX - RIS Electronic Health Records System</span>
                 </div>
               </div>
             </div>
@@ -301,7 +308,7 @@ export const PrintableInvoiceModal: React.FC<PrintableInvoiceModalProps> = ({ in
                 <p className="font-bold text-slate-700 mb-1">Terms & Conditions:</p>
                 <ol className="list-decimal pl-4 space-y-0.5 text-[10px]">
                   <li>Please retain this official computerized bill for collecting printed radiology reports and films.</li>
-                  <li>Online reports and DICOM imaging are accessible via portal.amaddiagnosticcentre.com.pk with MRN.</li>
+                  <li>Online reports are accessible via the patient portal using the patient MRN.</li>
                   <li>Diagnostic fee once paid is non-refundable once examination acquisition has commenced.</li>
                 </ol>
               </div>
@@ -309,7 +316,7 @@ export const PrintableInvoiceModal: React.FC<PrintableInvoiceModalProps> = ({ in
               <div className="flex flex-col justify-end items-end text-right">
                 <div className="w-48 border-b border-slate-400 pb-1 mb-1"></div>
                 <p className="font-bold text-slate-800 text-xs">Accounts Officer / Cashier</p>
-                <p className="text-[10px] text-slate-400">Amad Diagnostic Centre, Islamabad</p>
+                <p className="text-[10px] text-slate-400">{clinic?.name?.trim() || 'PolytronX - RIS'}{clinicAddress ? `, ${clinicAddress}` : ''}</p>
               </div>
             </div>
           </div>

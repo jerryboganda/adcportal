@@ -13,11 +13,6 @@ import {
   Lock,
   Plus,
   Eye,
-  Sliders,
-  Play,
-  RefreshCw,
-  ZoomIn,
-  ZoomOut,
   X,
   PhoneCall,
   History,
@@ -28,12 +23,12 @@ import {
   Printer,
   Droplet
 } from 'lucide-react';
-import { Appointment, RadiologyReport, ReportTemplate } from '../types';
+import { Appointment, RadiologyReport, ReportTemplate, ClinicProfileSettings } from '../types';
 import { generateRadiologyReportPdf } from '../utils/pdfGenerator';
-import { RadiologicalVisualizer } from './RadiologicalVisualizer';
 
 interface ReportingViewProps {
   currentUser: { name: string; role: string };
+  clinicSettings?: ClinicProfileSettings;
   appointments: Appointment[];
   templates: ReportTemplate[];
   selectedAppointment: Appointment | null;
@@ -46,6 +41,7 @@ interface ReportingViewProps {
 
 export const ReportingView: React.FC<ReportingViewProps> = ({
   currentUser,
+  clinicSettings,
   appointments,
   templates,
   selectedAppointment,
@@ -78,7 +74,7 @@ export const ReportingView: React.FC<ReportingViewProps> = ({
   const [rejectNotes, setRejectNotes] = useState('');
   const [criticalModalOpen, setCriticalModalOpen] = useState(false);
   const [criticalDoctorName, setCriticalDoctorName] = useState(apt?.referrer?.name || '');
-  const [criticalPhone, setCriticalPhone] = useState(apt?.referrer?.phone || '+92 300 5551234');
+  const [criticalPhone, setCriticalPhone] = useState(apt?.referrer?.phone || '');
   const [criticalReadback, setCriticalReadback] = useState(true);
   const [criticalAdvice, setCriticalAdvice] = useState('Immediate clinical evaluation recommended.');
   const [criticalEscalatedLog, setCriticalEscalatedLog] = useState<string | null>(null);
@@ -114,7 +110,7 @@ export const ReportingView: React.FC<ReportingViewProps> = ({
       setRecommendations(apt.report?.recommendations || '');
       setCriticalFlag(apt.report?.criticalFlag || false);
       setCriticalDoctorName(apt.referrer?.name || 'Treating Consultant');
-      setCriticalPhone(apt.referrer?.phone || '+92 300 5551234');
+      setCriticalPhone(apt.referrer?.phone || '');
       setCriticalEscalatedLog(null);
     }
   }, [apt?.id]);
@@ -421,7 +417,7 @@ export const ReportingView: React.FC<ReportingViewProps> = ({
 
             {apt && apt.report && isFinalized && (
               <button
-                onClick={() => generateRadiologyReportPdf(apt, apt.report!)}
+                onClick={() => generateRadiologyReportPdf(apt, apt.report!, clinicSettings)}
                 className="flex items-center space-x-1.5 px-3.5 py-2 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white font-bold text-xs transition-all shadow-md shadow-cyan-600/20 cursor-pointer"
               >
                 <Download className="w-4 h-4" />
@@ -1024,7 +1020,7 @@ export const ReportingView: React.FC<ReportingViewProps> = ({
 
                       {apt.referrer?.phone && (
                         <a
-                          href={`https://wa.me/${apt.referrer.phone.replace(/[^0-9]/g, '')}?text=${encodeURIComponent(`Dr. ${apt.referrer.name}, Radiology Report for patient ${apt.patient.name} (${apt.service?.name || 'Radiology Study'}, Token: ${apt.tokenNumber}) has been finalized and verified by Amad Diagnostic Centre. Review online: https://portal.amaddiagnosticcentre.com.pk/report/${apt.patient.mrn}`)}`}
+                          href={`https://wa.me/${apt.referrer.phone.replace(/[^0-9]/g, '')}?text=${encodeURIComponent(`Dr. ${apt.referrer.name}, Radiology Report for patient ${apt.patient.name} (${apt.service?.name || 'Radiology Study'}, Token: ${apt.tokenNumber}) has been finalized and verified by ${clinicSettings?.name?.trim() || 'PolytronX - RIS'}. Review online: ${window.location.origin}/report/${apt.patient.mrn}`)}`}
                           target="_blank"
                           rel="noreferrer"
                           onClick={() => onReleaseReport(apt.id, 'portal')}
@@ -1036,7 +1032,7 @@ export const ReportingView: React.FC<ReportingViewProps> = ({
                       )}
 
                       <button
-                        onClick={() => generateRadiologyReportPdf(apt, apt.report!)}
+                        onClick={() => generateRadiologyReportPdf(apt, apt.report!, clinicSettings)}
                         className="flex items-center space-x-1.5 px-3.5 py-1.5 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-bold shadow-md shadow-cyan-600/20 cursor-pointer"
                       >
                         <Download className="w-3.5 h-3.5" />
@@ -1074,9 +1070,6 @@ export const ReportingView: React.FC<ReportingViewProps> = ({
         <RadiologistPacsModal
           appointment={apt}
           onClose={() => setPacsModalOpen(false)}
-          onCaptureKeyImage={(slice) => {
-            showToast(`Key Image at slice #${slice} bookmarked to report.`);
-          }}
         />
       )}
 
@@ -1119,7 +1112,7 @@ export const ReportingView: React.FC<ReportingViewProps> = ({
                   type="text"
                   value={criticalPhone}
                   onChange={(e) => setCriticalPhone(e.target.value)}
-                  placeholder="+92 300 1234567"
+                  placeholder="Referrer phone"
                   className="w-full bg-white text-slate-900 p-2 rounded-xl border border-slate-300 focus:outline-none focus:ring-1 focus:ring-rose-500"
                 />
               </div>
@@ -1377,7 +1370,7 @@ export const ReportingView: React.FC<ReportingViewProps> = ({
                       signedAt: new Date().toLocaleDateString(),
                       releases: [],
                     };
-                    generateRadiologyReportPdf(apt, tempRep);
+                    generateRadiologyReportPdf(apt, tempRep, clinicSettings);
                   }}
                   className="flex items-center space-x-1 px-3 py-1.5 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white font-bold text-xs cursor-pointer shadow-xs"
                 >
@@ -1396,9 +1389,11 @@ export const ReportingView: React.FC<ReportingViewProps> = ({
                 {/* Header Letterhead */}
                 <div className="bg-slate-900 text-white p-4 rounded-lg flex justify-between items-center">
                   <div>
-                    <div className="font-black text-sm tracking-wide">AMAD DIAGNOSTIC CENTRE (ADC)</div>
+                    <div className="font-black text-sm tracking-wide">POLYTRONX - RIS</div>
                     <div className="text-[10px] text-slate-300">Radiology & Advanced Imaging Information System | ISO 9001:2015</div>
-                    <div className="text-[9px] text-slate-400">Plot 14-B, Executive Sector, Islamabad, Pakistan • +92 51 2223344</div>
+                    <div className="text-[9px] text-slate-400">
+                      {[[clinicSettings?.address?.trim(), clinicSettings?.city?.trim()].filter(Boolean).join(', '), clinicSettings?.phone?.trim()].filter(Boolean).join(' • ') || (clinicSettings?.name?.trim() || 'PolytronX - RIS')}
+                    </div>
                   </div>
                   <div className="text-right font-mono text-[10px]">
                     <div className="text-cyan-400">TOKEN: #{apt.tokenNumber}</div>
@@ -1485,33 +1480,12 @@ export const ReportingView: React.FC<ReportingViewProps> = ({
 interface PacsModalProps {
   appointment: Appointment;
   onClose: () => void;
-  onCaptureKeyImage: (slice: number) => void;
 }
 
 const RadiologistPacsModal: React.FC<PacsModalProps> = ({
   appointment,
   onClose,
-  onCaptureKeyImage,
 }) => {
-  const [sliceIndex, setSliceIndex] = useState(1);
-  const [windowPreset, setWindowPreset] = useState<'soft_tissue' | 'bone' | 'lung' | 'brain' | 'invert'>('soft_tissue');
-  const [zoomLevel, setZoomLevel] = useState(100);
-  const [isPlayingCine, setIsPlayingCine] = useState(false);
-  const maxSlices = appointment.doseLog?.sliceCount || (appointment.modality.code === 'CT' ? 32 : appointment.modality.code === 'MR' ? 24 : 4);
-
-  // Cine loop
-  useEffect(() => {
-    let interval: any = null;
-    if (isPlayingCine && maxSlices > 1) {
-      interval = setInterval(() => {
-        setSliceIndex((prev) => (prev >= maxSlices ? 1 : prev + 1));
-      }, 140);
-    }
-    return () => {
-      if (interval) clearInterval(interval);
-    };
-  }, [isPlayingCine, maxSlices]);
-
   return (
     <div className="fixed inset-0 z-50 bg-slate-950/85 backdrop-blur-sm flex items-center justify-center p-3 sm:p-6">
       <div className="bg-slate-900 border border-slate-800 rounded-3xl max-w-5xl w-full h-[92vh] shadow-2xl flex flex-col overflow-hidden text-slate-100">
@@ -1523,7 +1497,7 @@ const RadiologistPacsModal: React.FC<PacsModalProps> = ({
             </div>
             <div>
               <div className="flex items-center space-x-2">
-                <span className="font-mono font-bold text-purple-400 text-xs">AMAD PACS-DIAGNOSTIC v4.2</span>
+                <span className="font-mono font-bold text-purple-400 text-xs">POLYTRONX PACS VIEWER</span>
                 <span className="text-[10px] bg-slate-800 text-slate-300 px-1.5 py-0.2 rounded font-mono">
                   {appointment.modality.code} • #{appointment.tokenNumber}
                 </span>
@@ -1535,12 +1509,6 @@ const RadiologistPacsModal: React.FC<PacsModalProps> = ({
           </div>
 
           <div className="flex items-center space-x-2">
-            <button
-              onClick={() => onCaptureKeyImage(sliceIndex)}
-              className="px-2.5 py-1 rounded-lg bg-cyan-900 hover:bg-cyan-800 text-cyan-300 text-xs font-bold border border-cyan-700 cursor-pointer"
-            >
-              Bookmark Key Slice #{sliceIndex}
-            </button>
             <button onClick={onClose} className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 cursor-pointer">
               <X className="w-5 h-5" />
             </button>
@@ -1549,8 +1517,9 @@ const RadiologistPacsModal: React.FC<PacsModalProps> = ({
 
         {/* Viewer Main Body */}
         <div className="flex-1 flex flex-col md:flex-row overflow-hidden">
-          {/* Central Image Canvas */}
-          <div className="flex-1 bg-black flex flex-col items-center justify-center relative p-4 select-none overflow-hidden">
+          {/* Image area — shows an explicit empty state until real PACS/DICOM
+              acquisition is connected; never render schematic/pseudo scans. */}
+          <div className="flex-1 bg-black flex flex-col items-center justify-center relative p-8 select-none overflow-hidden">
             {/* Overlay Top Left */}
             <div className="absolute top-4 left-4 text-[11px] font-mono text-cyan-400/90 leading-tight pointer-events-none space-y-0.5">
               <div>{appointment.patient.name.toUpperCase()}</div>
@@ -1558,145 +1527,28 @@ const RadiologistPacsModal: React.FC<PacsModalProps> = ({
               <div>AGE: {appointment.patient.age}y ({appointment.patient.gender[0].toUpperCase()})</div>
               <div>STUDY: {appointment.service.name}</div>
             </div>
-
-            {/* Overlay Top Right */}
-            <div className="absolute top-4 right-4 text-[11px] font-mono text-cyan-400/90 leading-tight text-right pointer-events-none space-y-0.5">
-              <div>AMAD DIAGNOSTIC CENTRE</div>
-              <div>MODALITY: {appointment.modality.code}</div>
-              <div>ROOM: {appointment.roomNumber}</div>
-              <div>KVp: {appointment.doseLog?.kvp || 120} | mA: {appointment.doseLog?.mas || 200}</div>
-            </div>
-
-            {/* Visualizer */}
-            <div
-              className="transition-transform duration-100 flex items-center justify-center"
-              style={{ transform: `scale(${zoomLevel / 100})` }}
-            >
-              <RadiologicalVisualizer
-                modality={appointment.modality.code}
-                sliceIndex={sliceIndex}
-                maxSlices={maxSlices}
-                windowPreset={windowPreset}
-              />
-            </div>
-
-            {/* Overlay Bottom Left */}
-            <div className="absolute bottom-4 left-4 text-[11px] font-mono text-cyan-400/90 leading-tight pointer-events-none space-y-0.5">
-              <div>SLICE: {sliceIndex} / {maxSlices}</div>
-              <div>WINDOW: {windowPreset.toUpperCase()}</div>
-              <div>ZOOM: {zoomLevel}%</div>
-            </div>
-
-            {/* Overlay Bottom Right */}
-            <div className="absolute bottom-4 right-4 text-[11px] font-mono text-cyan-400/90 leading-tight text-right pointer-events-none space-y-0.5">
-              <div>DOSE: {appointment.doseLog?.doseValue || 'N/A'} {appointment.doseLog?.doseUnit || ''}</div>
-              <div>CONTRAST: {appointment.doseLog?.contrastAgent || 'NONE'}</div>
+            <div className="flex flex-col items-center text-center max-w-sm space-y-3">
+              <div className="w-16 h-16 rounded-2xl bg-slate-800 border border-slate-700 flex items-center justify-center">
+                <Eye className="w-8 h-8 text-slate-500" />
+              </div>
+              <h3 className="text-sm font-bold text-slate-200">No imaging files attached</h3>
+              <p className="text-xs text-slate-400 leading-relaxed">
+                No DICOM images are stored for this study yet. Interpretation is based on the
+                modality console / acquisition record; image display will be available once
+                PACS integration is connected.
+              </p>
             </div>
           </div>
 
-          {/* Right Control Toolbar */}
+          {/* Study metadata panel */}
           <div className="w-full md:w-80 bg-slate-900 border-t md:border-t-0 md:border-l border-slate-800 p-4 flex flex-col justify-between overflow-y-auto space-y-4 text-xs">
-            <div className="space-y-4">
-              {/* Window Presets */}
-              <div className="space-y-1.5">
-                <label className="text-[11px] font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
-                  <Sliders className="w-3.5 h-3.5 text-cyan-400" /> Window / Level Presets
-                </label>
-                <div className="grid grid-cols-2 gap-1.5">
-                  {[
-                    { id: 'soft_tissue', label: 'Soft Tissue' },
-                    { id: 'bone', label: 'Bone Window' },
-                    { id: 'lung', label: 'Lung Window' },
-                    { id: 'brain', label: 'Brain / Neuro' },
-                    { id: 'invert', label: 'Invert Grayscale' },
-                  ].map((preset) => (
-                    <button
-                      key={preset.id}
-                      onClick={() => setWindowPreset(preset.id as any)}
-                      className={`px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-colors cursor-pointer text-left ${
-                        windowPreset === preset.id
-                          ? 'bg-cyan-500 text-slate-950 font-bold'
-                          : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
-                      }`}
-                    >
-                      {preset.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Slice Scrubbing & Cine Loop */}
-              <div className="space-y-2 bg-slate-950 p-3 rounded-xl border border-slate-800">
-                <div className="flex items-center justify-between">
-                  <span className="text-[11px] font-bold text-slate-300">Slice Scrubbing</span>
-                  <span className="font-mono text-cyan-400 font-bold">{sliceIndex} / {maxSlices}</span>
-                </div>
-                <input
-                  type="range"
-                  min="1"
-                  max={maxSlices}
-                  value={sliceIndex}
-                  onChange={(e) => setSliceIndex(Number(e.target.value))}
-                  className="w-full accent-cyan-400 cursor-pointer"
-                />
-                <div className="flex items-center justify-between pt-1">
-                  <button
-                    onClick={() => setIsPlayingCine(!isPlayingCine)}
-                    className={`px-3 py-1 rounded-lg text-xs font-bold transition-colors cursor-pointer flex items-center gap-1.5 ${
-                      isPlayingCine ? 'bg-amber-500 text-slate-950' : 'bg-slate-800 text-slate-200 hover:bg-slate-700'
-                    }`}
-                  >
-                    <Play className="w-3 h-3 fill-current" />
-                    <span>{isPlayingCine ? 'Pause Cine' : 'Play Cine Loop'}</span>
-                  </button>
-
-                  <button
-                    onClick={() => {
-                      setSliceIndex(1);
-                      setZoomLevel(100);
-                      setWindowPreset('soft_tissue');
-                    }}
-                    className="p-1 text-slate-400 hover:text-white"
-                    title="Reset View"
-                  >
-                    <RefreshCw className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-              </div>
-
-              {/* Zoom Controls */}
-              <div className="flex items-center justify-between bg-slate-950 p-2.5 rounded-xl border border-slate-800">
-                <span className="text-[11px] font-bold text-slate-300">Zoom: {zoomLevel}%</span>
-                <div className="flex items-center space-x-1.5">
-                  <button
-                    onClick={() => setZoomLevel(Math.max(50, zoomLevel - 20))}
-                    className="p-1 bg-slate-800 hover:bg-slate-700 rounded text-slate-200 cursor-pointer"
-                  >
-                    <ZoomOut className="w-3.5 h-3.5" />
-                  </button>
-                  <button
-                    onClick={() => setZoomLevel(Math.min(250, zoomLevel + 20))}
-                    className="p-1 bg-slate-800 hover:bg-slate-700 rounded text-slate-200 cursor-pointer"
-                  >
-                    <ZoomIn className="w-3.5 h-3.5" />
-                  </button>
-                  <button
-                    onClick={() => setZoomLevel(100)}
-                    className="px-1.5 py-0.5 bg-slate-800 hover:bg-slate-700 rounded text-[10px] text-slate-300 font-mono cursor-pointer"
-                  >
-                    1:1
-                  </button>
-                </div>
-              </div>
-
-              {/* DICOM Header Tags */}
-              <div className="space-y-1 bg-slate-950/60 p-3 rounded-xl border border-slate-800 font-mono text-[10px] text-slate-400">
-                <div className="text-slate-300 font-sans font-bold text-[11px] mb-1">DICOM Header Tags</div>
-                <div>(0008,0060) Modality: {appointment.modality.code}</div>
-                <div>(0018,0050) Slice Thickness: 1.0 mm</div>
-                <div>(0018,0060) kVp: {appointment.doseLog?.kvp || 120}</div>
-                <div>(0028,0010) Rows / Columns: 512 x 512</div>
-                <div>(0020,0011) Series Number: 1</div>
+            <div className="bg-slate-950/60 p-3 rounded-xl border border-slate-800 font-mono text-[10px] text-slate-400">
+              <div className="text-slate-300 font-sans font-bold text-[11px] mb-1.5">Study Details</div>
+              <div className="space-y-1">
+                <div>MODALITY: {appointment.modality.code}</div>
+                <div>ROOM: {appointment.roomNumber}</div>
+                <div>DOSE: {appointment.doseLog ? `${appointment.doseLog.doseValue || '—'} ${appointment.doseLog.doseUnit || ''}` : '—'}</div>
+                <div>CONTRAST: {appointment.doseLog?.contrastAgent || 'NONE'}</div>
               </div>
             </div>
 

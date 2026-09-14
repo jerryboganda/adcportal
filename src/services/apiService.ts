@@ -27,7 +27,7 @@ import {
 } from '../types';
 
 /**
- * Typed client for the ADC Portal API. Every function returns the same
+ * Typed client for the PolytronX - RIS API. Every function returns the same
  * TypeScript models the UI already consumes (formerly hydrated from
  * localStorage); nulls from the server are normalized here so views keep
  * their null-safe rendering paths.
@@ -602,10 +602,6 @@ export async function clearNotifications(): Promise<void> {
 export async function exportBackup(): Promise<Record<string, unknown>> {
   const { data } = await http.get('/backup');
   return data.data;
-}
-
-export async function resetDemoData(): Promise<void> {
-  await http.post('/backup/reset-demo');
 }
 
 // ==================== platform admin ====================

@@ -36,5 +36,5 @@
     RewriteRule ^(css|assets|market_assets|form_layouts|module_assets|images|landing|uploads|storage|installer|js)/(.*)$ public/$1/$2 [L,NC]
 </IfModule>
 
-RewriteCond %{REQUEST_URI} ^/packages/adc/
-RewriteRule ^packages/adc/(.*)$ packages/workdo/$1 [L,NC]
+RewriteCond %{REQUEST_URI} ^/packages/polytronx-ris/
+RewriteRule ^packages/polytronx-ris/(.*)$ packages/workdo/$1 [L,NC]

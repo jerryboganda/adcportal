@@ -64,7 +64,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onAuthenticated }) => {
             <Activity className="w-6 h-6 text-cyan-400" />
           </div>
           <div>
-            <p className="font-bold text-lg leading-tight">ADC Portal</p>
+            <p className="font-bold text-lg leading-tight">PolytronX - RIS</p>
             <p className="text-xs text-cyan-300/80">Radiology Information System</p>
           </div>
         </div>
@@ -87,7 +87,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onAuthenticated }) => {
           </ul>
         </div>
 
-        <p className="text-xs text-slate-500">Amad Diagnostic Centre • Islamabad</p>
+        <p className="text-xs text-slate-500">PolytronX - RIS — Radiology Information System</p>
       </div>
 
       {/* Form panel */}

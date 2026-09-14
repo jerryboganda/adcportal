@@ -53,7 +53,7 @@ import { onUnauthorized, initCsrf } from './services/api';
 
 type BootStatus = 'loading' | 'unauthenticated' | 'ready';
 
-const ACTIVE_TAB_KEY = 'adc_ris_active_tab_v2';
+const ACTIVE_TAB_KEY = 'polytronx_ris_active_tab_v2';
 
 export const App: React.FC = () => {
   const [bootStatus, setBootStatus] = useState<BootStatus>('loading');
@@ -683,22 +683,13 @@ export const App: React.FC = () => {
       const url = URL.createObjectURL(blob);
       const anchor = document.createElement('a');
       anchor.href = url;
-      anchor.download = `ADC_RIS_Database_Backup_${new Date().toISOString().split('T')[0]}.json`;
+      anchor.download = `PolytronX_RIS_Database_Backup_${new Date().toISOString().split('T')[0]}.json`;
       document.body.appendChild(anchor);
       anchor.click();
       anchor.remove();
       URL.revokeObjectURL(url);
     } catch (err: any) { fail(err, 'Backup export failed.'); }
   }, [fail]);
-
-  const handleResetFactoryDefaults = useCallback(async () => {
-    if (!confirm('Reset this clinic\u2019s demo data to the original seeded dataset? Live clinical records will be refreshed.')) return;
-    try {
-      await api.resetDemoData();
-      await runBootstrap();
-      showFlash('success', 'Demo dataset restored.');
-    } catch (err: any) { fail(err, 'Reset is only available for the demo clinic.'); }
-  }, [fail, runBootstrap, showFlash]);
 
   // ==================== selections & modals ====================
 
@@ -723,7 +714,7 @@ export const App: React.FC = () => {
     return (
       <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center gap-4 text-slate-600">
         <div className="w-10 h-10 border-4 border-cyan-500/30 border-t-cyan-600 rounded-full animate-spin" />
-        <p className="text-sm">{bootError ? 'Connection problem' : 'Connecting to ADC Portal…'}</p>
+        <p className="text-sm">{bootError ? 'Connection problem' : 'Connecting to PolytronX - RIS…'}</p>
         {bootError && (
           <>
             <p className="text-xs text-rose-600 max-w-sm text-center">{bootError}</p>
@@ -821,6 +812,7 @@ export const App: React.FC = () => {
             templates={templates}
             selectedAppointment={currentSelectedAppointment}
             currentUser={user}
+            clinicSettings={clinicSettings}
             onSelectAppointment={(apt) => setSelectedAppointment(apt)}
             onSaveReport={handleSaveReport}
             onRejectToTech={handleRejectToTech}
@@ -834,6 +826,7 @@ export const App: React.FC = () => {
             invoices={invoices}
             appointments={appointments}
             patients={patients}
+            clinicSettings={clinicSettings}
             onRecordPayment={handleRecordPayment}
             onCreateInvoice={handleCreateInvoice}
             onAddInvoiceItem={handleAddInvoiceItem}
@@ -842,7 +835,7 @@ export const App: React.FC = () => {
         )}
 
         {activeTab === 'queue' && (
-          <QueueBoardView appointments={appointments} />
+          <QueueBoardView appointments={appointments} clinicName={clinicSettings.name} />
         )}
 
         {activeTab === 'inventory' && (
@@ -878,7 +871,6 @@ export const App: React.FC = () => {
             onAddTemplate={handleAddTemplate}
             onUpdateTemplate={handleUpdateTemplate}
             onDeleteTemplate={handleDeleteTemplate}
-            onResetFactoryDefaults={handleResetFactoryDefaults}
             onExportBackup={handleExportBackup}
           />
         )}
@@ -913,7 +905,6 @@ export const App: React.FC = () => {
             notificationTemplates={notificationTemplates}
             onUpdateNotificationTemplate={handleUpdateNotificationTemplate}
             auditLogs={auditLogs}
-            onResetFactoryDefaults={handleResetFactoryDefaults}
             onExportBackup={handleExportBackup}
           />
         )}
@@ -982,7 +973,7 @@ export const App: React.FC = () => {
 
       <footer className="border-t border-slate-200 bg-white py-4 text-center text-xs text-slate-500">
         <div className="max-w-[1680px] mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-2">
-          <span>ADC Portal © 2026 Amad Diagnostic Centre — Radiology Information System</span>
+          <span>{clinicSettings.name} © {new Date().getFullYear()} — Radiology Information System{clinicSettings.city ? ` • ${clinicSettings.city}` : ''}</span>
           <span className="font-mono text-slate-600">{clinicSettings.name} • {clinicSettings.city}</span>
         </div>
       </footer>

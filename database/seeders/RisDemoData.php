@@ -24,23 +24,32 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 
 /**
- * Demo tenant dataset (Amad Diagnostic Centre). Mirrors the SPA's former
+ * Demo tenant dataset (PolytronX - RIS). Mirrors the SPA's former
  * mock dataset so a fresh install demonstrates every workflow state with
  * REAL persisted rows. Only attached to the tenant whose tenant_code matches
  * RIS_DEMO_TENANT_CODE.
+ *
+ * GUARDED: refuses to run unless RIS_DEMO_MODE=true (local dev / CI e2e).
+ * Production databases can never receive this data.
  */
 class RisDemoData extends Seeder
 {
     public function run(Business $business, User $admin): void
     {
+        if (! config('ris.demo_mode')) {
+            throw new \RuntimeException(
+                'RisDemoData refuses to run: RIS_DEMO_MODE is not enabled. Demo data is local-dev/e2e only.'
+            );
+        }
+
         $today = now()->format('Y-m-d');
 
         // ---------- staff ----------
         $staff = [
-            ['Dr. Shahzad Khan, MBBS, FCPS', 'dr.shahzad@amaddiagnosticcentre.com.pk', 'radiologist', 'Radiology & Imaging', '+92 300 8501234', ['canSignReports' => true, 'canOverrideScreening' => true, 'canAccessPacs' => true]],
-            ['Kamran Ali (Lead RT)', 'kamran.tech@amaddiagnosticcentre.com.pk', 'technologist', 'MRI & CT Suites', '+92 333 5554321', ['canAccessPacs' => true]],
-            ['Amina Bilal', 'amina.reception@amaddiagnosticcentre.com.pk', 'receptionist', 'Front Desk & Registration', '+92 312 4447890', ['canVoidInvoices' => true]],
-            ['Tariq Mehmood (Senior US Tech)', 'tariq.us@amaddiagnosticcentre.com.pk', 'technologist', 'Ultrasound & Doppler', '+92 345 6789012', ['canAccessPacs' => true]],
+            ['Dr. Shahzad Khan, MBBS, FCPS', 'dr.shahzad@amaddiagnosticcentre.com.pk', 'radiologist', 'Radiology & Imaging', '+44 7843 985126', ['canSignReports' => true, 'canOverrideScreening' => true, 'canAccessPacs' => true]],
+            ['Kamran Ali (Lead RT)', 'kamran.tech@amaddiagnosticcentre.com.pk', 'technologist', 'MRI & CT Suites', '+44 7843 985126', ['canAccessPacs' => true]],
+            ['Amina Bilal', 'amina.reception@amaddiagnosticcentre.com.pk', 'receptionist', 'Front Desk & Registration', '+44 7843 985126', ['canVoidInvoices' => true]],
+            ['Tariq Mehmood (Senior US Tech)', 'tariq.us@amaddiagnosticcentre.com.pk', 'technologist', 'Ultrasound & Doppler', '+44 7843 985126', ['canAccessPacs' => true]],
         ];
 
         $staffUsers = [];
@@ -49,7 +58,7 @@ class RisDemoData extends Seeder
                 ['email' => $email],
                 [
                     'name' => $name,
-                    'password' => Hash::make(env('RIS_DEMO_PASSWORD', 'AdcDemo#2026')),
+                    'password' => Hash::make(config('ris.demo_password')),
                     'mobile_no' => $phone,
                     'email_verified_at' => now(),
                     'type' => 'staff',
@@ -82,12 +91,12 @@ class RisDemoData extends Seeder
 
         // ---------- patients ----------
         $patients = [
-            ['Muhammad Haroon', 'm.haroon92@gmail.com', '+92 302 5557812', 'male', '1978-04-12', 48, 'B+', 'Hypertension (managed with Amlodipine 5mg). Chronic lower back radiculopathy.', 'NKDA (No Known Drug Allergies)'],
-            ['Zainab Bibi', 'zainab.bibi1985@yahoo.com', '+92 333 7772190', 'female', '1985-09-24', 40, 'O+', 'Type 2 Diabetes Mellitus (HbA1c 7.1). Right flank colicky pain.', 'Penicillin (mild rash)'],
-            ['Capt. (R) Asadullah Khan', 'asad.khan73@gmail.com', '+92 321 4441982', 'male', '1952-11-03', 73, 'A+', 'Coronary artery disease, mild dyspnea, suspected pulmonary fibrosis.', 'Iodinated contrast (flushing reaction in 2018)'],
-            ['Fatima Noor', 'fatima.noor@outlook.com', '+92 314 6663321', 'female', '1996-02-18', 30, 'AB+', 'Severe persistent migraines, episodic visual auras, dizziness.', 'None'],
-            ['Bilal Ahmed Sheikh', 'bilal.sheikh@techcraft.io', '+92 345 8889123', 'male', '1989-07-30', 37, 'O-', 'Post motor vehicle accident (MVA) 2 hours ago. Acute right chest blunt trauma.', 'None'],
-            ['Nusrat Parveen', 'nusrat.p@gmail.com', '+92 300 2229988', 'female', '1968-12-05', 57, 'A+', 'Annual breast cancer screening. Maternal history of breast carcinoma.', 'Sulfa drugs'],
+            ['Muhammad Haroon', 'm.haroon92@gmail.com', '+44 7843 985126', 'male', '1978-04-12', 48, 'B+', 'Hypertension (managed with Amlodipine 5mg). Chronic lower back radiculopathy.', 'NKDA (No Known Drug Allergies)'],
+            ['Zainab Bibi', 'zainab.bibi1985@yahoo.com', '+44 7843 985126', 'female', '1985-09-24', 40, 'O+', 'Type 2 Diabetes Mellitus (HbA1c 7.1). Right flank colicky pain.', 'Penicillin (mild rash)'],
+            ['Capt. (R) Asadullah Khan', 'asad.khan73@gmail.com', '+44 7843 985126', 'male', '1952-11-03', 73, 'A+', 'Coronary artery disease, mild dyspnea, suspected pulmonary fibrosis.', 'Iodinated contrast (flushing reaction in 2018)'],
+            ['Fatima Noor', 'fatima.noor@outlook.com', '+44 7843 985126', 'female', '1996-02-18', 30, 'AB+', 'Severe persistent migraines, episodic visual auras, dizziness.', 'None'],
+            ['Bilal Ahmed Sheikh', 'bilal.sheikh@techcraft.io', '+44 7843 985126', 'male', '1989-07-30', 37, 'O-', 'Post motor vehicle accident (MVA) 2 hours ago. Acute right chest blunt trauma.', 'None'],
+            ['Nusrat Parveen', 'nusrat.p@gmail.com', '+44 7843 985126', 'female', '1968-12-05', 57, 'A+', 'Annual breast cancer screening. Maternal history of breast carcinoma.', 'Sulfa drugs'],
         ];
 
         foreach ($patients as [$name, $email, $phone, $gender, $dob, $age, $blood, $history, $allergies]) {
@@ -392,7 +401,7 @@ class RisDemoData extends Seeder
 
         // ---------- DICOM nodes ----------
         foreach ([
-            ['Primary Core PACS Archive', 'ADC_PACS_CORE', '192.168.10.50', 104, null, true, true],
+            ['Primary Core PACS Archive', 'POLYTRONX_PACS', '192.168.10.50', 104, null, true, true],
             ['MRI 1.5T Symphony Gateway', 'MR_SUITE_01', '192.168.10.104', 11112, 'MR', true, false],
             ['Somatom 128-Slice CT Scanner', 'CT_SOMATOM_01', '192.168.10.103', 104, 'CT', true, false],
         ] as [$name, $ae, $ip, $port, $mod, $wl, $st]) {

@@ -112,28 +112,28 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
   const [newItemCategory, setNewItemCategory] = useState<InventoryCategory>('contrast_ct');
   const [newItemModality, setNewItemModality] = useState<'CT' | 'MRI' | 'XRAY' | 'US' | 'ALL'>('CT');
   const [newItemUnit, setNewItemUnit] = useState('Vial (100mL)');
-  const [newItemStock, setNewItemStock] = useState(20);
+  const [newItemStock, setNewItemStock] = useState(0);
   const [newItemMin, setNewItemMin] = useState(10);
-  const [newItemCost, setNewItemCost] = useState(4000);
-  const [newItemSelling, setNewItemSelling] = useState(6000);
-  const [newItemSupplier, setNewItemSupplier] = useState('GE Healthcare PK');
-  const [newItemLocation, setNewItemLocation] = useState('CT Console Bay');
+  const [newItemCost, setNewItemCost] = useState(0);
+  const [newItemSelling, setNewItemSelling] = useState(0);
+  const [newItemSupplier, setNewItemSupplier] = useState('');
+  const [newItemLocation, setNewItemLocation] = useState('');
   const [newItemBatchNum, setNewItemBatchNum] = useState('');
-  const [newItemExpiry, setNewItemExpiry] = useState('2027-12-31');
+  const [newItemExpiry, setNewItemExpiry] = useState('');
 
   // Form states for Adverse Reaction Incident Report
   const [advToken, setAdvToken] = useState('');
   const [advPatient, setAdvPatient] = useState('');
   const [advModality, setAdvModality] = useState<'CT' | 'MRI'>('CT');
-  const [advAgent, setAdvAgent] = useState('Omnipaque 350 (Iohexol)');
-  const [advBatch, setAdvBatch] = useState('OPQ-2025-08');
-  const [advVolume, setAdvVolume] = useState('80 mL');
+  const [advAgent, setAdvAgent] = useState('');
+  const [advBatch, setAdvBatch] = useState('');
+  const [advVolume, setAdvVolume] = useState('');
   const [advSeverity, setAdvSeverity] = useState<AdverseSeverity>('mild');
-  const [advSymptomsInput, setAdvSymptomsInput] = useState('Mild urticaria, transient nausea, peripheral pruritus');
-  const [advTreatment, setAdvTreatment] = useState('Inj. Avil 2mL IV administered slowly + 30 min vital signs observation.');
+  const [advSymptomsInput, setAdvSymptomsInput] = useState('');
+  const [advTreatment, setAdvTreatment] = useState('');
   const [advOutcome, setAdvOutcome] = useState<AdverseOutcome>('resolved_on_site');
   const [advSupervisor, setAdvSupervisor] = useState('');
-  const [advNotes, setAdvNotes] = useState('Patient stabilized with normal blood pressure and discharged accompanied by attendant.');
+  const [advNotes, setAdvNotes] = useState('');
 
   // High-Level KPI Computations
   const totalSkuCount = inventoryItems.length;
@@ -349,7 +349,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement('a');
     link.setAttribute('href', encodedUri);
-    link.setAttribute('download', `ADC_Radiology_Inventory_${new Date().toISOString().split('T')[0]}.csv`);
+    link.setAttribute('download', `PolytronX_RIS_Inventory_${new Date().toISOString().split('T')[0]}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);

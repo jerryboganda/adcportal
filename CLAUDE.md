@@ -1,4 +1,4 @@
-# CLAUDE.md — ADC Portal
+# CLAUDE.md — PolytronX - RIS
 
 See `AGENTS.md` for the full project guide. The critical, HARD ENFORCED rule:
 

@@ -31,7 +31,6 @@ import {
   ExternalLink,
   ChevronRight,
   Eye,
-  RefreshCw
 } from 'lucide-react';
 import { Modality, Service, Referrer, ScreeningForm, ReportTemplate, ScreeningQuestion } from '../types';
 
@@ -65,7 +64,6 @@ interface MasterDataViewProps {
   onAddTemplate?: (newTpl: Omit<ReportTemplate, 'id'>) => void;
   onUpdateTemplate?: (updatedTpl: ReportTemplate) => void;
   onDeleteTemplate?: (templateId: string) => void;
-  onResetFactoryDefaults?: () => void;
   onExportBackup?: () => void;
 }
 
@@ -88,7 +86,6 @@ export const MasterDataView: React.FC<MasterDataViewProps> = ({
   onAddTemplate,
   onUpdateTemplate,
   onDeleteTemplate,
-  onResetFactoryDefaults,
   onExportBackup,
 }) => {
   const [activeSubTab, setActiveSubTab] = useState<'services' | 'modalities' | 'referrers' | 'forms' | 'templates'>('services');
@@ -155,7 +152,7 @@ export const MasterDataView: React.FC<MasterDataViewProps> = ({
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement('a');
     link.setAttribute('href', encodedUri);
-    link.setAttribute('download', `ADC_Radiology_Fee_Schedule_${new Date().toISOString().split('T')[0]}.csv`);
+    link.setAttribute('download', `PolytronX_RIS_Fee_Schedule_${new Date().toISOString().split('T')[0]}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -241,17 +238,6 @@ export const MasterDataView: React.FC<MasterDataViewProps> = ({
             >
               <Download className="w-3.5 h-3.5 text-slate-600" />
               <span>Backup JSON</span>
-            </button>
-          )}
-
-          {onResetFactoryDefaults && (
-            <button
-              onClick={onResetFactoryDefaults}
-              className="px-3 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 rounded-lg text-xs font-semibold flex items-center space-x-1.5 border border-rose-200 transition-colors cursor-pointer"
-              title="Restore pristine factory database defaults"
-            >
-              <RefreshCw className="w-3.5 h-3.5 text-rose-600" />
-              <span>Reset Factory DB</span>
             </button>
           )}
 
@@ -1221,8 +1207,8 @@ export const MasterDataView: React.FC<MasterDataViewProps> = ({
             </div>
             <div className="p-6 overflow-y-auto space-y-6 text-xs text-slate-800 print:p-0">
               <div className="text-center border-b border-slate-200 pb-4">
-                <h2 className="text-lg font-black text-slate-900 tracking-tight">AMAD DIAGNOSTIC CENTRE</h2>
-                <p className="text-slate-600 font-medium">Radiology & Clinical Imaging Department • Islamabad</p>
+                <h2 className="text-lg font-black text-slate-900 tracking-tight">POLYTRONX - RIS</h2>
+                <p className="text-slate-600 font-medium">Radiology & Clinical Imaging Department</p>
                 <p className="text-[11px] text-slate-500 font-mono mt-1">Official Master Procedure Schedule & Fee Registry • {new Date().toLocaleDateString()}</p>
               </div>
 
@@ -1271,7 +1257,7 @@ export const MasterDataView: React.FC<MasterDataViewProps> = ({
               </div>
 
               <div className="text-center pt-4 border-t border-slate-200 text-[10px] text-slate-500">
-                Amad Diagnostic Centre • All fees are in PKR (Pakistani Rupees) • Regulated by Islamabad Healthcare Regulatory Authority (IHRA)
+                PolytronX - RIS • All fees are in PKR (Pakistani Rupees)
               </div>
             </div>
           </div>
@@ -1594,8 +1580,8 @@ const ReferrerFormModal: React.FC<ReferrerFormModalProps> = ({ referrer, onSave,
       name: name.trim(),
       specialty: specialty.trim() || 'General Medicine',
       clinicName: clinicName.trim() || 'Private Clinic',
-      phone: phone.trim() || '+92 300 0000000',
-      email: email.trim() || 'doctor@hospital.pk'
+      phone: phone.trim(),
+      email: email.trim()
     });
   };
 
@@ -1641,7 +1627,7 @@ const ReferrerFormModal: React.FC<ReferrerFormModalProps> = ({ referrer, onSave,
                 required
                 value={clinicName}
                 onChange={(e) => setClinicName(e.target.value)}
-                placeholder="e.g. PIMS Hospital Islamabad"
+                placeholder="e.g. City General Hospital"
                 className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs"
               />
             </div>
@@ -1653,7 +1639,7 @@ const ReferrerFormModal: React.FC<ReferrerFormModalProps> = ({ referrer, onSave,
                   required
                   value={phone}
                   onChange={(e) => setPhone(e.target.value)}
-                  placeholder="+92 300 1234567"
+                  placeholder="Referrer contact number"
                   className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-mono"
                 />
               </div>

@@ -29,9 +29,10 @@ import { Appointment } from '../types';
 
 interface QueueBoardViewProps {
   appointments: Appointment[];
+  clinicName?: string;
 }
 
-export const QueueBoardView: React.FC<QueueBoardViewProps> = ({ appointments }) => {
+export const QueueBoardView: React.FC<QueueBoardViewProps> = ({ appointments, clinicName }) => {
   const [currentTime, setCurrentTime] = useState(new Date());
   const [calledToken, setCalledToken] = useState<{ token: string; room: string; service: string; modality: string } | null>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -43,11 +44,11 @@ export const QueueBoardView: React.FC<QueueBoardViewProps> = ({ appointments }) 
 
   const [tickerIndex, setTickerIndex] = useState(0);
   const tickerMessages = [
-    '🔔 Amad Diagnostic Centre: Please keep your computerized token slip ready before entering the examination suite.',
+    '🔔 PolytronX - RIS: Please keep your computerized token slip ready before entering the examination suite.',
     '🧪 Patients undergoing IV Contrast CT or MRI scans must submit their serum creatinine / eGFR report to the nurse station.',
     '💧 Abdomen & Pelvis Ultrasound patients: Please maintain a full urinary bladder as instructed by the reception.',
     '⚡ STAT Trauma & Intensive Care cases receive immediate emergency clinical priority.',
-    '📄 Verified final diagnostic reports with key DICOM images can be downloaded from the ADC Online Patient Portal.',
+    '📄 Verified final diagnostic reports with key DICOM images can be downloaded from the PolytronX - RIS Online Patient Portal.',
   ];
 
   const boardContainerRef = useRef<HTMLDivElement>(null);
@@ -328,11 +329,11 @@ export const QueueBoardView: React.FC<QueueBoardViewProps> = ({ appointments }) 
         <div className="flex flex-col md:flex-row md:items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-5 gap-4">
           <div className="flex items-center space-x-4">
             <div className="w-14 h-14 rounded-2xl bg-cyan-600 text-white font-black text-2xl flex items-center justify-center shadow-lg shadow-cyan-600/30">
-              ADC
+              PX
             </div>
             <div>
               <div className="flex items-center space-x-2">
-                <h1 className="text-2xl md:text-3xl font-black tracking-tight">AMAD DIAGNOSTIC CENTRE</h1>
+                <h1 className="text-2xl md:text-3xl font-black tracking-tight">POLYTRONX - RIS</h1>
                 <span className="bg-cyan-500/20 text-cyan-600 dark:text-cyan-400 text-xs font-black px-2 py-0.5 rounded uppercase font-mono">
                   RIS/PACS LIVE
                 </span>
@@ -580,7 +581,7 @@ export const QueueBoardView: React.FC<QueueBoardViewProps> = ({ appointments }) 
         }`}>
           <div className="flex items-center space-x-3 overflow-hidden flex-1">
             <span className="bg-cyan-600 text-white font-black text-[10px] px-2 py-0.5 rounded uppercase tracking-wider whitespace-nowrap flex items-center gap-1 shadow-xs">
-              <Sparkles className="w-3 h-3" /> ADC BROADCAST
+              <Sparkles className="w-3 h-3" /> POLYTRONX - RIS BROADCAST
             </span>
             <div className="truncate font-medium animate-in fade-in duration-300 key={tickerIndex}">
               {tickerMessages[tickerIndex]}
@@ -589,7 +590,7 @@ export const QueueBoardView: React.FC<QueueBoardViewProps> = ({ appointments }) 
 
           <div className="hidden sm:flex items-center space-x-2 text-cyan-600 dark:text-cyan-400 font-bold uppercase text-[11px] pl-4 border-l border-slate-300 dark:border-slate-700 whitespace-nowrap">
             <ShieldCheck className="w-3.5 h-3.5" />
-            <span>Islamabad Radiology Hub</span>
+            <span>{clinicName || 'Radiology Queue'}</span>
           </div>
         </div>
       </div>

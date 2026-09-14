@@ -7,7 +7,7 @@ import { test, expect } from '@playwright/test';
  * billing → notification center → sign out → login gate returns.
  */
 
-const EMAIL = process.env.E2E_EMAIL ?? 'admin@adc-e2e.test';
+const EMAIL = process.env.E2E_EMAIL ?? 'admin@polytronx-e2e.test';
 const PASSWORD = process.env.E2E_PASSWORD ?? 'E2eDemo#2026';
 
 // window.confirm() guards the sign-out action — accept it.

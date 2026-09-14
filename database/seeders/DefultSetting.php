@@ -153,16 +153,22 @@ class DefultSetting extends Seeder
             }
         }
 
-        // admin settings
-        $admin = User::where('type', 'admin')->first();
+        // admin settings — on a production seed there is no tenant admin yet
+        // (demo mode off), so fall back to the platform super admin.
+        $admin = User::where('type', 'admin')->first()
+            ?? User::where('type', 'super_admin')->first();
+
+        if (! $admin) {
+            throw new \RuntimeException('DefultSetting requires an admin or super admin user to exist.');
+        }
         $admin_setting = [
             "currency_format" => "1",
             "defult_currancy" => "PKR",
             "defult_currancy_symbol" => "₨",
             "defult_language" => "en",
             "defult_timezone" => "Asia/Kolkata",
-            "title_text" => !empty(env('APP_NAME')) ? env('APP_NAME') : 'ADC - Amad Diagnostic Centre',
-            "footer_text" => "Copyright © " . (!empty(env('APP_NAME')) ? env('APP_NAME') : 'ADC - Amad Diagnostic Centre') . " | Powered By PolytronX - Business Digitalized",
+            "title_text" => !empty(env('APP_NAME')) ? env('APP_NAME') : 'PolytronX - RIS',
+            "footer_text" => "Copyright © " . (!empty(env('APP_NAME')) ? env('APP_NAME') : 'PolytronX - RIS') . " | Powered By PolytronX - Business Digitalized",
             "landing_page" => "off",
             "site_rtl" => "off",
             "cust_darklayout" => "off",
@@ -171,7 +177,7 @@ class DefultSetting extends Seeder
             "color" => "theme-1",
 
             //seo
-            "meta_title" => !empty(env('APP_NAME')) ? env('APP_NAME') : 'ADC - Amad Diagnostic Centre',
+            "meta_title" => !empty(env('APP_NAME')) ? env('APP_NAME') : 'PolytronX - RIS',
             "meta_keywords" => "clinic,appointments,patient management,scheduling",
             "meta_description" => "Single-clinic appointment booking and patient management system.",
 
@@ -212,7 +218,7 @@ class DefultSetting extends Seeder
                 'appointment_prefix' => '#STU',
                 'invoice_tax_rate' => '0',
                 'release_reports_to_patients' => 'on',
-                'queue_board_key' => 'adc-queue-'.strtolower(\Illuminate\Support\Str::random(8)),
+                'queue_board_key' => 'polytronx-queue-'.strtolower(\Illuminate\Support\Str::random(8)),
             ];
             foreach ($clinic_settings as $key => $value) {
                 Setting::updateOrInsert(

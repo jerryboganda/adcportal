@@ -303,15 +303,15 @@ class TenantBootstrap extends Seeder
     private function seedInventoryCatalog(Business $business, User $admin): void
     {
         $items = [
-            ['CT-OMNI-350-100', 'Omnipaque 350 mg I/mL (Iohexol 100mL)', 'Iohexol Non-Ionic Low-Osmolar Iodinated Contrast', 'contrast_ct', 'CT', 'Vial (100mL)', 34, 15, 3850, 5500, 'GE Healthcare / Bio-Medical Express PK', 'CT Console Bay Cabinet A'],
-            ['CT-ULTRA-370-100', 'Ultravist 370 mg I/mL (Iopromide 100mL)', 'Iopromide High-Concentration Iodinated Contrast', 'contrast_ct', 'CT', 'Vial (100mL)', 18, 10, 4400, 6200, 'Bayer Pakistan Diagnostics', 'CT Console Bay Cabinet A'],
-            ['CT-VISI-320-100', 'Visipaque 320 mg I/mL (Iodixanol Iso-osmolar 100mL)', 'Iodixanol Iso-Osmolar Dimeric Iodinated Contrast', 'contrast_ct', 'CT', 'Vial (100mL)', 6, 8, 6500, 8900, 'GE Healthcare PK', 'CT Console Bay Locked Cabinet'],
-            ['MR-DOTA-05-20', 'Dotarem 0.5 mmol/mL (Gadoterate Meglumine 20mL)', 'Gadoterate Meglumine Macrocyclic Gadolinium Contrast', 'contrast_mri', 'MRI', 'Vial (20mL)', 22, 12, 5200, 7500, 'Guerbet Pakistan / MedTech Solutions', 'MRI Prep Room Cold Cabinet'],
-            ['MR-CLARIS-05-15', 'Clariscan 0.5 mmol/mL (Gadoteric Acid 15mL)', 'Gadoteric Acid Macrocyclic Paramagnetic Contrast', 'contrast_mri', 'MRI', 'Vial (15mL)', 14, 8, 4800, 6800, 'GE Healthcare PK', 'MRI Prep Room Shelf 2'],
-            ['SYR-MEDRAD-200', 'Medrad Stellant Dual CT Syringe Fast Fill Kit (200mL x 2)', 'Dual Injector Syringe & Low Pressure Y-Tubing with Dual Check Valve', 'cannula_syringes', 'CT', 'Kit', 45, 20, 1950, 2800, 'Bayer Diagnostics Devices PK', 'CT Injector Cart Room 1'],
-            ['CAN-BD-18G', 'BD Venflon Pro Safety IV Cannula 18G (Green)', '18 Gauge High-Flow Power Injector Rated Cannula', 'cannula_syringes', 'CT', 'Box (50)', 6, 4, 3200, 4500, 'Becton Dickinson Pakistan', 'IV Prep Station Cart'],
-            ['EMERG-HYDRO-100', 'Inj. Solu-Cortef (Hydrocortisone Sodium Succinate 100mg)', 'Hydrocortisone Emergency IV Corticosteroid', 'pharmacy_emergency', 'ALL', 'Vial', 25, 10, 350, 450, 'Pfizer Pakistan Direct', 'Crash Cart Top Drawer (Red Box)'],
-            ['EMERG-EPI-1MG', 'Inj. Epinephrine / Adrenaline (1:1000, 1mg/mL)', 'Adrenaline 1mg Ampoule for IM/SC Anaphylaxis', 'pharmacy_emergency', 'ALL', 'Ampoule (1mL)', 18, 8, 180, 250, 'Atco Pharma PK', 'Crash Cart Top Drawer (Adrenaline Box)'],
+            ['CT-OMNI-350-100', 'Omnipaque 350 mg I/mL (Iohexol 100mL)', 'Iohexol Non-Ionic Low-Osmolar Iodinated Contrast', 'contrast_ct', 'CT', 'Vial (100mL)', 34, 15, 3850, 5500, 'GE Healthcare', 'CT Console Bay Cabinet A'],
+            ['CT-ULTRA-370-100', 'Ultravist 370 mg I/mL (Iopromide 100mL)', 'Iopromide High-Concentration Iodinated Contrast', 'contrast_ct', 'CT', 'Vial (100mL)', 18, 10, 4400, 6200, 'Bayer', 'CT Console Bay Cabinet A'],
+            ['CT-VISI-320-100', 'Visipaque 320 mg I/mL (Iodixanol Iso-osmolar 100mL)', 'Iodixanol Iso-Osmolar Dimeric Iodinated Contrast', 'contrast_ct', 'CT', 'Vial (100mL)', 6, 8, 6500, 8900, 'GE Healthcare', 'CT Console Bay Locked Cabinet'],
+            ['MR-DOTA-05-20', 'Dotarem 0.5 mmol/mL (Gadoterate Meglumine 20mL)', 'Gadoterate Meglumine Macrocyclic Gadolinium Contrast', 'contrast_mri', 'MRI', 'Vial (20mL)', 22, 12, 5200, 7500, 'Guerbet', 'MRI Prep Room Cold Cabinet'],
+            ['MR-CLARIS-05-15', 'Clariscan 0.5 mmol/mL (Gadoteric Acid 15mL)', 'Gadoteric Acid Macrocyclic Paramagnetic Contrast', 'contrast_mri', 'MRI', 'Vial (15mL)', 14, 8, 4800, 6800, 'GE Healthcare', 'MRI Prep Room Shelf 2'],
+            ['SYR-MEDRAD-200', 'Medrad Stellant Dual CT Syringe Fast Fill Kit (200mL x 2)', 'Dual Injector Syringe & Low Pressure Y-Tubing with Dual Check Valve', 'cannula_syringes', 'CT', 'Kit', 45, 20, 1950, 2800, 'Bayer', 'CT Injector Cart Room 1'],
+            ['CAN-BD-18G', 'BD Venflon Pro Safety IV Cannula 18G (Green)', '18 Gauge High-Flow Power Injector Rated Cannula', 'cannula_syringes', 'CT', 'Box (50)', 6, 4, 3200, 4500, 'Becton Dickinson', 'IV Prep Station Cart'],
+            ['EMERG-HYDRO-100', 'Inj. Solu-Cortef (Hydrocortisone Sodium Succinate 100mg)', 'Hydrocortisone Emergency IV Corticosteroid', 'pharmacy_emergency', 'ALL', 'Vial', 25, 10, 350, 450, 'Pfizer', 'Crash Cart Top Drawer (Red Box)'],
+            ['EMERG-EPI-1MG', 'Inj. Epinephrine / Adrenaline (1:1000, 1mg/mL)', 'Adrenaline 1mg Ampoule for IM/SC Anaphylaxis', 'pharmacy_emergency', 'ALL', 'Ampoule (1mL)', 18, 8, 180, 250, 'Atco Pharma', 'Crash Cart Top Drawer (Adrenaline Box)'],
             ['PPE-LEAD-05', 'Radiation Protection 0.5mm Pb Equiv Frontal Lead Aprons', 'Lead Protective Vinyl Aprons with Thyroid Collar', 'ppe_safety', 'XRAY', 'Piece', 12, 10, 14500, 0, 'Bar-Ray Radiation Products', 'X-Ray & CT Console Apron Rack'],
         ];
 
@@ -324,7 +324,9 @@ class TenantBootstrap extends Seeder
                     'category' => $category,
                     'modality' => $modality,
                     'unit' => $unit,
-                    'current_stock' => $stock,
+                    // Starter catalog ships unstocked: real stock/batches are
+                    // entered by the clinic when goods actually arrive.
+                    'current_stock' => 0,
                     'min_threshold' => $min,
                     'unit_cost' => $cost,
                     'selling_price' => $price,
@@ -332,14 +334,7 @@ class TenantBootstrap extends Seeder
                     'requires_cold_chain' => $category === 'contrast_mri',
                     'supplier' => $supplier,
                     'storage_location' => $location,
-                    'batches' => [
-                        [
-                            'batch_number' => 'SEED-'.substr($code, -4),
-                            'expiry_date' => now()->addYear()->format('Y-m-d'),
-                            'quantity' => $stock,
-                            'received_date' => now()->subMonths(2)->format('Y-m-d'),
-                        ],
-                    ],
+                    'batches' => [],
                     'business_id' => $business->id,
                 ]
             );
@@ -362,7 +357,7 @@ class TenantBootstrap extends Seeder
                 'branch' => '',
                 'address' => '',
                 'city' => '',
-                'phone' => $admin->mobile_no ?? '',
+                'phone' => '',
                 'emergencyPhone' => '',
                 'email' => $admin->email,
                 'website' => '',

@@ -87,7 +87,7 @@ export const DoseCaptureModal: React.FC<DoseCaptureModalProps> = ({
       : 'Target organ scanned in real-time B-mode and color Doppler. Representative static clips and images stored.'
   );
   const [qcPassed, setQcPassed] = useState<boolean>(true);
-  const [techName, setTechName] = useState('Amad Certified Technologist');
+  const [techName, setTechName] = useState('');
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -412,6 +412,8 @@ export const DoseCaptureModal: React.FC<DoseCaptureModalProps> = ({
               </label>
               <input
                 type="text"
+                required
+                placeholder="Technologist / RT name"
                 value={techName}
                 onChange={(e) => setTechName(e.target.value)}
                 className="w-full bg-white text-slate-900 p-2 rounded-lg border border-slate-300 text-xs focus:outline-none focus:ring-1 focus:ring-purple-500 font-medium"

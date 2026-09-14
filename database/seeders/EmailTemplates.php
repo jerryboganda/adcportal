@@ -156,7 +156,7 @@ class EmailTemplates extends Seeder
                 $emailtemplate=  EmailTemplate::create(
                     [
                         'name' => $eTemp,
-                        'from' => 'BookingGo',
+                        'from' => 'PolytronX - RIS',
                         'module_name' => 'general',
                         'created_by' => 1,
                         'business_id' => 0

@@ -88,10 +88,10 @@ export const Navbar: React.FC<NavbarProps> = ({
           {/* Logo & Brand */}
           <div className="flex items-center space-x-2 sm:space-x-3 cursor-pointer shrink-0" onClick={() => setActiveTab('dashboard')}>
             <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-tr from-cyan-600 via-sky-500 to-indigo-600 flex items-center justify-center shadow-md shadow-cyan-600/20 text-white font-black text-lg sm:text-xl tracking-wider shrink-0">
-              ADC
+              PX
             </div>
             <div className="hidden sm:block">
-              <span className="font-bold text-base sm:text-lg text-slate-900 tracking-tight block leading-tight">Amad Diagnostic Centre</span>
+              <span className="font-bold text-base sm:text-lg text-slate-900 tracking-tight block leading-tight">PolytronX - RIS</span>
               <p className="text-[11px] text-slate-500 font-medium">Radiology Information System</p>
             </div>
           </div>

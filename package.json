@@ -1,4 +1,5 @@
 {
+    "name": "polytronx-ris",
     "private": true,
     "type": "module",
     "scripts": {

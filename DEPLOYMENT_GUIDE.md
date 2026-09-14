@@ -1,4 +1,4 @@
-# DEPLOYMENT GUIDE — ADC Portal (SaaS) on Hostinger Business Plan
+# DEPLOYMENT GUIDE — PolytronX - RIS (SaaS) on Hostinger Business Plan
 
 Architecture: **Laravel 11 (PHP 8.4) + MySQL + React/Vite SPA**, deployed as one
 application on Hostinger shared hosting (Business plan). The SPA is compiled by
@@ -32,28 +32,34 @@ Browser ──> Apache (Hostinger, docroot = repo root)
 
 ```bash
 cd ~/domains/<domain>            # the app directory
-git clone https://github.com/jerryboganda/adcportal.git .   # or git pull
+git clone https://github.com/jerryboganda/adcportal.git .   # or git pull — after renaming the GitHub repo to polytronx-ris, update this URL
 
 cp .env.example .env             # then edit with hPanel DB credentials
 php artisan key:generate --force
 
 # edit .env: DB_DATABASE / DB_USERNAME / DB_PASSWORD / APP_URL / MAIL_*
-# RIS_SUPER_ADMIN_PASSWORD and RIS_DEMO_PASSWORD: set real values, never commit.
+# RIS_SUPER_ADMIN_EMAIL + RIS_SUPER_ADMIN_PASSWORD: set real values BEFORE seeding.
+# RIS_DEMO_MODE: leave false/unset — demo data must never exist in production.
 
 composer install --no-dev --optimize-autoloader
 php artisan migrate --force
-php artisan db:seed --force      # plans + super admin + demo clinic
+php artisan db:seed --force      # plans catalog + platform super admin + languages/emails/settings — NO demo data
 php artisan storage:link
 php artisan config:cache
 ```
 
-Default seeded accounts (set real passwords via `.env` BEFORE first seed, or
-change them from the UI right after first login):
+The seeder creates exactly one account: the platform super admin
+(`RIS_SUPER_ADMIN_EMAIL`, password from `RIS_SUPER_ADMIN_PASSWORD` — choose a
+strong value; it is never committed). Real clinics are then created through the
+normal signup flow or by the super admin — each gets clean starter content
+(roles, services, screening forms, templates) and zero sample records.
 
-| Account | Email | Purpose |
-|---|---|---|
-| Platform super admin | `RIS_SUPER_ADMIN_EMAIL` | Tenant management (`/platform/*`) |
-| Demo clinic admin | `RIS_DEMO_ADMIN_EMAIL` | Amad Diagnostic Centre demo tenant |
+If a database ever does contain the demo tenant (e.g. seeded with
+`RIS_DEMO_MODE=true` by mistake), remove it with:
+
+```bash
+php artisan ris:purge-demo --force
+```
 
 ## 3. Deploying an update (fast cycle)
 
@@ -79,12 +85,11 @@ change them from the UI right after first login):
 - Subscription state (`trialing | active | suspended | expired`) is enforced by
   the `EnsureTenantActive` middleware. Activation is manual (super admin) - no
   payment gateway is wired yet; connect one before selling plans publicly.
-- The demo tenant is the only one with "factory reset"; guarded server-side by
-  `RIS_DEMO_TENANT_CODE`.
+- Demo data (`RIS_DEMO_MODE=true`) exists only for local development and the
+  CI e2e job. In production it stays false: the seeder skips the demo tenant
+  and `/api/v1/backup/reset-demo` returns 404.
 
 ## 5. Data safety
 
 - Never commit `.env` or secrets. Backups: hPanel -> Backups (daily). Test a
   restore before going live.
-- The old VPS/docker-compose flow (`185.252.233.186`, ghcr image) is superseded
-  by this Hostinger deployment; keep it only as a cold-standby option.

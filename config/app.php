@@ -13,7 +13,7 @@ return [
     |
     */
 
-    'name' => env('APP_NAME', 'ADC - Amad Diagnostic Centre'),
+    'name' => env('APP_NAME', 'PolytronX - RIS'),
 
     /*
     |--------------------------------------------------------------------------

@@ -57,7 +57,6 @@ interface SettingsViewProps {
 
   auditLogs: AuditLogEntry[];
 
-  onResetFactoryDefaults: () => void;
   onExportBackup: () => void;
 }
 
@@ -78,7 +77,6 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   notificationTemplates,
   onUpdateNotificationTemplate,
   auditLogs,
-  onResetFactoryDefaults,
   onExportBackup,
 }) => {
   const [activeSection, setActiveSection] = useState<SettingsSection>('users');
@@ -329,13 +327,6 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
               <Download className="w-4 h-4 text-cyan-400" />
               <span>Export Backup</span>
             </button>
-            <button
-              onClick={onResetFactoryDefaults}
-              className="flex items-center space-x-2 px-3.5 py-2 rounded-xl bg-rose-950/60 hover:bg-rose-900/80 text-rose-200 border border-rose-800/80 text-xs font-semibold transition-all shadow-xs cursor-pointer"
-            >
-              <RefreshCw className="w-4 h-4 text-rose-400" />
-              <span>Factory Reset</span>
-            </button>
           </div>
         </div>
 
@@ -524,7 +515,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
               <span>Role-Based Access Control (RBAC) Permission Matrix</span>
             </h3>
             <p className="text-xs text-slate-500 mb-4">
-              Overview of default capability authorizations enforced across Amad Diagnostic Centre RIS Portal.
+              Overview of default capability authorizations enforced across the PolytronX - RIS Portal.
             </p>
             <div className="overflow-x-auto">
               <table className="w-full text-left text-xs border-collapse">
@@ -802,7 +793,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
           <div className="flex items-center justify-between bg-white p-4 rounded-xl border border-slate-200 shadow-xs">
             <div>
               <h3 className="font-bold text-slate-900 text-sm">DICOM Application Entities & PACS Topology</h3>
-              <p className="text-xs text-slate-500">Configured Modality Worklist (MWL) and Storage SCP nodes across ADC radiology network.</p>
+              <p className="text-xs text-slate-500">Configured Modality Worklist (MWL) and Storage SCP nodes across the PolytronX - RIS radiology network.</p>
             </div>
             <button
               onClick={() => handleOpenNodeModal()}
@@ -1101,7 +1092,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                     required
                     value={userEmail}
                     onChange={e => setUserEmail(e.target.value)}
-                    placeholder="email@amaddiagnosticcentre.com.pk"
+                    placeholder="clinic@example.com"
                     className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-slate-800 focus:ring-1 focus:ring-cyan-500"
                   />
                 </div>
@@ -1156,7 +1147,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                     type="text"
                     value={userPhone}
                     onChange={e => setUserPhone(e.target.value)}
-                    placeholder="+92 300 1234567"
+                    placeholder="Clinic phone"
                     className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-slate-800 font-mono"
                   />
                 </div>
@@ -1282,7 +1273,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                     required
                     value={nodeAeTitle}
                     onChange={e => setNodeAeTitle(e.target.value.toUpperCase())}
-                    placeholder="ADC_CT_01"
+                    placeholder="PX_CT_01"
                     className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-slate-800 font-mono uppercase"
                   />
                 </div>

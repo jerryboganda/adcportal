@@ -24,7 +24,7 @@ import {
   Percent,
   Check
 } from 'lucide-react';
-import { Invoice, Appointment, Patient, InvoiceItem, InvoicePayment } from '../types';
+import { Invoice, Appointment, Patient, InvoiceItem, InvoicePayment, ClinicProfileSettings } from '../types';
 import { generateInvoicePdf, generateShiftClosingPdf, ShiftClosingData } from '../utils/pdfGenerator';
 import { PrintableInvoiceModal } from './PrintableInvoiceModal';
 
@@ -32,6 +32,7 @@ interface BillingViewProps {
   invoices: Invoice[];
   appointments: Appointment[];
   patients: Patient[];
+  clinicSettings?: ClinicProfileSettings;
   onRecordPayment: (
     invoiceId: string,
     amount: number,
@@ -53,6 +54,7 @@ export const BillingView: React.FC<BillingViewProps> = ({
   invoices,
   appointments,
   patients,
+  clinicSettings,
   onRecordPayment,
   onCreateInvoice,
   onAddInvoiceItem,
@@ -104,7 +106,7 @@ export const BillingView: React.FC<BillingViewProps> = ({
     { id: 'add-media', name: 'DICOM Archive CD/DVD Disc Export', price: 200, selected: false },
   ]);
   const [isPanelBilling, setIsPanelBilling] = useState(false);
-  const [panelProvider, setPanelProvider] = useState('Sehat Sahulat Program (Federal Panel)');
+  const [panelProvider, setPanelProvider] = useState('');
   const [panelAuthCode, setPanelAuthCode] = useState('');
   const [invoiceNotes, setInvoiceNotes] = useState('');
   const [collectUpfront, setCollectUpfront] = useState(true);
@@ -113,11 +115,11 @@ export const BillingView: React.FC<BillingViewProps> = ({
 
   // Shift Closing & Reconciliation State
   const [shiftClosingOpen, setShiftClosingOpen] = useState(false);
-  const [shiftCashier, setShiftCashier] = useState('Amina Khan (Billing Officer)');
+  const [shiftCashier, setShiftCashier] = useState('');
   const [shiftName, setShiftName] = useState('Morning Shift (08:00 AM - 04:00 PM)');
-  const [supervisorName, setSupervisorName] = useState('Mr. Tariq Mehmood (Accounts Incharge)');
-  const [cardBatchRef, setCardBatchRef] = useState('POS-BATCH-88910');
-  const [shiftNotes, setShiftNotes] = useState('Counter drawer balanced with physical cash count.');
+  const [supervisorName, setSupervisorName] = useState('');
+  const [cardBatchRef, setCardBatchRef] = useState('');
+  const [shiftNotes, setShiftNotes] = useState('');
   const [denominations, setDenominations] = useState<{ [key: number]: number }>({
     5000: 0,
     1000: 0,
@@ -299,7 +301,7 @@ export const BillingView: React.FC<BillingViewProps> = ({
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement('a');
     link.setAttribute('href', encodedUri);
-    link.setAttribute('download', `ADC-Invoices-${new Date().toISOString().split('T')[0]}.csv`);
+    link.setAttribute('download', `PolytronX-RIS-Invoices-${new Date().toISOString().split('T')[0]}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -663,7 +665,7 @@ export const BillingView: React.FC<BillingViewProps> = ({
 
                           {/* Download PDF Invoice */}
                           <button
-                            onClick={() => generateInvoicePdf(inv)}
+                            onClick={() => generateInvoicePdf(inv, clinicSettings)}
                             title="Download Official A4 Tax Invoice (PDF)"
                             className="p-1.5 rounded bg-slate-100 hover:bg-slate-200 text-cyan-700 border border-slate-200 transition-colors cursor-pointer"
                           >
@@ -1163,10 +1165,14 @@ export const BillingView: React.FC<BillingViewProps> = ({
             <div className="bg-slate-50 border border-dashed border-slate-300 p-4 rounded-xl font-mono text-[11px] text-slate-800 space-y-2 shadow-inner">
               {/* Slip Header */}
               <div className="text-center space-y-0.5 border-b border-dashed border-slate-300 pb-2">
-                <div className="font-bold text-xs text-slate-900">AMAD DIAGNOSTIC CENTRE</div>
-                <div className="text-[10px] text-slate-500">Radiology & Advanced Imaging</div>
-                <div className="text-[9px] text-slate-400">Plot 14-B, Islamabad | Tel: 051-2223344</div>
-                <div className="text-[9px] text-slate-400">NTN: 8492019-3 | ISO 9001:2015</div>
+                <div className="font-bold text-xs text-slate-900">{(clinicSettings?.name?.trim() || 'POLYTRONX - RIS').toUpperCase()}</div>
+                {clinicSettings?.headerTagline?.trim() && <div className="text-[10px] text-slate-500">{clinicSettings.headerTagline.trim()}</div>}
+                {(clinicSettings?.city?.trim() || clinicSettings?.phone?.trim()) && (
+                  <div className="text-[9px] text-slate-400">
+                    {[clinicSettings?.city?.trim(), clinicSettings?.phone?.trim() ? `Phone: ${clinicSettings.phone.trim()}` : ''].filter(Boolean).join(' | ')}
+                  </div>
+                )}
+                {clinicSettings?.taxId?.trim() && <div className="text-[9px] text-slate-400">Tax ID: {clinicSettings.taxId.trim()}</div>}
               </div>
 
               {/* Patient & Token Info */}
@@ -1630,6 +1636,7 @@ export const BillingView: React.FC<BillingViewProps> = ({
       {printableInvoice && (
         <PrintableInvoiceModal
           invoice={printableInvoice}
+          clinicSettings={clinicSettings}
           onClose={() => setPrintableInvoice(null)}
         />
       )}

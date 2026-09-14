@@ -36,10 +36,10 @@ export const NewBookingModal: React.FC<NewBookingModalProps> = ({
 
   // New patient inputs
   const [newName, setNewName] = useState('');
-  const [newPhone, setNewPhone] = useState('+92 300 ');
-  const [newAge, setNewAge] = useState<number>(35);
+  const [newPhone, setNewPhone] = useState('');
+  const [newAge, setNewAge] = useState<number | ''>('');
   const [newGender, setNewGender] = useState<'male' | 'female' | 'other'>('male');
-  const [newBloodGroup, setNewBloodGroup] = useState('B+');
+  const [newBloodGroup, setNewBloodGroup] = useState('');
   const [newAllergies, setNewAllergies] = useState('');
 
   // Study parameters
@@ -78,13 +78,13 @@ export const NewBookingModal: React.FC<NewBookingModalProps> = ({
     if (modality.code === 'MG') roomNumber = 'Room 5 (Mammography Suite)';
 
     if (isNewPatient) {
-      const generatedMrn = `ADC-2026-${Math.floor(10000 + Math.random() * 90000)}`;
+      const generatedMrn = `PX-2026-${Math.floor(10000 + Math.random() * 90000)}`;
       const newPatientData: Partial<Patient> = {
         id: `pat-${Date.now()}`,
         mrn: generatedMrn,
         name: newName,
         phone: newPhone,
-        age: newAge,
+        age: Number(newAge),
         gender: newGender,
         bloodGroup: newBloodGroup,
         allergies: newAllergies || 'NKDA',
@@ -222,8 +222,10 @@ export const NewBookingModal: React.FC<NewBookingModalProps> = ({
                   <div className="flex space-x-2">
                     <input
                       type="number"
+                      required
+                      min="0"
                       value={newAge}
-                      onChange={(e) => setNewAge(Number(e.target.value))}
+                      onChange={(e) => setNewAge(e.target.value === '' ? '' : Number(e.target.value))}
                       className="w-20 bg-white text-slate-900 p-2 rounded-lg border border-slate-300 text-xs"
                     />
                     <select

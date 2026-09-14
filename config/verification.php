@@ -1,6 +1,6 @@
 <?php
 
 return [
-    'system' => 'BookingGo SaaS',
+    'system' => 'PolytronX - RIS',
     'system_version' => '5.6',
 ];

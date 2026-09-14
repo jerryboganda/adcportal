@@ -34,7 +34,7 @@ return new class extends Migration
             $table->string('subscription_status', 15)->default('trialing')->after('plan_id'); // trialing|active|suspended|expired
             $table->timestamp('trial_ends_at')->nullable()->after('subscription_status');
             $table->timestamp('subscription_ends_at')->nullable()->after('trial_ends_at');
-            $table->string('tenant_code', 12)->nullable()->unique()->after('subscription_ends_at'); // public short code e.g. ADC-4821
+            $table->string('tenant_code', 12)->nullable()->unique()->after('subscription_ends_at'); // public short code e.g. PX-4821
         });
     }
 

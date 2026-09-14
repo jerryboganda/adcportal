@@ -218,7 +218,7 @@ class SettingsController extends BaseApiController
 
         return $this->ok([
             'exportedAt' => now()->toIso8601String(),
-            'system' => 'Amad Diagnostic Centre RIS Portal',
+            'system' => 'PolytronX - RIS Portal',
             'version' => '3.0.0',
             'data' => [
                 'patients' => \App\Models\Customer::where('business_id', $tenantId)->get()
@@ -258,12 +258,17 @@ class SettingsController extends BaseApiController
 
     public function resetDemo(): JsonResponse
     {
+        // Demo-only surface: inert (404) in production installs.
+        if (! config('ris.demo_mode')) {
+            abort(404);
+        }
+
         $this->denyUnless('setting manage');
 
         $tenantId = $this->tenantId();
         $business = \App\Models\Business::find($tenantId);
 
-        if (! $business || $business->tenant_code !== env('RIS_DEMO_TENANT_CODE')) {
+        if (! $business || $business->tenant_code !== config('ris.demo_tenant_code')) {
             abort(403, 'Factory reset is only available for the demo clinic.');
         }
 

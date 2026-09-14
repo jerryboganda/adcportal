@@ -1,4 +1,4 @@
-# AGENTS.md — ADC Portal (Radiology Clinic Management SaaS)
+# AGENTS.md — PolytronX - RIS (Radiology Clinic Management SaaS)
 
 Multi-tenant Radiology Information System (RIS) for diagnostic clinics:
 study workflow, safety screening, reporting, invoicing, inventory, doctor

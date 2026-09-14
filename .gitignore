@@ -5,6 +5,11 @@ dist/
 /public/build/
 /public/mix-manifest.json
 
+# Dev databases & AI-agent tooling
+*.sqlite
+*.sqlite-journal
+/.agent/
+
 # Environment & Secrets
 .env
 .env.*

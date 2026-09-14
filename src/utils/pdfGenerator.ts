@@ -1,7 +1,19 @@
 import { jsPDF } from 'jspdf';
-import { Appointment, Invoice, RadiologyReport } from '../types';
+import { Appointment, Invoice, RadiologyReport, ClinicProfileSettings } from '../types';
 
-export function generateRadiologyReportPdf(appointment: Appointment, report: RadiologyReport) {
+/** Clinic identity printed on PDF documents — sourced from clinic settings. */
+export type ClinicIdentity = Pick<ClinicProfileSettings, 'name' | 'address' | 'city' | 'phone' | 'email' | 'taxId'>;
+
+const clinicName = (clinic?: ClinicIdentity) => clinic?.name?.trim() || 'PolytronX - RIS';
+
+const clinicContactLine = (clinic?: ClinicIdentity) =>
+  [
+    [clinic?.address?.trim(), clinic?.city?.trim()].filter(Boolean).join(', '),
+    clinic?.phone?.trim() ? `Phone: ${clinic.phone.trim()}` : '',
+    clinic?.email?.trim(),
+  ].filter(Boolean).join(' | ');
+
+export function generateRadiologyReportPdf(appointment: Appointment, report: RadiologyReport, clinic?: ClinicIdentity) {
   const doc = new jsPDF({
     orientation: 'portrait',
     unit: 'mm',
@@ -19,12 +31,13 @@ export function generateRadiologyReportPdf(appointment: Appointment, report: Rad
   doc.setTextColor(255, 255, 255);
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(14);
-  doc.text('AMAD DIAGNOSTIC CENTRE (ADC)', margin + 6, y + 9);
+  doc.text(clinicName(clinic), margin + 6, y + 9);
 
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(8.5);
-  doc.text('Radiology & Advanced Imaging Information System | ISO 9001:2015 Certified', margin + 6, y + 15);
-  doc.text('Plot 14-B, Executive Sector, Islamabad, Pakistan | Tel: +92 51 2223344 | info@amaddiagnosticcentre.com.pk', margin + 6, y + 20);
+  doc.text('Radiology & Advanced Imaging Information System', margin + 6, y + 15);
+  const contactLine = clinicContactLine(clinic);
+  if (contactLine) doc.text(contactLine, margin + 6, y + 20);
 
   y += 30;
 
@@ -161,14 +174,14 @@ export function generateRadiologyReportPdf(appointment: Appointment, report: Rad
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(7.5);
   doc.setTextColor(148, 163, 184);
-  doc.text(`Report Ref: ${report.id} | Page 1 of 1 | Digitally signed via ADC Portal RIS`, margin, y + 6);
+  doc.text(`Report Ref: ${report.id} | Page 1 of 1 | Digitally signed via ${clinicName(clinic)}`, margin, y + 6);
 
   // Save / Trigger Download
-  const filename = `ADC-Report-${appointment.tokenNumber}-${appointment.patient.mrn}.pdf`;
+  const filename = `PolytronX-RIS-Report-${appointment.tokenNumber}-${appointment.patient.mrn}.pdf`;
   doc.save(filename);
 }
 
-export function generateInvoicePdf(invoice: Invoice) {
+export function generateInvoicePdf(invoice: Invoice, clinic?: ClinicIdentity) {
   const doc = new jsPDF({
     orientation: 'portrait',
     unit: 'mm',
@@ -186,12 +199,14 @@ export function generateInvoicePdf(invoice: Invoice) {
   doc.setTextColor(255, 255, 255);
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(14);
-  doc.text('AMAD DIAGNOSTIC CENTRE (ADC)', margin + 6, y + 9);
+  doc.text(clinicName(clinic), margin + 6, y + 9);
 
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(8.5);
-  doc.text('Official Clinical Billing Receipt & Invoice | NTN: 8492019-3', margin + 6, y + 15);
-  doc.text('Plot 14-B, Executive Sector, Islamabad, Pakistan | Tel: +92 51 2223344', margin + 6, y + 20);
+  const invoiceTitle = `Official Clinical Billing Receipt & Invoice${clinic?.taxId?.trim() ? ` | Tax ID: ${clinic.taxId.trim()}` : ''}`;
+  doc.text(invoiceTitle, margin + 6, y + 15);
+  const invoiceContact = clinicContactLine(clinic);
+  if (invoiceContact) doc.text(invoiceContact, margin + 6, y + 20);
 
   y += 30;
 
@@ -331,7 +346,7 @@ export function generateInvoicePdf(invoice: Invoice) {
   doc.setFont('helvetica', 'italic');
   doc.setFontSize(7.5);
   doc.setTextColor(148, 163, 184);
-  doc.text('Thank you for trusting Amad Diagnostic Centre. Computer generated document, requires no physical signature.', margin, y);
+  doc.text(`Thank you for choosing ${clinicName(clinic)}. Computer generated document, requires no physical signature.`, margin, y);
 
   const filename = `${invoice.invoiceNumber}.pdf`;
   doc.save(filename);
@@ -359,7 +374,7 @@ export interface ShiftClosingData {
   supervisorName?: string;
 }
 
-export function generateShiftClosingPdf(data: ShiftClosingData) {
+export function generateShiftClosingPdf(data: ShiftClosingData, clinic?: ClinicIdentity) {
   const doc = new jsPDF({
     orientation: 'portrait',
     unit: 'mm',
@@ -377,12 +392,13 @@ export function generateShiftClosingPdf(data: ShiftClosingData) {
   doc.setTextColor(255, 255, 255);
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(13);
-  doc.text('AMAD DIAGNOSTIC CENTRE (ADC)', margin + 6, y + 8);
+  doc.text(clinicName(clinic), margin + 6, y + 8);
 
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(8.5);
   doc.text('Daily Shift Cash Closing & POS Financial Reconciliation Statement', margin + 6, y + 14);
-  doc.text('Plot 14-B, Executive Sector, Islamabad, Pakistan | Tel: +92 51 2223344 | NTN: 8492019-3', margin + 6, y + 19);
+  const shiftContact = clinicContactLine(clinic);
+  if (shiftContact) doc.text(shiftContact, margin + 6, y + 19);
 
   y += 30;
 
@@ -423,7 +439,7 @@ export function generateShiftClosingPdf(data: ShiftClosingData) {
   doc.setFont('helvetica', 'bold');
   doc.text('POS Batch Ref:', col2X, y + 18);
   doc.setFont('helvetica', 'normal');
-  doc.text(data.cardSettlementRef || 'BATCH-88219', col2X + 32, y + 18);
+  doc.text(data.cardSettlementRef || 'N/A', col2X + 32, y + 18);
 
   y += 32;
 
@@ -530,6 +546,6 @@ export function generateShiftClosingPdf(data: ShiftClosingData) {
   doc.text(`Shift Cashier Handover: ${data.cashierName}`, sigCol1, y);
   doc.text(`Shift Supervisor Sign-off: ${data.supervisorName || 'Accounts Incharge'}`, sigCol2, y);
 
-  const filename = `ADC-Shift-Closing-${data.shiftDate}-${data.shiftName.replace(/\s+/g, '-')}.pdf`;
+  const filename = `PolytronX-RIS-Shift-Closing-${data.shiftDate}-${data.shiftName.replace(/\s+/g, '-')}.pdf`;
   doc.save(filename);
 }
