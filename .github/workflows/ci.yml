@@ -114,6 +114,8 @@ jobs:
           RIS_DEMO_TENANT_CODE: DEMO-2026
           RIS_DEMO_ADMIN_EMAIL: admin@polytronx-e2e.test
           RIS_DEMO_PASSWORD: E2eDemo#2026
+          RIS_SUPER_ADMIN_EMAIL: platform@polytronx-e2e.test
+          RIS_SUPER_ADMIN_PASSWORD: Platform#E2e2026
         run: |
           set -o pipefail
           {
