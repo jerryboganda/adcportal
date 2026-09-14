@@ -1,4 +1,21 @@
-# COMPLETION_EVIDENCE — SaaS re-engineering program (2026-09-14)
+# COMPLETION_EVIDENCE — SaaS re-engineering program (2026-09-14, re-verified 2026-09-15)
+
+## 2026-09-15 re-audit + final hardening
+
+- **Full Definition-of-Done re-audit** against the master prompt: all 14 gap-matrix
+  items remain fixed, no TODO/FIXME/placeholder debt in scope, isolation/entitlement/
+  lifecycle/support-session evidence unchanged. One residual in-scope gap found and
+  closed: **§52 noisy-neighbor protection** (per-tenant aggregate API rate limit).
+- Implementation commit: `67c34b7` — *feat(saas): aggregate per-tenant API rate limit*
+  (`throttle:tenant` on the tenant data plane, keyed on `getActiveBusiness()`;
+  default 2400/min via `RIS_TENANT_API_RATE_LIMIT_PER_MINUTE`; per-user `throttle:api`
+  still applies underneath). Gap matrix row 15; posture documented in `OPERATIONS.md`.
+- New test: `TenantRateLimitTest` — 429 isolation across tenants, aggregate budget
+  shared by all users of one tenant, switched-member keying follows the operated clinic.
+- **CI run `34892267671` (commit `67c34b7`): all 4 jobs ✅** — Backend PHP feature
+  tests, Frontend typecheck+build, E2E real-browser journey, **Deliver to Hostinger ✅**
+  (production is running `67c34b7`: `git pull`, `composer install --no-dev`,
+  `migrate --force`, `config:cache` executed on the host by the gated job).
 
 ## Platform
 
@@ -39,4 +56,4 @@ From `SaaSAcceptanceScenarioTest` (Alpha/Beta, plus Tenant C exercised in `Tenan
 
 ## Remaining issues
 
-**NONE in scope.** External dependencies that remain outside the repository (not code gaps): payment gateway credentials (activation stays manual by design — no fake billing), live WhatsApp/SMS delivery credentials (dispatch rows log `pending`), and Hostinger SSH secrets if not yet added (deploy job skips gracefully).
+**NONE in scope** (re-confirmed 2026-09-15). External dependencies that remain outside the repository (not code gaps): payment gateway credentials (activation stays manual by design — no fake billing), live WhatsApp/SMS delivery credentials (dispatch rows log `pending`), and the production domain URL for out-of-band HTTP smoke checks (deployment verification is the gated CI delivery job).
