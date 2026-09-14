@@ -17,6 +17,18 @@
   (production is running `67c34b7`: `git pull`, `composer install --no-dev`,
   `migrate --force`, `config:cache` executed on the host by the gated job).
 
+## 2026-09-15 — tenant manageability in the control plane
+
+Following operator feedback that the Tenant 360 view was read-only ("very initial"), full
+tenant administration shipped on `51d6e0c` (CI run `34895682011`, all 4 jobs ✅ incl.
+Hostinger delivery): tenant rename + subscription editing, tenant user administration
+(create/edit/role change/password rotation/login revoke with last-admin protection and
+session revocation), and facility CRUD with a study-reference delete guard
+(`appointments.location_id` FK cascades — deletion is refused while referenced).
+Endpoints + capability map in `CONTROL_PLANE.md`; evidence in `PlatformTenantManageTest`
+(authorization boundaries, one-time password handover, last-admin lockout prevention,
+cross-tenant 404s, facility delete guard).
+
 ## Platform
 
 - Repo: `jerryboganda/adcportal` (PolytronX - RIS), branch `main`.
