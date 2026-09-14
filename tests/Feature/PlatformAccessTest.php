@@ -87,7 +87,7 @@ class PlatformAccessTest extends ApiTestCase
         $this->actingAs($billing)->getJson('/api/v1/platform/tenants')->assertOk();
         $this->actingAs($billing)->postJson('/api/v1/platform/plans', [
             'name' => 'Billing Plan', 'priceMonthly' => 999, 'currency' => 'PKR', 'trialDays' => 7,
-        ])->assertOk()->assertJsonPath('data.plan.name', 'Billing Plan');
+        ])->assertStatus(201)->assertJsonPath('data.plan.name', 'Billing Plan');
 
         $this->actingAs($billing)
             ->postJson("/api/v1/platform/tenants/{$this->businessA->id}/suspend", ['reason' => 'nope'])

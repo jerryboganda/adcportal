@@ -33,14 +33,8 @@ class AuthController extends BaseApiController
 
         $user = Auth::user();
 
-        if (! $user->active_status || ! $user->is_enable_login) {
-            Auth::logout();
-
-            return response()->json(['message' => 'This account is disabled. Contact your clinic administrator.'], 403);
-        }
-
-        // Terminated / offboarding tenants lose even interactive access;
-        // suspended/expired tenants may still sign in and reach the gate view.
+        // Terminated / offboarding tenants lose even interactive access —
+        // checked BEFORE the generic disabled flag so the operator sees why.
         if (! $user->isPlatformAdmin()) {
             $businessId = (int) ($user->business_id ?: $user->active_business ?: 0);
             $business = $businessId ? Business::find($businessId) : null;
@@ -55,6 +49,12 @@ class AuthController extends BaseApiController
                     'subscriptionStatus' => $business->subscription_status,
                 ], 403);
             }
+        }
+
+        if (! $user->active_status || ! $user->is_enable_login) {
+            Auth::logout();
+
+            return response()->json(['message' => 'This account is disabled. Contact your clinic administrator.'], 403);
         }
 
         $user->forceFill(['last_login_at' => now()])->save();
