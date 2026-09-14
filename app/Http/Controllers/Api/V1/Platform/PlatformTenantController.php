@@ -598,7 +598,12 @@ class PlatformTenantController extends PlatformController
 
     // ==================== internals ====================
 
-    /** Attach the tenant's own laratrust role (portal role vocabulary). */
+    /**
+     * Attach the tenant's own laratrust role (portal role vocabulary). This is
+     * a REPLACE within the tenant: the user ends up holding exactly one of the
+     * tenant's roles, while roles owned by OTHER tenants stay untouched
+     * (multi-tenant members keep their memberships elsewhere).
+     */
     private function assignTenantRole(Business $tenant, User $user, string $portalRole): void
     {
         $roleName = match ($portalRole) {
@@ -615,11 +620,23 @@ class PlatformTenantController extends PlatformController
             ->where('created_by', $tenant->created_by)
             ->first();
 
-        if ($role && ! $user->hasRole($roleName)) {
-            $user->addRole($role);
-            if (method_exists($user, 'flushCache')) {
-                $user->flushCache();
-            }
+        if (! $role) {
+            return;
+        }
+
+        $supersededIds = \App\Models\Role::where('guard_name', 'web')
+            ->where('created_by', $tenant->created_by)
+            ->where('id', '!=', $role->id)
+            ->pluck('id')
+            ->all();
+
+        if ($supersededIds !== []) {
+            $user->roles()->detach($supersededIds);
+        }
+        $user->roles()->syncWithoutDetaching([$role->id]);
+
+        if (method_exists($user, 'flushCache')) {
+            $user->flushCache();
         }
     }
 
