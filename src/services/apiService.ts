@@ -33,8 +33,10 @@ import {
   StudyScreeningAnswer,
   SupportSessionInfo,
   Tenant360,
+  TenantFacilityRecord,
   TenantMembership,
   TenantRecord,
+  TenantUserRecord,
   UsageSummary,
 } from '../types';
 
@@ -691,9 +693,56 @@ export async function fetchTenant360(id: string): Promise<Tenant360> {
   return data.data.tenant;
 }
 
-export async function updateTenantSubscription(id: string, updates: { planId?: string | null; subscriptionEndsAt?: string | null; trialEndsAt?: string | null }): Promise<TenantRecord> {
+export async function updateTenantSubscription(id: string, updates: { name?: string; planId?: string | null; subscriptionEndsAt?: string | null; trialEndsAt?: string | null }): Promise<TenantRecord> {
   const { data } = await http.patch(`/platform/tenants/${id}`, updates);
   return data.data.tenant;
+}
+
+// ==================== platform: tenant user administration ====================
+
+export async function createTenantUser(tenantId: string, input: {
+  name: string;
+  email: string;
+  role: string;
+  phone?: string;
+  password?: string;
+  isActive?: boolean;
+}): Promise<{ user: TenantUserRecord; initialPassword: string | null }> {
+  const { data } = await http.post(`/platform/tenants/${tenantId}/users`, input);
+  return { user: data.data.user, initialPassword: data.data.initialPassword ?? null };
+}
+
+export async function updateTenantUser(tenantId: string, userId: string, updates: {
+  name?: string;
+  email?: string;
+  role?: string;
+  phone?: string | null;
+  isActive?: boolean;
+  loginEnabled?: boolean;
+}): Promise<TenantUserRecord> {
+  const { data } = await http.patch(`/platform/tenants/${tenantId}/users/${userId}`, updates);
+  return data.data.user;
+}
+
+export async function resetTenantUserPassword(tenantId: string, userId: string): Promise<{ user: TenantUserRecord; newPassword: string }> {
+  const { data } = await http.post(`/platform/tenants/${tenantId}/users/${userId}/reset-password`);
+  return { user: data.data.user, newPassword: data.data.newPassword };
+}
+
+// ==================== platform: tenant facilities ====================
+
+export async function createTenantFacility(tenantId: string, input: { name: string; address?: string; phone?: string; description?: string }): Promise<TenantFacilityRecord> {
+  const { data } = await http.post(`/platform/tenants/${tenantId}/facilities`, input);
+  return data.data.facility;
+}
+
+export async function updateTenantFacility(tenantId: string, facilityId: string, updates: { name?: string; address?: string | null; phone?: string | null; description?: string | null }): Promise<TenantFacilityRecord> {
+  const { data } = await http.patch(`/platform/tenants/${tenantId}/facilities/${facilityId}`, updates);
+  return data.data.facility;
+}
+
+export async function deleteTenantFacility(tenantId: string, facilityId: string): Promise<void> {
+  await http.delete(`/platform/tenants/${tenantId}/facilities/${facilityId}`);
 }
 
 export type TenantLifecycleAction = 'activate' | 'suspend' | 'reactivate' | 'offboard' | 'terminate' | 'provision-retry';

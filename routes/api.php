@@ -169,6 +169,14 @@ Route::middleware(['auth', 'platform'])->prefix('platform')->group(function () {
     Route::post('/tenants/{tenant}/terminate', [PlatformTenantController::class, 'terminate'])->whereNumber('tenant');
     Route::post('/tenants/{tenant}/provision-retry', [PlatformTenantController::class, 'retryProvisioning'])->whereNumber('tenant');
 
+    // Tenant administration: user accounts + facilities inside one tenant
+    Route::post('/tenants/{tenant}/users', [PlatformTenantController::class, 'storeUser'])->whereNumber('tenant');
+    Route::patch('/tenants/{tenant}/users/{user}', [PlatformTenantController::class, 'updateUser'])->whereNumber('tenant')->whereNumber('user');
+    Route::post('/tenants/{tenant}/users/{user}/reset-password', [PlatformTenantController::class, 'resetUserPassword'])->whereNumber('tenant')->whereNumber('user');
+    Route::post('/tenants/{tenant}/facilities', [PlatformTenantController::class, 'storeFacility'])->whereNumber('tenant');
+    Route::patch('/tenants/{tenant}/facilities/{location}', [PlatformTenantController::class, 'updateFacility'])->whereNumber('tenant')->whereNumber('location');
+    Route::delete('/tenants/{tenant}/facilities/{location}', [PlatformTenantController::class, 'destroyFacility'])->whereNumber('tenant')->whereNumber('location');
+
     // Plans
     Route::get('/plans', [PlatformPlanController::class, 'index']);
     Route::post('/plans', [PlatformPlanController::class, 'store']);

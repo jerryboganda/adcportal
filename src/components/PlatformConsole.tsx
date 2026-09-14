@@ -1,8 +1,8 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-  Activity, Archive, ArrowLeft, BarChart3, Building2, CheckCircle2, ChevronRight, CreditCard,
-  Download, KeyRound, LifeBuoy, LogOut, Pause, Play, Plus, RefreshCw, RotateCcw, ScrollText,
-  Search, ShieldCheck, Users as UsersIcon, XCircle,
+  Activity, Archive, ArrowLeft, BarChart3, Building2, CheckCircle2, ChevronRight, Copy, CreditCard,
+  Download, KeyRound, LifeBuoy, LogOut, Pause, Pencil, Play, Plus, RefreshCw, RotateCcw, ScrollText,
+  Search, ShieldCheck, Trash2, Users as UsersIcon, XCircle,
 } from 'lucide-react';
 import * as api from '../services/apiService';
 import { SessionUser } from '../services/apiService';
@@ -15,8 +15,10 @@ import {
   PlatformSupportSessionRecord,
   PlatformUserRecord,
   Tenant360,
+  TenantFacilityRecord,
   TenantLifecycleEntry,
   TenantRecord,
+  TenantUserRecord,
   UsageSummary,
 } from '../types';
 
@@ -466,6 +468,10 @@ const TenantDetail: React.FC<{
   const [confirmTerminate, setConfirmTerminate] = useState('');
   const [suspendReason, setSuspendReason] = useState('');
   const [busy, setBusy] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
+  const [userModal, setUserModal] = useState<{ mode: 'create' } | { mode: 'edit'; user: TenantUserRecord } | null>(null);
+  const [facilityModal, setFacilityModal] = useState<{ facility: TenantFacilityRecord | null } | null>(null);
+  const [oneTimeSecret, setOneTimeSecret] = useState<{ title: string; secret: string } | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -585,26 +591,33 @@ const TenantDetail: React.FC<{
               <Row k="Patients" v={String(tenant.patientCount)} />
               <Row k="DICOM nodes" v={String(tenant.dicomNodeCount)} />
               <Row k="Created" v={tenant.createdAt ?? '—'} />
-              {can(user, 'tenants.manage') && (
-                <button
-                  onClick={async () => {
-                    try {
-                      const data = await api.exportTenantData(tenant.id);
-                      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-                      const url = URL.createObjectURL(blob);
-                      const a = document.createElement('a');
-                      a.href = url;
-                      a.download = `tenant_${tenant.id}_export.json`;
-                      a.click();
-                      URL.revokeObjectURL(url);
-                      notify('success', 'Tenant export downloaded.');
-                    } catch (err) { fail(err, 'Export failed.'); }
-                  }}
-                  className="mt-1 inline-flex items-center gap-1.5 rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50"
-                >
-                  <Download size={13} /> Export tenant data (JSON)
-                </button>
-              )}
+              <div className="flex flex-wrap gap-2 pt-1">
+                {can(user, 'subscriptions.manage') && (
+                  <button onClick={() => setEditOpen(true)} className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50">
+                    <Pencil size={13} /> Edit profile & subscription
+                  </button>
+                )}
+                {can(user, 'tenants.manage') && (
+                  <button
+                    onClick={async () => {
+                      try {
+                        const data = await api.exportTenantData(tenant.id);
+                        const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+                        const url = URL.createObjectURL(blob);
+                        const a = document.createElement('a');
+                        a.href = url;
+                        a.download = `tenant_${tenant.id}_export.json`;
+                        a.click();
+                        URL.revokeObjectURL(url);
+                        notify('success', 'Tenant export downloaded.');
+                      } catch (err) { fail(err, 'Export failed.'); }
+                    }}
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+                  >
+                    <Download size={13} /> Export tenant data (JSON)
+                  </button>
+                )}
+              </div>
             </div>
             <div className="rounded-xl border border-slate-200 bg-white p-4">
               <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Module entitlements (server-enforced)</p>
@@ -621,46 +634,159 @@ const TenantDetail: React.FC<{
       )}
 
       {tab === 'users' && (
-        <div className="rounded-xl border border-slate-200 bg-white overflow-hidden">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-slate-200 bg-slate-50 text-left text-[11px] uppercase tracking-wide text-slate-500">
-                <th className="px-4 py-2.5 font-semibold">Name</th>
-                <th className="px-4 py-2.5 font-semibold">Email</th>
-                <th className="px-4 py-2.5 font-semibold">Role</th>
-                <th className="px-4 py-2.5 font-semibold">Login</th>
-                <th className="px-4 py-2.5 font-semibold">Last login</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {tenant.users.map(u => (
-                <tr key={u.id}>
-                  <td className="px-4 py-2.5 font-medium text-slate-800">{u.name}{u.isAdmin && <span className="ml-1.5 rounded bg-cyan-50 px-1.5 py-0.5 text-[10px] font-bold text-cyan-700">OWNER</span>}</td>
-                  <td className="px-4 py-2.5 text-slate-600">{u.email}</td>
-                  <td className="px-4 py-2.5 capitalize text-slate-600">{u.role}</td>
-                  <td className="px-4 py-2.5">{u.loginEnabled ? <span className="text-emerald-600 text-xs font-semibold">enabled</span> : <span className="text-rose-600 text-xs font-semibold">revoked</span>}</td>
-                  <td className="px-4 py-2.5 text-xs text-slate-500">{u.lastLogin ? fmtWhen(u.lastLogin) : 'Never'}</td>
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <p className="text-xs text-slate-500">{tenant.users.length} account(s) — access changes revoke the user's live sessions and are audited.</p>
+            {can(user, 'tenants.manage') && (
+              <button onClick={() => setUserModal({ mode: 'create' })} className={btnPrimary}>
+                <Plus size={13} /> Add user
+              </button>
+            )}
+          </div>
+          <div className="rounded-xl border border-slate-200 bg-white overflow-hidden">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-slate-200 bg-slate-50 text-left text-[11px] uppercase tracking-wide text-slate-500">
+                  <th className="px-4 py-2.5 font-semibold">Name</th>
+                  <th className="px-4 py-2.5 font-semibold">Email</th>
+                  <th className="px-4 py-2.5 font-semibold">Role</th>
+                  <th className="px-4 py-2.5 font-semibold">Login</th>
+                  <th className="px-4 py-2.5 font-semibold">Last login</th>
+                  {can(user, 'tenants.manage') && <th className="px-4 py-2.5 font-semibold text-right">Actions</th>}
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {tenant.users.map(u => {
+                  const isActiveAdmin = u.isAdmin && u.role === 'admin';
+                  const canManageRow = can(user, 'tenants.manage');
+                  return (
+                    <tr key={u.id}>
+                      <td className="px-4 py-2.5 font-medium text-slate-800">
+                        {u.name}
+                        {u.isAdmin && <span className="ml-1.5 rounded bg-cyan-50 px-1.5 py-0.5 text-[10px] font-bold text-cyan-700">OWNER</span>}
+                        {!u.active && <span className="ml-1.5 rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-bold text-slate-500">INACTIVE</span>}
+                      </td>
+                      <td className="px-4 py-2.5 text-slate-600">{u.email}</td>
+                      <td className="px-4 py-2.5 capitalize text-slate-600">{u.role}</td>
+                      <td className="px-4 py-2.5">{u.loginEnabled ? <span className="text-emerald-600 text-xs font-semibold">enabled</span> : <span className="text-rose-600 text-xs font-semibold">revoked</span>}</td>
+                      <td className="px-4 py-2.5 text-xs text-slate-500">{u.lastLogin ? fmtWhen(u.lastLogin) : 'Never'}</td>
+                      {canManageRow && (
+                        <td className="px-4 py-2.5">
+                          <div className="flex flex-wrap items-center justify-end gap-1.5">
+                            <button onClick={() => setUserModal({ mode: 'edit', user: u })} disabled={busy} className={btnGhost} title="Edit identity and role">
+                              <Pencil size={12} /> Edit
+                            </button>
+                            <button
+                              onClick={async () => {
+                                if (!window.confirm(`Rotate the password for ${u.email}? Live sessions are revoked and the new password is shown once.`)) return;
+                                setBusy(true);
+                                try {
+                                  const { newPassword } = await api.resetTenantUserPassword(tenant.id, u.id);
+                                  setOneTimeSecret({ title: `New password for ${u.email}`, secret: newPassword });
+                                  await load();
+                                } catch (err) { fail(err, 'Password reset failed.'); } finally { setBusy(false); }
+                              }}
+                              disabled={busy}
+                              className={btnGhost}
+                              title="Generate a new password (shown once)"
+                            >
+                              <KeyRound size={12} /> Reset password
+                            </button>
+                            <button
+                              onClick={async () => {
+                                setBusy(true);
+                                try {
+                                  await api.updateTenantUser(tenant.id, u.id, { loginEnabled: !u.loginEnabled });
+                                  notify('success', `Login ${u.loginEnabled ? 'revoked' : 'restored'} for ${u.email}.`);
+                                  await load();
+                                } catch (err) { fail(err, 'Access change failed.'); } finally { setBusy(false); }
+                              }}
+                              disabled={busy}
+                              className={u.loginEnabled
+                                ? 'inline-flex items-center gap-1.5 rounded-lg border border-amber-300 bg-amber-50 px-3 py-1.5 text-xs font-semibold text-amber-800 hover:bg-amber-100 disabled:opacity-40'
+                                : 'inline-flex items-center gap-1.5 rounded-lg border border-emerald-300 bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-800 hover:bg-emerald-100 disabled:opacity-40'}
+                              title={u.loginEnabled ? 'Revoke interactive login' : 'Restore interactive login'}
+                            >
+                              {u.loginEnabled ? <XCircle size={12} /> : <CheckCircle2 size={12} />} {u.loginEnabled ? 'Revoke login' : 'Restore login'}
+                            </button>
+                            <button
+                              onClick={async () => {
+                                setBusy(true);
+                                try {
+                                  await api.updateTenantUser(tenant.id, u.id, { isActive: !u.active });
+                                  notify('success', `${u.name} is now ${u.active ? 'inactive' : 'active'}.`);
+                                  await load();
+                                } catch (err) { fail(err, 'Access change failed.'); } finally { setBusy(false); }
+                              }}
+                              disabled={busy}
+                              className={btnGhost}
+                              title={u.active ? 'Deactivate this account' : 'Reactivate this account'}
+                            >
+                              {u.active ? <Pause size={12} /> : <Play size={12} />} {u.active ? 'Deactivate' : 'Activate'}
+                            </button>
+                            {isActiveAdmin && (
+                              <span className="text-[10px] font-semibold uppercase tracking-wide text-slate-400" title="The platform refuses to revoke the last active administrator of a tenant.">admin</span>
+                            )}
+                          </div>
+                        </td>
+                      )}
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
 
       {tab === 'facilities' && (
-        <div className="rounded-xl border border-slate-200 bg-white overflow-hidden">
-          {tenant.facilities.length === 0 ? (
-            <p className="px-4 py-6 text-sm text-slate-500">No facility (location) records.</p>
-          ) : (
-            <ul className="divide-y divide-slate-100">
-              {tenant.facilities.map(f => (
-                <li key={f.id} className="px-4 py-3">
-                  <p className="text-sm font-semibold text-slate-800">{f.name}</p>
-                  <p className="text-xs text-slate-500">{f.address || '—'} {f.phone && `· ${f.phone}`}</p>
-                </li>
-              ))}
-            </ul>
-          )}
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <p className="text-xs text-slate-500">Facilities (locations) of this tenant. Deletion is refused while studies still reference a facility.</p>
+            {can(user, 'tenants.manage') && (
+              <button onClick={() => setFacilityModal({ facility: null })} className={btnPrimary}>
+                <Plus size={13} /> Add facility
+              </button>
+            )}
+          </div>
+          <div className="rounded-xl border border-slate-200 bg-white overflow-hidden">
+            {tenant.facilities.length === 0 ? (
+              <p className="px-4 py-6 text-sm text-slate-500">No facility (location) records.</p>
+            ) : (
+              <ul className="divide-y divide-slate-100">
+                {tenant.facilities.map(f => (
+                  <li key={f.id} className="flex items-center gap-3 px-4 py-3">
+                    <div className="min-w-0">
+                      <p className="text-sm font-semibold text-slate-800">{f.name}</p>
+                      <p className="text-xs text-slate-500">{f.address || '—'} {f.phone && `· ${f.phone}`}</p>
+                    </div>
+                    {can(user, 'tenants.manage') && (
+                      <div className="ml-auto flex shrink-0 items-center gap-1.5">
+                        <button onClick={() => setFacilityModal({ facility: f })} disabled={busy} className={btnGhost}>
+                          <Pencil size={12} /> Edit
+                        </button>
+                        <button
+                          onClick={async () => {
+                            if (!window.confirm(`Delete facility "${f.name}"? This is refused while studies still reference it.`)) return;
+                            setBusy(true);
+                            try {
+                              await api.deleteTenantFacility(tenant.id, f.id);
+                              notify('success', `Facility "${f.name}" deleted.`);
+                              await load();
+                            } catch (err) { fail(err, 'Delete failed — the facility may still be referenced by studies.'); } finally { setBusy(false); }
+                          }}
+                          disabled={busy}
+                          className="inline-flex items-center gap-1.5 rounded-lg border border-rose-300 bg-rose-50 px-3 py-1.5 text-xs font-semibold text-rose-800 hover:bg-rose-100 disabled:opacity-40"
+                        >
+                          <Trash2 size={12} /> Delete
+                        </button>
+                      </div>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
         </div>
       )}
 
@@ -699,6 +825,52 @@ const TenantDetail: React.FC<{
       )}
 
       {tab === 'features' && <FeatureOverridesTab tenant={tenant} onChanged={load} notify={notify} fail={fail} />}
+
+      {editOpen && (
+        <EditTenantModal
+          tenant={tenant}
+          onClose={() => setEditOpen(false)}
+          onSaved={() => { setEditOpen(false); load(); }}
+          notify={notify}
+          fail={fail}
+        />
+      )}
+      {userModal?.mode === 'create' && (
+        <TenantUserModal
+          tenantId={tenant.id}
+          onClose={() => setUserModal(null)}
+          onSaved={secret => { setUserModal(null); if (secret) setOneTimeSecret(secret); load(); }}
+          notify={notify}
+          fail={fail}
+        />
+      )}
+      {userModal?.mode === 'edit' && (
+        <TenantUserModal
+          tenantId={tenant.id}
+          user={userModal.user}
+          onClose={() => setUserModal(null)}
+          onSaved={() => { setUserModal(null); load(); }}
+          notify={notify}
+          fail={fail}
+        />
+      )}
+      {facilityModal && (
+        <FacilityModal
+          tenantId={tenant.id}
+          facility={facilityModal.facility}
+          onClose={() => setFacilityModal(null)}
+          onSaved={() => { setFacilityModal(null); load(); }}
+          notify={notify}
+          fail={fail}
+        />
+      )}
+      {oneTimeSecret && (
+        <OneTimeSecretModal
+          title={oneTimeSecret.title}
+          secret={oneTimeSecret.secret}
+          onClose={() => setOneTimeSecret(null)}
+        />
+      )}
     </div>
   );
 };
@@ -745,6 +917,268 @@ const FeatureOverridesTab: React.FC<{
         </div>
       ))}
     </div>
+  );
+};
+
+// ==================== tenant manageability modals ====================
+
+const EditTenantModal: React.FC<{
+  tenant: Tenant360;
+  onClose: () => void;
+  onSaved: () => void;
+  notify: (k: 'error' | 'success', m: string) => void;
+  fail: (e: any, f: string) => void;
+}> = ({ tenant, onClose, onSaved, notify, fail }) => {
+  const [plans, setPlans] = useState<Plan[]>([]);
+  const [name, setName] = useState(tenant.name);
+  const [planId, setPlanId] = useState<string>(tenant.plan?.id ?? '');
+  const [trialEndsAt, setTrialEndsAt] = useState(tenant.trialEndsAt ? tenant.trialEndsAt.slice(0, 10) : '');
+  const [termEndsAt, setTermEndsAt] = useState(tenant.subscriptionEndsAt ? tenant.subscriptionEndsAt.slice(0, 10) : '');
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    api.fetchPlatformPlans().then(setPlans).catch(() => setPlans([]));
+  }, []);
+
+  const submit = async () => {
+    setBusy(true);
+    try {
+      await api.updateTenantSubscription(tenant.id, {
+        name: name.trim() !== tenant.name ? name.trim() : undefined,
+        planId: planId || null,
+        trialEndsAt: trialEndsAt || null,
+        subscriptionEndsAt: termEndsAt || null,
+      });
+      notify('success', 'Tenant profile and subscription updated.');
+      onSaved();
+    } catch (err) {
+      fail(err, 'Update failed.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <ModalShell title={`Edit tenant: ${tenant.tenantCode}`} onClose={onClose}>
+      <div className="space-y-3">
+        <Field label="Tenant name">
+          <input value={name} onChange={e => setName(e.target.value)} className={inputCls} />
+        </Field>
+        <Field label="Plan">
+          <select value={planId} onChange={e => setPlanId(e.target.value)} className={inputCls}>
+            <option value="">— no plan —</option>
+            {plans.map(p => (
+              <option key={p.id} value={p.id}>{p.name} · {fmtMoney(p.priceMonthly, p.currency)}/mo</option>
+            ))}
+          </select>
+        </Field>
+        <div className="grid grid-cols-2 gap-3">
+          <Field label="Trial ends">
+            <input type="date" value={trialEndsAt} onChange={e => setTrialEndsAt(e.target.value)} className={inputCls} />
+          </Field>
+          <Field label="Term ends">
+            <input type="date" value={termEndsAt} onChange={e => setTermEndsAt(e.target.value)} className={inputCls} />
+          </Field>
+        </div>
+        <p className="text-xs text-slate-500">The tenant code <span className="font-semibold">{tenant.tenantCode}</span> is the permanent identity anchor and never changes. Status changes go through the lifecycle actions.</p>
+        <div className="flex justify-end gap-2 pt-1">
+          <button onClick={onClose} className={btnGhost}>Cancel</button>
+          <button onClick={submit} disabled={busy || !name.trim()} className={btnPrimary}>
+            {busy ? 'Saving…' : 'Save changes'}
+          </button>
+        </div>
+      </div>
+    </ModalShell>
+  );
+};
+
+const TENANT_ROLES = ['admin', 'radiologist', 'technologist', 'receptionist', 'billing'] as const;
+
+const TenantUserModal: React.FC<{
+  tenantId: string;
+  user?: TenantUserRecord;
+  onClose: () => void;
+  onSaved: (secret?: { title: string; secret: string }) => void;
+  notify: (k: 'error' | 'success', m: string) => void;
+  fail: (e: any, f: string) => void;
+}> = ({ tenantId, user, onClose, onSaved, notify, fail }) => {
+  const editing = Boolean(user);
+  const [name, setName] = useState(user?.name ?? '');
+  const [email, setEmail] = useState(user?.email ?? '');
+  const [role, setRole] = useState<string>(user?.role ?? 'receptionist');
+  const [phone, setPhone] = useState('');
+  const [password, setPassword] = useState('');
+  const [busy, setBusy] = useState(false);
+
+  const submit = async () => {
+    setBusy(true);
+    try {
+      if (editing && user) {
+        await api.updateTenantUser(tenantId, user.id, {
+          name: name.trim() !== user.name ? name.trim() : undefined,
+          email: email.trim() !== user.email ? email.trim() : undefined,
+          role: role !== user.role ? role : undefined,
+          phone: phone.trim() !== '' ? phone.trim() : undefined,
+        });
+        notify('success', `User ${email.trim()} updated.`);
+        onSaved();
+      } else {
+        const { initialPassword } = await api.createTenantUser(tenantId, {
+          name: name.trim(),
+          email: email.trim(),
+          role,
+          phone: phone.trim() || undefined,
+          password: password || undefined,
+        });
+        notify('success', `User ${email.trim()} created.`);
+        onSaved(initialPassword ? { title: `Initial password for ${email.trim()}`, secret: initialPassword } : undefined);
+      }
+    } catch (err) {
+      fail(err, editing ? 'User update failed.' : 'User creation failed.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <ModalShell title={editing ? `Edit user: ${user?.email}` : 'Add user to this tenant'} onClose={onClose}>
+      <div className="space-y-3">
+        <Field label="Full name">
+          <input value={name} onChange={e => setName(e.target.value)} className={inputCls} />
+        </Field>
+        <Field label="Email">
+          <input type="email" value={email} onChange={e => setEmail(e.target.value)} className={inputCls} />
+        </Field>
+        <div className="grid grid-cols-2 gap-3">
+          <Field label="Tenant role">
+            <select value={role} onChange={e => setRole(e.target.value)} className={inputCls}>
+              {TENANT_ROLES.map(r => <option key={r} value={r}>{r}</option>)}
+            </select>
+          </Field>
+          <Field label="Phone (optional)">
+            <input value={phone} onChange={e => setPhone(e.target.value)} className={inputCls} />
+          </Field>
+        </div>
+        {!editing && (
+          <Field label="Password — leave blank to auto-generate">
+            <input
+              type="text"
+              value={password}
+              onChange={e => setPassword(e.target.value)}
+              placeholder="Minimum 8 characters; blank = generated & shown once"
+              className={inputCls}
+              autoComplete="new-password"
+            />
+          </Field>
+        )}
+        <p className="text-xs text-slate-500">
+          {editing
+            ? 'Role changes re-attach the tenant role and update the membership; the last active administrator of this tenant can never be demoted or locked out.'
+            : 'The role is the tenant\u2019s own role definition — platform staff never grant privileges across tenants.'}
+        </p>
+        <div className="flex justify-end gap-2 pt-1">
+          <button onClick={onClose} className={btnGhost}>Cancel</button>
+          <button onClick={submit} disabled={busy || !name.trim() || !email.trim()} className={btnPrimary}>
+            {busy ? 'Saving…' : editing ? 'Save changes' : 'Create user'}
+          </button>
+        </div>
+      </div>
+    </ModalShell>
+  );
+};
+
+const FacilityModal: React.FC<{
+  tenantId: string;
+  facility: TenantFacilityRecord | null;
+  onClose: () => void;
+  onSaved: () => void;
+  notify: (k: 'error' | 'success', m: string) => void;
+  fail: (e: any, f: string) => void;
+}> = ({ tenantId, facility, onClose, onSaved, notify, fail }) => {
+  const editing = Boolean(facility);
+  const [name, setName] = useState(facility?.name ?? '');
+  const [address, setAddress] = useState(facility?.address ?? '');
+  const [phone, setPhone] = useState(facility?.phone ?? '');
+  const [description, setDescription] = useState(facility?.description ?? '');
+  const [busy, setBusy] = useState(false);
+
+  const submit = async () => {
+    setBusy(true);
+    try {
+      if (editing && facility) {
+        await api.updateTenantFacility(tenantId, facility.id, {
+          name: name.trim() !== facility.name ? name.trim() : undefined,
+          address: address !== facility.address ? address : undefined,
+          phone: phone !== (facility.phone ?? '') ? phone : undefined,
+          description: description !== (facility.description ?? '') ? description : undefined,
+        });
+        notify('success', 'Facility updated.');
+      } else {
+        await api.createTenantFacility(tenantId, { name: name.trim(), address, phone, description });
+        notify('success', `Facility "${name.trim()}" created.`);
+      }
+      onSaved();
+    } catch (err) {
+      fail(err, editing ? 'Facility update failed.' : 'Facility creation failed.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <ModalShell title={editing ? `Edit facility: ${facility?.name}` : 'Add facility'} onClose={onClose}>
+      <div className="space-y-3">
+        <Field label="Facility name">
+          <input value={name} onChange={e => setName(e.target.value)} className={inputCls} />
+        </Field>
+        <Field label="Address">
+          <input value={address} onChange={e => setAddress(e.target.value)} className={inputCls} />
+        </Field>
+        <div className="grid grid-cols-2 gap-3">
+          <Field label="Phone">
+            <input value={phone} onChange={e => setPhone(e.target.value)} className={inputCls} />
+          </Field>
+          <Field label="Description (optional)">
+            <input value={description} onChange={e => setDescription(e.target.value)} className={inputCls} />
+          </Field>
+        </div>
+        <div className="flex justify-end gap-2 pt-1">
+          <button onClick={onClose} className={btnGhost}>Cancel</button>
+          <button onClick={submit} disabled={busy || !name.trim()} className={btnPrimary}>
+            {busy ? 'Saving…' : editing ? 'Save changes' : 'Add facility'}
+          </button>
+        </div>
+      </div>
+    </ModalShell>
+  );
+};
+
+const OneTimeSecretModal: React.FC<{ title: string; secret: string; onClose: () => void }> = ({ title, secret, onClose }) => {
+  const [copied, setCopied] = useState(false);
+  return (
+    <ModalShell title={title} onClose={onClose}>
+      <div className="space-y-3">
+        <p className="text-xs text-slate-500">Hand this value to the user over a secure channel. It is shown <span className="font-semibold">only once</span> and cannot be retrieved again.</p>
+        <div className="flex items-center gap-2 rounded-lg border border-cyan-200 bg-cyan-50 px-3 py-2.5">
+          <code className="flex-1 select-all break-all font-mono text-sm font-bold text-cyan-900">{secret}</code>
+          <button
+            onClick={async () => {
+              try {
+                await navigator.clipboard.writeText(secret);
+                setCopied(true);
+                setTimeout(() => setCopied(false), 1500);
+              } catch { /* clipboard unavailable — the value stays selectable */ }
+            }}
+            className={btnGhost}
+          >
+            <Copy size={12} /> {copied ? 'Copied' : 'Copy'}
+          </button>
+        </div>
+        <div className="flex justify-end">
+          <button onClick={onClose} className={btnPrimary}>Done</button>
+        </div>
+      </div>
+    </ModalShell>
   );
 };
 

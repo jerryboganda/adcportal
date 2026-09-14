@@ -14,6 +14,8 @@ class AuditLog extends Model
         'tenant_updated', 'tenant_registered', 'provisioning_retried',
         'support_session_started', 'support_session_ended',
         'plan_created', 'plan_updated', 'platform_user_created', 'platform_user_updated',
+        'tenant_user_created', 'tenant_user_updated', 'tenant_user_password_reset',
+        'tenant_facility_created', 'tenant_facility_updated', 'tenant_facility_deleted',
     ];
 
     protected $fillable = ['user_id', 'business_id', 'action', 'subject_type', 'subject_id', 'changes', 'ip'];

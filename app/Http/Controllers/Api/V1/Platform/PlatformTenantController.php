@@ -181,18 +181,22 @@ class PlatformTenantController extends PlatformController
         ]);
     }
 
-    /** Subscription modification: plan, term dates. Status changes go through the lifecycle actions. */
+    /** Tenant profile + subscription modification: rename, plan, term dates. Status changes go through the lifecycle actions. */
     public function updateSubscription(Request $request, Business $tenant): JsonResponse
     {
         $this->denyUnlessCapability('subscriptions.manage');
 
         $validated = $request->validate([
+            'name' => ['sometimes', 'string', 'max:255'],
             'planId' => ['sometimes', 'nullable', 'integer', 'exists:plans,id'],
             'subscriptionEndsAt' => ['sometimes', 'nullable', 'date'],
             'trialEndsAt' => ['sometimes', 'nullable', 'date'],
         ]);
 
         $updates = [];
+        if (array_key_exists('name', $validated) && trim($validated['name']) !== '') {
+            $updates['name'] = trim($validated['name']);
+        }
         if (array_key_exists('planId', $validated)) {
             $updates['plan_id'] = $validated['planId'];
         }
@@ -206,10 +210,10 @@ class PlatformTenantController extends PlatformController
         $tenant->update($updates);
 
         \App\Models\TenantLifecycleEvent::record($tenant, 'subscription_updated', $tenant->subscription_status, $tenant->subscription_status, [
-            'summary' => 'Subscription details updated: '.implode(', ', array_keys($updates)).'.',
+            'summary' => 'Tenant profile/subscription updated: '.implode(', ', array_keys($updates)).'.',
         ]);
         AuditLog::record('subscription_updated', $tenant, [
-            'summary' => "Tenant {$tenant->name} subscription updated: ".implode(', ', array_keys($updates)).'.',
+            'summary' => "Tenant {$tenant->name} updated: ".implode(', ', array_keys($updates)).'.',
         ], $tenant->id);
 
         return $this->ok(['tenant' => ApiShape::tenant($tenant->fresh('plan'))]);
@@ -368,6 +372,331 @@ class PlatformTenantController extends PlatformController
         $tenant = app(TenantLifecycleService::class)->retryProvisioning($tenant);
 
         return $this->lifecycleResponse($tenant);
+    }
+
+    // ==================== tenant user administration ====================
+
+    /**
+     * Create a staff user inside the tenant. The password is optional: when
+     * omitted the platform generates one and returns it exactly once for
+     * secure handover (same semantics as tenant provisioning).
+     */
+    public function storeUser(Request $request, Business $tenant): JsonResponse
+    {
+        $this->denyUnlessCapability('tenants.manage');
+
+        $validated = $request->validate([
+            'name' => ['required', 'string', 'max:255'],
+            'email' => ['required', 'email', 'max:255', 'unique:users,email'],
+            'role' => ['required', 'in:admin,radiologist,technologist,receptionist,billing'],
+            'phone' => ['nullable', 'string', 'max:50'],
+            'password' => ['nullable', 'string', 'min:8'],
+            'isActive' => ['nullable', 'boolean'],
+        ]);
+
+        $initialPassword = $validated['password'] ?? \Illuminate\Support\Str::password(16);
+
+        $user = User::create([
+            'name' => $validated['name'],
+            'email' => $validated['email'],
+            'password' => $initialPassword,
+            'mobile_no' => $validated['phone'] ?? null,
+            'email_verified_at' => now(),
+            'type' => 'staff',
+            'active_status' => (int) ($validated['isActive'] ?? true),
+            'business_id' => $tenant->id,
+            'created_by' => $tenant->id,
+            'lang' => 'en',
+        ]);
+
+        $this->assignTenantRole($tenant, $user, $validated['role']);
+
+        TenantMembership::create([
+            'user_id' => $user->id,
+            'business_id' => $tenant->id,
+            'role' => $validated['role'],
+            'is_default' => false,
+            'status' => 'active',
+        ]);
+
+        AuditLog::record('tenant_user_created', $user, [
+            'summary' => "Platform created {$validated['role']} account {$user->email} for {$tenant->name}.",
+        ], $tenant->id);
+
+        return response()->json([
+            'data' => [
+                'user' => $this->tenantUserShape($user->fresh()),
+                // Shown once to the operator; never stored in plaintext.
+                'initialPassword' => $validated['password'] ?? null ? null : $initialPassword,
+            ],
+        ], 201);
+    }
+
+    /** Edit a tenant user's identity, role, activation or login flag. */
+    public function updateUser(Request $request, Business $tenant, User $user): JsonResponse
+    {
+        $this->denyUnlessCapability('tenants.manage');
+
+        // Platform identities are never manageable through a tenant.
+        if ($user->business_id !== $tenant->id || in_array($user->type, ['super_admin', 'platform_admin', 'customer'], true)) {
+            abort(404);
+        }
+
+        $validated = $request->validate([
+            'name' => ['sometimes', 'string', 'max:255'],
+            'email' => ['sometimes', 'email', 'max:255', Rule::unique('users', 'email')->ignore($user->id)],
+            'role' => ['sometimes', 'in:admin,radiologist,technologist,receptionist,billing'],
+            'phone' => ['sometimes', 'nullable', 'string', 'max:50'],
+            'isActive' => ['sometimes', 'boolean'],
+            'loginEnabled' => ['sometimes', 'boolean'],
+        ]);
+
+        $revokingAccess = (isset($validated['isActive']) && ! $validated['isActive'])
+            || (isset($validated['loginEnabled']) && ! $validated['loginEnabled']);
+        $demotingAdmin = isset($validated['role']) && $validated['role'] !== 'admin' && $this->holdsAdminRole($tenant, $user);
+        $needsAdminGuard = ($revokingAccess || $demotingAdmin)
+            && $user->active_status && $user->is_enable_login
+            && $this->holdsAdminRole($tenant, $user)
+            && ! $this->otherActiveAdminExists($tenant, $user);
+
+        if ($needsAdminGuard) {
+            abort(422, 'This is the last active administrator of the tenant — at least one must keep access.');
+        }
+
+        if (array_key_exists('name', $validated)) {
+            $user->name = $validated['name'];
+        }
+        if (array_key_exists('email', $validated)) {
+            $user->email = $validated['email'];
+        }
+        if (array_key_exists('phone', $validated)) {
+            $user->mobile_no = $validated['phone'];
+        }
+        if (isset($validated['isActive'])) {
+            $user->active_status = (int) $validated['isActive'];
+        }
+        if (isset($validated['loginEnabled'])) {
+            $user->is_enable_login = (int) $validated['loginEnabled'];
+        }
+        $user->save();
+
+        if (isset($validated['role'])) {
+            $this->assignTenantRole($tenant, $user, $validated['role']);
+            TenantMembership::query()
+                ->where('user_id', $user->id)->where('business_id', $tenant->id)
+                ->update(['role' => $validated['role']]);
+        }
+
+        if ($revokingAccess) {
+            $this->revokeUserSessions($user);
+        }
+
+        AuditLog::record('tenant_user_updated', $user, [
+            'summary' => "Platform updated tenant user {$user->email} (".implode(', ', array_keys($validated)).') for '.$tenant->name.'.'.$this->actorNote(),
+        ], $tenant->id);
+
+        return $this->ok(['user' => $this->tenantUserShape($user->fresh())]);
+    }
+
+    /** Rotate a tenant user's password; the new value is returned exactly once. */
+    public function resetUserPassword(Request $request, Business $tenant, User $user): JsonResponse
+    {
+        $this->denyUnlessCapability('tenants.manage');
+
+        if ($user->business_id !== $tenant->id || in_array($user->type, ['super_admin', 'platform_admin', 'customer'], true)) {
+            abort(404);
+        }
+
+        $newPassword = \Illuminate\Support\Str::password(16);
+        $user->password = $newPassword;
+        $user->save();
+
+        $this->revokeUserSessions($user);
+
+        AuditLog::record('tenant_user_password_reset', $user, [
+            'summary' => "Platform rotated the password for {$user->email} ({$tenant->name}). Live sessions revoked.".$this->actorNote(),
+        ], $tenant->id);
+
+        return $this->ok([
+            'user' => $this->tenantUserShape($user->fresh()),
+            // Shown once to the operator; never stored or logged in plaintext.
+            'newPassword' => $newPassword,
+        ]);
+    }
+
+    // ==================== tenant facilities (locations) ====================
+
+    public function storeFacility(Request $request, Business $tenant): JsonResponse
+    {
+        $this->denyUnlessCapability('tenants.manage');
+
+        $validated = $request->validate([
+            'name' => ['required', 'string', 'max:255'],
+            'address' => ['nullable', 'string', 'max:1000'],
+            'phone' => ['nullable', 'string', 'max:50'],
+            'description' => ['nullable', 'string', 'max:1000'],
+        ]);
+
+        $location = Location::create([
+            'name' => $validated['name'],
+            'address' => (string) ($validated['address'] ?? ''),
+            'phone' => $validated['phone'] ?? null,
+            'description' => $validated['description'] ?? null,
+            'business_id' => $tenant->id,
+            'created_by' => $this->actor()->id,
+        ]);
+
+        AuditLog::record('tenant_facility_created', $location, [
+            'summary' => "Platform added facility {$location->name} to {$tenant->name}.".$this->actorNote(),
+        ], $tenant->id);
+
+        return response()->json(['data' => ['facility' => $this->facilityShape($location)]], 201);
+    }
+
+    public function updateFacility(Request $request, Business $tenant, Location $location): JsonResponse
+    {
+        $this->denyUnlessCapability('tenants.manage');
+        abort_unless($location->business_id === $tenant->id, 404);
+
+        $validated = $request->validate([
+            'name' => ['sometimes', 'string', 'max:255'],
+            'address' => ['sometimes', 'nullable', 'string', 'max:1000'],
+            'phone' => ['sometimes', 'nullable', 'string', 'max:50'],
+            'description' => ['sometimes', 'nullable', 'string', 'max:1000'],
+        ]);
+
+        $location->update($validated);
+
+        AuditLog::record('tenant_facility_updated', $location, [
+            'summary' => "Platform updated facility {$location->name} ({$tenant->name}): ".implode(', ', array_keys($validated)).'.'.$this->actorNote(),
+        ], $tenant->id);
+
+        return $this->ok(['facility' => $this->facilityShape($location->fresh())]);
+    }
+
+    /**
+     * Deleting a facility would CASCADE-DELETE the tenant's studies
+     * (appointments.location_id FK) — refuse while any study references it.
+     */
+    public function destroyFacility(Request $request, Business $tenant, Location $location): JsonResponse
+    {
+        $this->denyUnlessCapability('tenants.manage');
+        abort_unless($location->business_id === $tenant->id, 404);
+
+        $studies = \App\Models\Appointment::forClinic($tenant->id)->where('location_id', $location->id)->count();
+        abort_unless($studies === 0, 422, "This facility is referenced by {$studies} study record(s) — reassign or archive those studies first.");
+
+        $name = $location->name;
+        $location->delete();
+
+        AuditLog::record('tenant_facility_deleted', $location, [
+            'summary' => "Platform deleted facility {$name} from {$tenant->name}.".$this->actorNote(),
+        ], $tenant->id);
+
+        return $this->ok(['deleted' => true]);
+    }
+
+    // ==================== internals ====================
+
+    /** Attach the tenant's own laratrust role (portal role vocabulary). */
+    private function assignTenantRole(Business $tenant, User $user, string $portalRole): void
+    {
+        $roleName = match ($portalRole) {
+            'radiologist' => 'radiologist',
+            'technologist' => 'technician',
+            'receptionist' => 'receptionist',
+            'billing' => 'billing',
+            'admin' => 'admin',
+            default => 'receptionist',
+        };
+
+        $role = \App\Models\Role::where('name', $roleName)
+            ->where('guard_name', 'web')
+            ->where('created_by', $tenant->created_by)
+            ->first();
+
+        if ($role && ! $user->hasRole($roleName)) {
+            $user->addRole($role);
+            if (method_exists($user, 'flushCache')) {
+                $user->flushCache();
+            }
+        }
+    }
+
+    /**
+     * A tenant must always keep one reachable administrator: an active,
+     * login-enabled user that is either the owner (type admin) or holds the
+     * tenant's admin role.
+     */
+    private function holdsAdminRole(Business $tenant, User $user): bool
+    {
+        if ($user->type === 'admin') {
+            return true;
+        }
+
+        $adminRoleId = \App\Models\Role::where('name', 'admin')
+            ->where('guard_name', 'web')
+            ->where('created_by', $tenant->created_by)
+            ->value('id');
+
+        return (bool) ($adminRoleId && $user->hasRole('admin'));
+    }
+
+    private function otherActiveAdminExists(Business $tenant, User $except): bool
+    {
+        $adminRoleId = \App\Models\Role::where('name', 'admin')
+            ->where('guard_name', 'web')
+            ->where('created_by', $tenant->created_by)
+            ->value('id');
+
+        return User::query()
+            ->where('business_id', $tenant->id)
+            ->where('active_status', 1)
+            ->where('is_enable_login', 1)
+            ->where('id', '!=', $except->id)
+            ->where(function ($q) use ($adminRoleId) {
+                $q->where('type', 'admin');
+                if ($adminRoleId) {
+                    $q->orWhereHas('roles', fn ($r) => $r->where('roles.id', $adminRoleId));
+                }
+            })
+            ->exists();
+    }
+
+    /** Cookie sessions are database-backed — revoke them on access changes. */
+    private function revokeUserSessions(User $user): void
+    {
+        DB::table('sessions')->where('user_id', $user->id)->delete();
+    }
+
+    private function actorNote(): string
+    {
+        return ' Acting platform user: '.$this->actor()->email.'.';
+    }
+
+    private function tenantUserShape(User $u): array
+    {
+        return [
+            'id' => (string) $u->id,
+            'name' => $u->name,
+            'email' => $u->email,
+            'role' => $u->portalRole(),
+            'isAdmin' => $u->type === 'admin',
+            'active' => (bool) $u->active_status,
+            'loginEnabled' => (bool) $u->is_enable_login,
+            'lastLogin' => $u->last_login_at?->toIso8601String(),
+        ];
+    }
+
+    private function facilityShape(Location $l): array
+    {
+        return [
+            'id' => (string) $l->id,
+            'name' => $l->name,
+            'address' => (string) $l->address,
+            'phone' => (string) ($l->phone ?? ''),
+            'description' => (string) ($l->description ?? ''),
+        ];
     }
 
     private function lifecycleResponse(Business $tenant): JsonResponse
