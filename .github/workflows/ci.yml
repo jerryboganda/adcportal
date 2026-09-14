@@ -125,6 +125,9 @@ jobs:
             sed -i 's|^APP_ENV=.*|APP_ENV=local|' .env
             sed -i 's|^APP_URL=.*|APP_URL=http://127.0.0.1:8000|' .env
             sed -i 's|^DB_CONNECTION=.*|DB_CONNECTION=sqlite|' .env
+            # An empty DB_DATABASE= overrides SQLite's default path with "",
+            # which fails with "unable to open database file" — drop it.
+            sed -i '/^DB_DATABASE=/d' .env
             grep -q '^SANCTUM_STATEFUL_DOMAINS=' .env || echo 'SANCTUM_STATEFUL_DOMAINS=localhost:3000,127.0.0.1:3000,localhost:8000,127.0.0.1:8000' >> .env
             sed -i 's|^SANCTUM_STATEFUL_DOMAINS=.*|SANCTUM_STATEFUL_DOMAINS=localhost:3000,127.0.0.1:3000,localhost:8000,127.0.0.1:8000|' .env
             php artisan key:generate --force
