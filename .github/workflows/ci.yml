@@ -117,10 +117,20 @@ jobs:
         run: |
           set -o pipefail
           {
+            # The repo ships no .env (by design). key:generate cannot CREATE
+            # one, so provision it from the example first — otherwise the app
+            # runs with an empty APP_KEY and the browser login flow can never
+            # complete (CSRF/session cookies cannot be encrypted).
+            php -r "file_exists('.env') || copy('.env.example', '.env');"
+            sed -i 's|^APP_ENV=.*|APP_ENV=local|' .env
+            sed -i 's|^APP_URL=.*|APP_URL=http://127.0.0.1:8000|' .env
+            sed -i 's|^DB_CONNECTION=.*|DB_CONNECTION=sqlite|' .env
+            grep -q '^SANCTUM_STATEFUL_DOMAINS=' .env || echo 'SANCTUM_STATEFUL_DOMAINS=localhost:3000,127.0.0.1:3000,localhost:8000,127.0.0.1:8000' >> .env
+            sed -i 's|^SANCTUM_STATEFUL_DOMAINS=.*|SANCTUM_STATEFUL_DOMAINS=localhost:3000,127.0.0.1:3000,localhost:8000,127.0.0.1:8000|' .env
             php artisan key:generate --force
             php artisan migrate --force
             php artisan db:seed --force
-          } 2>&1 | tee /tmp/prepare.log || echo "PREPARE FAILED — see detail step"
+          } 2>&1 | tee /tmp/prepare.log
 
       - name: Prepare failure detail
         if: failure()
