@@ -42,6 +42,20 @@ class RisDemoData extends Seeder
             );
         }
 
+        // TenantBootstrap::run() re-enables mass-assignment protection before
+        // this seeder runs, which silently drops non-fillable demo fields
+        // (token_number, workflow timestamps…). This seeder writes only
+        // server-controlled demo data — unguard for its scope, then restore.
+        \Illuminate\Database\Eloquent\Model::unguard();
+        try {
+            $this->seed($business, $admin);
+        } finally {
+            \Illuminate\Database\Eloquent\Model::reguard();
+        }
+    }
+
+    private function seed(Business $business, User $admin): void
+    {
         $today = now()->format('Y-m-d');
 
         // ---------- staff ----------

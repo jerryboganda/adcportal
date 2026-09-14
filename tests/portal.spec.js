@@ -66,8 +66,8 @@ test('technologist worklist and billing render live data', async ({ page }) => {
 test('sign-out destroys the session and the login gate returns', async ({ page }) => {
     await login(page);
 
-    // Open the profile menu (trigger is the last button in the header actions group).
-    await page.locator('header .flex.items-center.space-x-2 > button').last().click();
+    // Open the profile menu via its accessible label (a11y-hardened trigger).
+    await page.getByRole('button', { name: 'Open profile menu' }).click();
     await page.getByText('Sign Out').first().click();
 
     // Session destroyed → the API gate is shown again.

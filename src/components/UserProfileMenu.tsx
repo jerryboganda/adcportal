@@ -146,6 +146,7 @@ export const UserProfileMenu: React.FC<UserProfileMenuProps> = ({
       <button
         type="button"
         onClick={() => setIsOpen(!isOpen)}
+        aria-label="Open profile menu"
         className={`flex items-center space-x-2 p-1.5 sm:px-3 sm:py-1.5 rounded-xl border transition-all duration-150 cursor-pointer shadow-xs ${
           isOpen
             ? 'bg-slate-100 border-cyan-400 ring-2 ring-cyan-500/20'

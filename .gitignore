@@ -65,3 +65,7 @@ bun.lock
 
 # Keep the example template in the repo
 !.env.example
+
+# SPA build artifacts are delivered by the CI deploy job, not git
+public/index.html
+public/assets/
