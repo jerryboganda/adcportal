@@ -63,7 +63,7 @@ export const DoctorNetworkView: React.FC<DoctorNetworkViewProps> = ({
   onAddReferrer,
   onUpdateReferrer,
   onDeleteReferrer,
-  onAddDoctorDispatch,,
+  onAddDoctorDispatch,
   clinicSettings,
 }) => {
   const [activeSubTab, setActiveSubTab] = useState<DoctorSubTab>('directory');

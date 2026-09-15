@@ -82,7 +82,7 @@ class IntegrityRepairTest extends ApiTestCase
             ->postJson("/api/v1/studies/{$study['id']}/invoices", [
                 'items' => [['description' => $service->name, 'quantity' => 1, 'unitPrice' => $service->price]],
                 'discountAmount' => 500,
-            ])->assertOk();
+            ])->assertStatus(201);
 
         $invoice = $response->json('data.invoice');
         $this->assertEquals(500.0, $invoice['manualDiscount']);
@@ -100,7 +100,7 @@ class IntegrityRepairTest extends ApiTestCase
             ->postJson("/api/v1/studies/{$study['id']}/invoices", [
                 'items' => [['description' => $service->name, 'quantity' => 1, 'unitPrice' => $service->price]],
                 'discountAmount' => $service->price * 10,
-            ])->assertOk()
+            ])->assertStatus(201)
             ->json('data.invoice');
 
         $this->assertGreaterThanOrEqual(0, $invoice['total']);
@@ -112,10 +112,11 @@ class IntegrityRepairTest extends ApiTestCase
     public function test_second_draft_is_rejected_update_edits_and_addendum_versions(): void
     {
         $study = $this->book();
+        $this->acquire($study);
         $id = $study['id'];
         $radiologist = $this->makeStaff($this->businessA, $this->adminA, 'radiologist');
 
-        // First save: draft v1.
+        // First save: draft v1 (moves the study acquired → reading).
         $first = $this->actingAs($radiologist)->postJson("/api/v1/studies/{$id}/reports", [
             'findings' => 'Initial findings.',
             'impression' => 'Initial impression.',
@@ -347,16 +348,17 @@ class IntegrityRepairTest extends ApiTestCase
             'time' => '10:00 AM',
         ], $this->businessB, $this->adminB);
 
-        Setting::create([
-            'key' => 'ris_clinic_profile',
-            'business' => $this->businessA->id,
-            'created_by' => $this->adminA->id,
-            'value' => json_encode([
-                'name' => $this->businessA->name,
-                'sendAppointmentReminders' => true,
-                'reminderHours' => 48,
-            ]),
-        ]);
+        Setting::updateOrCreate(
+            ['key' => 'ris_clinic_profile', 'business' => $this->businessA->id],
+            [
+                'created_by' => $this->adminA->id,
+                'value' => json_encode([
+                    'name' => $this->businessA->name,
+                    'sendAppointmentReminders' => true,
+                    'reminderHours' => 48,
+                ]),
+            ]
+        );
 
         $this->artisan('app:appointment-reminder')->assertSuccessful();
 
@@ -390,14 +392,15 @@ class IntegrityRepairTest extends ApiTestCase
 
         $customer = Customer::where('business_id', $this->businessA->id)->where('name', 'Walk-in Patient')->first();
         $this->assertNotNull($customer);
-        $this->assertStringEndsWith('@patients.local', (string) $customer->user->email);
+        $this->assertStringEndsWith('@patients.local', (string) $customer->customer->email);
 
-        Setting::create([
-            'key' => 'ris_clinic_profile',
-            'business' => $this->businessA->id,
-            'created_by' => $this->adminA->id,
-            'value' => json_encode(['sendAppointmentReminders' => true, 'reminderHours' => 48]),
-        ]);
+        Setting::updateOrCreate(
+            ['key' => 'ris_clinic_profile', 'business' => $this->businessA->id],
+            [
+                'created_by' => $this->adminA->id,
+                'value' => json_encode(['sendAppointmentReminders' => true, 'reminderHours' => 48]),
+            ]
+        );
 
         $this->artisan('app:appointment-reminder')->assertSuccessful();
 
