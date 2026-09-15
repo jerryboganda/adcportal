@@ -280,9 +280,10 @@ class ApiShape
             'preparingAt' => $a->preparing_at ? self::time($a->preparing_at) : null,
             'inProgressAt' => $a->in_progress_at ? self::time($a->in_progress_at) : null,
             'acquiredAt' => $a->acquired_at ? self::time($a->acquired_at) : null,
-            'readingAt' => $a->acquired_at ? self::time($a->acquired_at) : null,
+            'readingAt' => $a->reading_at ? self::time($a->reading_at) : null,
             'reportedAt' => $a->reported_at ? self::time($a->reported_at) : null,
             'deliveredAt' => $a->delivered_at ? self::time($a->delivered_at) : null,
+            'calledAt' => $a->called_at ? self::dateTime($a->called_at) : null,
             'doseLog' => $a->relationLoaded('doseLog') && $a->doseLog ? self::doseLog($a->doseLog) : null,
             'report' => $latestReport ? self::radiologyReport($latestReport) : null,
             'roomNumber' => (string) ($a->room_number ?? ''),
@@ -307,6 +308,7 @@ class ApiShape
             'appointmentToken' => (string) optional($inv->appointment)->token_number ?? '',
             'subtotal' => (float) $inv->subtotal,
             'discountTotal' => (float) $inv->discount_total,
+            'manualDiscount' => (float) $inv->manual_discount,
             'taxRate' => (float) $inv->tax_rate,
             'taxAmount' => (float) $inv->tax_amount,
             'total' => (float) $inv->total,
@@ -451,6 +453,9 @@ class ApiShape
             'requireScreeningSignOff' => (bool) ($data['requireScreeningSignOff'] ?? true),
             'enableCriticalFindingsAlerts' => (bool) ($data['enableCriticalFindingsAlerts'] ?? true),
             'autoSendWhatsappReport' => (bool) ($data['autoSendWhatsappReport'] ?? false),
+            'sendAppointmentReminders' => (bool) ($data['sendAppointmentReminders'] ?? false),
+            'reminderHours' => (int) ($data['reminderHours'] ?? 24),
+            'referralCommissionPercent' => (float) ($data['referralCommissionPercent'] ?? 0),
         ];
     }
 
@@ -618,6 +623,8 @@ class ApiShape
         'login' => ['Security', 'Staff Sign-In', 'success'],
         'logout' => ['Security', 'Staff Sign-Out', 'success'],
         'appointment_created' => ['Reception & Booking', 'Study Booked', 'success'],
+        'queue_patient_called' => ['Reception & Booking', 'Patient Called to Room', 'success'],
+        'appointment_reminder_sent' => ['Reception & Booking', 'Appointment Reminder Sent', 'success'],
         'tenant_switched' => ['Security', 'Clinic Context Switched', 'success'],
         'tenant_provisioned' => ['Platform', 'Tenant Provisioned', 'success'],
         'tenant_activated' => ['Platform', 'Tenant Activated', 'success'],

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   Bell,
   X,
@@ -50,6 +50,44 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
   const [onlyUnread, setOnlyUnread] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [soundEnabled, setSoundEnabled] = useState(true);
+
+  // The sound toggle is REAL: new server notifications trigger an audible
+  // alert (triple-blip for critical, double-blip otherwise). First render
+  // seeds the seen-set so a fresh open never chimes for old notifications.
+  const seenIdsRef = useRef<Set<string>>(new Set(notifications.map(n => n.id)));
+  const audioCtxRef = useRef<AudioContext | null>(null);
+
+  useEffect(() => {
+    const seen = seenIdsRef.current;
+    const arrived = notifications.filter(n => !seen.has(n.id));
+    seenIdsRef.current = new Set(notifications.map(n => n.id));
+
+    if (!soundEnabled || arrived.length === 0) return;
+
+    try {
+      const Ctx = window.AudioContext || (window as any).webkitAudioContext;
+      if (!Ctx) return;
+      const ctx = audioCtxRef.current ?? new Ctx();
+      audioCtxRef.current = ctx;
+      const critical = arrived.some(n => n.priority === 'critical');
+      const blips = critical ? [0, 0.18, 0.36] : [0, 0.16];
+      blips.forEach(offset => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.value = critical ? 1046.5 : 880;
+        const t = ctx.currentTime + offset;
+        gain.gain.setValueAtTime(0.12, t);
+        gain.gain.exponentialRampToValueAtTime(0.001, t + 0.14);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start(t);
+        osc.stop(t + 0.15);
+      });
+    } catch {
+      // Audio unavailable in this browser — the badge still signals arrival.
+    }
+  }, [notifications, soundEnabled]);
 
   if (!isOpen) return null;
 

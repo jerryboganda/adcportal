@@ -31,6 +31,7 @@ import {
 import { Appointment, Modality, DoseLog, WorkflowState } from '../types';
 import { WorklistFilterToolbar } from './WorklistFilterToolbar';
 import { SortableColumnHeader } from './SortableColumnHeader';
+import { Barcode } from './Barcode';
 import {
   AdvancedFilterState,
   defaultAdvancedFilters,
@@ -46,6 +47,8 @@ interface TechnologistViewProps {
   onOpenScreeningModal: (apt: Appointment) => void;
   onStartAcquisition: (apt: Appointment) => void;
   onOpenDoseModal: (apt: Appointment) => void;
+  /** PACS QC verified: moves the study acquired → reading (server-tracked). */
+  onSendToReading: (aptId: string) => void;
   onCancelStudy: (aptId: string, reason: string) => void;
   onUpdateAppointment?: (aptId: string, updates: Partial<Appointment>) => void;
 }
@@ -57,6 +60,7 @@ export const TechnologistView: React.FC<TechnologistViewProps> = ({
   onOpenScreeningModal,
   onStartAcquisition,
   onOpenDoseModal,
+  onSendToReading,
   onCancelStudy,
   onUpdateAppointment,
 }) => {
@@ -694,11 +698,9 @@ export const TechnologistView: React.FC<TechnologistViewProps> = ({
           appointment={pacsModalApt}
           onClose={() => setPacsModalApt(null)}
           onSignOff={() => {
-            if (onUpdateAppointment) {
-              onUpdateAppointment(pacsModalApt.id, {
-                notes: pacsModalApt.notes ? `${pacsModalApt.notes} [PACS QC reviewed by technologist]` : '[PACS QC reviewed by technologist]',
-              });
-            }
+            // REAL workflow handoff: acquired → reading, server-tracked and
+            // audited (the old version smuggled a status string into notes).
+            onSendToReading(pacsModalApt.id);
             setPacsModalApt(null);
           }}
         />
@@ -872,21 +874,9 @@ export const TechnologistView: React.FC<TechnologistViewProps> = ({
                 <div className="text-[11px] font-semibold text-slate-800">{wristbandApt.service.name}</div>
               </div>
 
-              {/* Simulated 1D Barcode */}
+              {/* Scannable Code128 barcode (encodes MRN, falls back to token) */}
               <div className="pt-2 flex flex-col items-center">
-                <div className="h-10 w-full bg-slate-900 rounded flex items-center justify-center p-1">
-                  <div className="w-full h-full flex justify-between items-stretch bg-white p-0.5 gap-[2px]">
-                    {Array.from({ length: 42 }).map((_, i) => (
-                      <div
-                        key={i}
-                        className={`h-full ${i % 3 === 0 ? 'w-1 bg-slate-900' : i % 2 === 0 ? 'w-0.5 bg-slate-900' : 'w-0.5 bg-transparent'}`}
-                      />
-                    ))}
-                  </div>
-                </div>
-                <div className="font-mono text-[10px] tracking-widest text-slate-500 mt-1">
-                  *{wristbandApt.patient.mrn}*
-                </div>
+                <Barcode value={wristbandApt.patient.mrn || wristbandApt.tokenNumber} height={38} width={1} />
               </div>
             </div>
 

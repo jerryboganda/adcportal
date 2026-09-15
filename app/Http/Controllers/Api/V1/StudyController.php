@@ -232,9 +232,11 @@ class StudyController extends BaseApiController
         $permissionByAction = [
             'checkin' => 'study checkin',
             'no_show' => 'study checkin',
+            'call' => 'study checkin',
             'prepare' => 'study acquire',
             'start' => 'study acquire',
             'complete' => 'study acquire',
+            'send_to_reading' => 'study acquire',
             'cancel' => 'study cancel',
             'reject' => 'report edit',
         ];
@@ -253,6 +255,15 @@ class StudyController extends BaseApiController
 
             case 'no_show':
                 $this->workflow->markNoShow($appointment);
+                break;
+
+            case 'call':
+                // Queue-board call: persisted so every terminal (and the
+                // audit trail) sees the same "now serving" state.
+                $appointment->forceFill(['called_at' => now()])->save();
+                $this->audit('queue_patient_called', $appointment, [
+                    'summary' => "Called {$appointment->patientDisplayName()} (#{$appointment->token_number}) to ".($appointment->room_number ?: 'the examination area').'.',
+                ]);
                 break;
 
             case 'prepare':
@@ -287,6 +298,22 @@ class StudyController extends BaseApiController
 
                 $this->workflow->completeAcquisition($appointment, $dose, Auth::id());
                 $this->notifyAcquisition($appointment);
+                break;
+
+            case 'send_to_reading':
+                // PACS QC verified: hand the study to the reading radiologist.
+                $this->workflow->sendToReading($appointment);
+                $this->notify([
+                    'title' => "Study Sent to Reading (#{$appointment->token_number})",
+                    'message' => ($appointment->ServiceData?->modality?->code ?? 'Imaging')." study for {$appointment->patientDisplayName()} passed technologist QC and is ready for interpretation.",
+                    'category' => 'workflow',
+                    'priority' => $appointment->priority === 'stat' ? 'high' : 'medium',
+                    'appointment_id' => $appointment->id,
+                    'token_number' => $appointment->token_number,
+                    'patient_name' => $appointment->patientDisplayName(),
+                    'target_tab' => 'reporting',
+                    'action_label' => 'Open Report Worklist',
+                ]);
                 break;
 
             case 'cancel':
@@ -353,9 +380,15 @@ class StudyController extends BaseApiController
             $hasRisk = false;
 
             foreach ($validated['answers'] as $entry) {
-                $question = ScreeningQuestion::find($entry['questionId']);
+                // Tenant-scoped and strict: an unknown question — or one from
+                // ANOTHER clinic's form — fails the submission instead of being
+                // silently skipped (skipping would clear the safety gate).
+                $question = ScreeningQuestion::whereHas('form', fn ($q) => $q->where('business_id', $this->tenantId()))
+                    ->find($entry['questionId']);
                 if (! $question) {
-                    continue;
+                    throw ValidationException::withMessages([
+                        'answers' => 'Screening contains a question that does not belong to this clinic. Reload the form and try again.',
+                    ]);
                 }
 
                 $isRisk = $question->flagsRisk($entry['answerValue']);
@@ -486,25 +519,9 @@ class StudyController extends BaseApiController
             'line_total' => (float) $service->price,
         ]);
 
-        $this->recalculate($invoice);
+        $invoice->recalculateTotals();
 
         return $invoice;
-    }
-
-    private function recalculate(\App\Models\Invoice $invoice): void
-    {
-        $invoice->refresh();
-        $subtotal = (float) $invoice->items()->sum('line_total');
-        $discount = (float) $invoice->items()->sum('discount');
-        $taxable = max(0, $subtotal - $discount);
-        $taxAmount = round($taxable * ((float) $invoice->tax_rate / 100), 2);
-
-        $invoice->forceFill([
-            'subtotal' => $subtotal,
-            'discount_total' => $discount,
-            'tax_amount' => $taxAmount,
-            'total' => round($taxable + $taxAmount, 2),
-        ])->save();
     }
 
     private function notifyCheckIn(Appointment $appointment): void

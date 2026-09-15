@@ -34,6 +34,7 @@ import {
 import { Appointment, Invoice, ActiveTab, Priority, Patient, WorkflowState } from '../types';
 import { WorklistFilterToolbar } from './WorklistFilterToolbar';
 import { SortableColumnHeader } from './SortableColumnHeader';
+import { Barcode } from './Barcode';
 import {
   AdvancedFilterState,
   defaultAdvancedFilters,
@@ -87,6 +88,7 @@ export const CheckinBoardView: React.FC<CheckinBoardViewProps> = ({
   const [wristbandApt, setWristbandApt] = useState<Appointment | null>(null);
   const [patientDetailApt, setPatientDetailApt] = useState<Appointment | null>(null);
   const [paymentModalApt, setPaymentModalApt] = useState<Appointment | null>(null);
+  const [paymentError, setPaymentError] = useState<string | null>(null);
   const [editModalApt, setEditModalApt] = useState<Appointment | null>(null);
   const [cancelModalApt, setCancelModalApt] = useState<Appointment | null>(null);
   const [cancelReason, setCancelReason] = useState('');
@@ -178,6 +180,7 @@ export const CheckinBoardView: React.FC<CheckinBoardViewProps> = ({
     setPayAmount(balance);
     setPayMethod('cash');
     setPayRef(`RCP-${Date.now().toString().slice(-4)}`);
+    setPaymentError(null);
     setPaymentModalApt(apt);
   };
 
@@ -186,9 +189,13 @@ export const CheckinBoardView: React.FC<CheckinBoardViewProps> = ({
     e.preventDefault();
     if (!paymentModalApt) return;
     const inv = getInvoiceForApt(paymentModalApt);
-    if (inv) {
-      onRecordPayment(inv.id, payAmount, payMethod, payRef || `REC-${Date.now().toString().slice(-4)}`);
+    if (!inv) {
+      // No silent no-ops: without an invoice there is nothing to pay against.
+      setPaymentError('This study has no invoice yet — every booking creates one. Reload the worklist or create the invoice in Billing first.');
+      return;
     }
+    setPaymentError(null);
+    onRecordPayment(inv.id, payAmount, payMethod, payRef || `REC-${Date.now().toString().slice(-4)}`);
     setPaymentModalApt(null);
   };
 
@@ -701,12 +708,21 @@ export const CheckinBoardView: React.FC<CheckinBoardViewProps> = ({
                 </div>
               </div>
               <button
-                onClick={() => setPaymentModalApt(null)}
+                onClick={() => {
+                  setPaymentError(null);
+                  setPaymentModalApt(null);
+                }}
                 className="text-slate-400 hover:text-slate-600 p-1 cursor-pointer"
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
+
+            {paymentError && (
+              <div className="rounded-xl bg-rose-50 border border-rose-200 px-3 py-2 text-xs font-semibold text-rose-700">
+                {paymentError}
+              </div>
+            )}
 
             {/* Patient & Study Summary */}
             <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-200 text-xs space-y-1.5">
@@ -1133,18 +1149,9 @@ export const CheckinBoardView: React.FC<CheckinBoardViewProps> = ({
                 </span>
               </div>
 
-              {/* Barcode Simulation */}
+              {/* Scannable Code128 barcode (encodes MRN, falls back to token) */}
               <div className="bg-white p-2 rounded border border-slate-200 flex flex-col items-center justify-center space-y-1">
-                <div className="flex items-center space-x-1 h-8">
-                  {[4,2,5,1,3,2,6,1,4,2,3,5,2,4,1,6,2,3,4,1,5,2].map((h, i) => (
-                    <span
-                      key={i}
-                      className="bg-slate-900 inline-block"
-                      style={{ width: `${(i % 3) + 1}px`, height: `${h * 4 + 10}px` }}
-                    ></span>
-                  ))}
-                </div>
-                <span className="font-mono text-[9px] text-slate-500 tracking-widest">{wristbandApt.patient.mrn}</span>
+                <Barcode value={wristbandApt.patient.mrn || wristbandApt.tokenNumber} height={36} width={1} />
               </div>
 
               <div className="text-[10px] text-slate-500 flex justify-between">

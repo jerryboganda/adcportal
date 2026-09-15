@@ -93,9 +93,13 @@ export function generateRadiologyReportPdf(appointment: Appointment, report: Rad
   if (report.criticalFlag) {
     doc.setTextColor(220, 38, 38);
     doc.text('FINAL REPORT [CRITICAL ALERT]', col2X + 32, y + 24);
-  } else {
+  } else if (report.signedBy) {
     doc.setTextColor(22, 163, 74);
-    doc.text(`FINAL SIGNED REPORT (v${report.version})`, col2X + 32, y + 24);
+    doc.text(`${(report.type || 'final').toUpperCase()} REPORT (v${report.version})`, col2X + 32, y + 24);
+  } else {
+    // Never render a signed title for an unsigned draft.
+    doc.setTextColor(100, 116, 139);
+    doc.text(`UNSIGNED DRAFT (v${report.version})`, col2X + 32, y + 24);
   }
 
   y += 38;
@@ -163,18 +167,24 @@ export function generateRadiologyReportPdf(appointment: Appointment, report: Rad
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(8);
   doc.setTextColor(100, 116, 139);
-  doc.text(`Electronically Authenticated & Signed on ${report.signedAt || appointment.date} by:`, margin, y);
+  doc.text(
+    report.signedBy
+      ? `Electronically Authenticated & Signed on ${report.signedAt || appointment.date} by:`
+      : 'DRAFT — NOT electronically signed. This is not a final report.',
+    margin,
+    y
+  );
 
   y += 5;
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(10);
   doc.setTextColor(15, 23, 42);
-  doc.text(report.signedBy || appointment.assignedRadiologistName || 'Unsigned draft', margin, y);
+  doc.text(report.signedBy || 'Unsigned draft', margin, y);
 
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(7.5);
   doc.setTextColor(148, 163, 184);
-  doc.text(`Report Ref: ${report.id} | Page 1 of 1 | Digitally signed via ${clinicName(clinic)}`, margin, y + 6);
+  doc.text(`Report Ref: ${report.id} | Page 1 of 1 | ${report.signedBy ? `Digitally signed via ${clinicName(clinic)}` : 'Preview generated locally — not an official document'}`, margin, y + 6);
 
   // Save / Trigger Download
   const filename = `PolytronX-RIS-Report-${appointment.tokenNumber}-${appointment.patient.mrn}.pdf`;

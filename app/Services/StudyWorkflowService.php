@@ -133,6 +133,14 @@ class StudyWorkflowService
     /** Called by the reporting module once a report is signed. */
     public function markReported(Appointment $appointment): Appointment
     {
+        $current = $appointment->state();
+
+        // A signed ADDENDUM on an already-reported (or delivered) study must
+        // not rewind the pipeline — signing is idempotent for the state.
+        if (in_array($current, [StudyState::Reported, StudyState::Delivered], true)) {
+            return $appointment;
+        }
+
         return $this->transition($appointment, StudyState::Reported);
     }
 

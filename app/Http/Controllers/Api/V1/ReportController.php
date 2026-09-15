@@ -36,6 +36,12 @@ class ReportController extends BaseApiController
 
         $signed = $appointment->radiologyReports()->whereNotNull('locked_at')->exists();
 
+        // An unsaved draft already exists: it must be UPDATED (PUT /reports/{id}),
+        // not duplicated — the old behaviour piled up version rows per save.
+        if (! $signed && $appointment->radiologyReports()->whereNull('locked_at')->exists()) {
+            abort(422, 'An unsigned draft already exists for this study. Update it instead of creating another.');
+        }
+
         $report = DB::transaction(function () use ($validated, $appointment, $signed) {
             $nextVersion = ((int) $appointment->radiologyReports()->max('version')) + 1;
             $parent = $appointment->radiologyReports()->first();

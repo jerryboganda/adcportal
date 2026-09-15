@@ -1,20 +1,24 @@
 import React from 'react';
 import { Printer, X, Download, ShieldCheck, Building2, Phone, Mail, FileText, CheckCircle2, AlertCircle } from 'lucide-react';
-import { Invoice, ClinicProfileSettings } from '../types';
-import { generateInvoicePdf } from '../utils/pdfGenerator';
+import { Invoice, Appointment, ClinicProfileSettings } from '../types';
+import { invoicePdfUrl } from '../services/apiService';
+import { Barcode } from './Barcode';
 
 interface PrintableInvoiceModalProps {
   invoice: Invoice | null;
+  appointments?: Appointment[];
   clinicSettings?: ClinicProfileSettings;
   onClose: () => void;
 }
 
-export const PrintableInvoiceModal: React.FC<PrintableInvoiceModalProps> = ({ invoice, clinicSettings, onClose }) => {
+export const PrintableInvoiceModal: React.FC<PrintableInvoiceModalProps> = ({ invoice, appointments, clinicSettings, onClose }) => {
   if (!invoice) return null;
 
   const clinic = clinicSettings;
   const clinicAddress = [clinic?.address?.trim(), clinic?.city?.trim()].filter(Boolean).join(', ');
   const clinicContact = [clinic?.phone?.trim() ? `Phone: ${clinic.phone.trim()}` : '', clinic?.email?.trim()].filter(Boolean).join(' • ');
+  // The ACTUAL referring doctor of the billed study — never a hard-coded name.
+  const referrerName = appointments?.find(a => a.id === invoice.appointmentId)?.referrer?.name;
 
   const handlePrint = () => {
     window.print();
@@ -47,14 +51,14 @@ export const PrintableInvoiceModal: React.FC<PrintableInvoiceModalProps> = ({ in
           </div>
 
           <div className="flex items-center space-x-2">
-            <button
-              onClick={() => generateInvoicePdf(invoice, clinicSettings)}
+            <a
+              href={invoicePdfUrl(invoice.id)}
               className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold flex items-center space-x-1.5 border border-slate-700 transition-colors cursor-pointer"
-              title="Save as PDF"
+              title="Downloads the server-generated PDF of record (authoritative totals)"
             >
               <Download className="w-3.5 h-3.5 text-cyan-400" />
               <span className="hidden sm:inline">Export PDF</span>
-            </button>
+            </a>
             <button
               onClick={handlePrint}
               className="px-4 py-1.5 rounded-lg bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-bold flex items-center space-x-1.5 shadow-md shadow-cyan-600/30 transition-colors cursor-pointer"
@@ -167,7 +171,7 @@ export const PrintableInvoiceModal: React.FC<PrintableInvoiceModalProps> = ({ in
               </h4>
               <div className="grid grid-cols-3 gap-1">
                 <span className="text-slate-500 font-medium">Referring Doctor:</span>
-                <span className="col-span-2 font-semibold text-slate-900">Dr. Tariq Mehmood (FCPS) / Walk-in</span>
+                <span className="col-span-2 font-semibold text-slate-900">{referrerName || 'Self / Walk-in'}</span>
               </div>
               <div className="grid grid-cols-3 gap-1">
                 <span className="text-slate-500 font-medium">Payment Mode:</span>
@@ -258,9 +262,7 @@ export const PrintableInvoiceModal: React.FC<PrintableInvoiceModalProps> = ({ in
 
               {/* Barcode & Security Marker */}
               <div className="pt-3 flex items-center space-x-3 text-slate-600">
-                <div className="font-mono text-xs tracking-widest font-black py-1 px-2 border border-slate-300 rounded bg-slate-50">
-                  *INV-{invoice.invoiceNumber}*
-                </div>
+                <Barcode value={invoice.invoiceNumber} height={36} width={1} />
                 <div className="text-[10px] text-slate-500">
                   <span>Authorized by PolytronX - RIS Electronic Health Records System</span>
                 </div>

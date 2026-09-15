@@ -41,6 +41,7 @@ class BillingController extends BaseApiController
 
         $validated = $request->validate([
             'taxRate' => ['nullable', 'numeric', 'min:0', 'max:100'],
+            'discountAmount' => ['nullable', 'numeric', 'min:0'],
             'notes' => ['nullable', 'string', 'max:2000'],
             'items' => ['required', 'array', 'min:1'],
             'items.*.serviceId' => ['nullable', 'integer'],
@@ -60,6 +61,7 @@ class BillingController extends BaseApiController
                 'patient_id' => $appointment->customer_id,
                 'appointment_id' => $appointment->id,
                 'tax_rate' => (float) ($validated['taxRate'] ?? 0),
+                'manual_discount' => (float) ($validated['discountAmount'] ?? 0),
                 'notes' => $validated['notes'] ?? null,
                 'business_id' => $this->tenantId(),
                 'created_by' => Auth::id(),
@@ -76,7 +78,7 @@ class BillingController extends BaseApiController
                 ]);
             }
 
-            $this->recalculate($invoice);
+            $invoice->recalculateTotals();
 
             if (! empty($validated['issueNow']) || isset($validated['initialPayment'])) {
                 $invoice->forceFill(['issued_by' => Auth::id(), 'issued_at' => now()])->save();
@@ -129,7 +131,7 @@ class BillingController extends BaseApiController
                 'line_total' => max(0, (float) $validated['unitPrice'] * (int) $validated['quantity'] - (float) ($validated['discount'] ?? 0)),
             ]);
 
-            $this->recalculate($invoice);
+            $invoice->recalculateTotals();
         });
 
         return $this->ok(['invoice' => ApiShape::invoice($invoice->fresh(['items', 'payments.receivedBy', 'appointment']))]);
@@ -153,12 +155,18 @@ class BillingController extends BaseApiController
             'reference' => ['nullable', 'string', 'max:255'],
         ]);
 
-        $due = (float) $invoice->balance_due;
-        if ((float) $validated['amount'] > $due + 0.001) {
-            abort(422, 'Payment exceeds balance due ('.number_format($due, 2).').');
-        }
+        // Balance check rides INSIDE the transaction against the locked row so
+        // two concurrent POS terminals cannot both pass against the same due.
+        $payment = DB::transaction(function () use ($validated, $invoice) {
+            $locked = Invoice::whereKey($invoice->id)->lockForUpdate()->first();
 
-        $payment = DB::transaction(fn () => $this->recordPayment($invoice, $validated));
+            $due = (float) $locked->balance_due;
+            if ((float) $validated['amount'] > $due + 0.001) {
+                abort(422, 'Payment exceeds balance due ('.number_format($due, 2).').');
+            }
+
+            return $this->recordPayment($locked, $validated);
+        });
 
         $this->audit('payment_recorded', $invoice, [
             'summary' => sprintf(
@@ -259,21 +267,5 @@ class BillingController extends BaseApiController
         $invoice->recalculateFromPayments();
 
         return $model;
-    }
-
-    private function recalculate(Invoice $invoice): void
-    {
-        $invoice->refresh();
-        $subtotal = (float) $invoice->items()->sum('line_total');
-        $discount = (float) $invoice->items()->sum('discount');
-        $taxable = max(0, $subtotal - $discount);
-        $taxAmount = round($taxable * ((float) $invoice->tax_rate / 100), 2);
-
-        $invoice->forceFill([
-            'subtotal' => $subtotal,
-            'discount_total' => $discount,
-            'tax_amount' => $taxAmount,
-            'total' => round($taxable + $taxAmount, 2),
-        ])->save();
     }
 }

@@ -9,7 +9,7 @@ import {
   Building,
   SwitchCamera,
 } from 'lucide-react';
-import { ActiveTab, AppRole, StaffUser, UserPresenceStatus } from '../types';
+import { ActiveTab, AppRole, StaffUser } from '../types';
 import { SessionUser } from '../services/apiService';
 
 interface UserProfileMenuProps {
@@ -38,7 +38,6 @@ export const UserProfileMenu: React.FC<UserProfileMenuProps> = ({
   onSwitchTenant,
 }) => {
   const [isOpen, setIsOpen] = useState(false);
-  const [presenceStatus, setPresenceStatus] = useState<UserPresenceStatus>('available');
   const menuRef = useRef<HTMLDivElement>(null);
 
   // Close menu when clicking outside
@@ -56,36 +55,6 @@ export const UserProfileMenu: React.FC<UserProfileMenuProps> = ({
     };
   }, [isOpen]);
 
-  const getPresenceColor = (status: UserPresenceStatus) => {
-    switch (status) {
-      case 'available':
-        return 'bg-emerald-500 ring-emerald-300';
-      case 'reporting':
-        return 'bg-purple-500 ring-purple-300';
-      case 'in_procedure':
-        return 'bg-amber-500 ring-amber-300';
-      case 'away':
-        return 'bg-slate-400 ring-slate-200';
-      case 'busy':
-        return 'bg-rose-500 ring-rose-300';
-    }
-  };
-
-  const getPresenceLabel = (status: UserPresenceStatus) => {
-    switch (status) {
-      case 'available':
-        return 'Available / On Duty';
-      case 'reporting':
-        return 'In Reporting Session';
-      case 'in_procedure':
-        return 'In Procedure Suite';
-      case 'away':
-        return 'Away / On Break';
-      case 'busy':
-        return 'Busy / Do Not Disturb';
-    }
-  };
-
   const getRoleGradient = (currentRole: string) => {
     switch (currentRole) {
       case 'radiologist':
@@ -95,32 +64,11 @@ export const UserProfileMenu: React.FC<UserProfileMenuProps> = ({
       case 'receptionist':
       case 'billing':
         return 'from-sky-600 via-blue-600 to-indigo-600';
-      case 'patient':
-        return 'from-emerald-600 to-teal-700';
       case 'admin':
       default:
         return 'from-slate-800 via-slate-700 to-cyan-800';
     }
   };
-
-  const getRoleBadgeStyle = (currentRole: string) => {
-    switch (currentRole) {
-      case 'radiologist':
-        return 'bg-purple-100 text-purple-800 border-purple-200';
-      case 'technologist':
-        return 'bg-cyan-100 text-cyan-800 border-cyan-200';
-      case 'receptionist':
-      case 'billing':
-        return 'bg-sky-100 text-sky-800 border-sky-200';
-      case 'patient':
-        return 'bg-emerald-100 text-emerald-800 border-emerald-200';
-      case 'admin':
-      default:
-        return 'bg-slate-800 text-white border-slate-700';
-    }
-  };
-
-  void getRoleBadgeStyle;
 
   const getRoleDisplayName = (r: string) => {
     switch (r) {
@@ -132,8 +80,6 @@ export const UserProfileMenu: React.FC<UserProfileMenuProps> = ({
         return 'Front Desk Officer';
       case 'billing':
         return 'Billing Officer';
-      case 'patient':
-        return 'Patient Self-Service';
       case 'admin':
       default:
         return 'System Administrator';
@@ -155,17 +101,11 @@ export const UserProfileMenu: React.FC<UserProfileMenuProps> = ({
         aria-expanded={isOpen}
         aria-haspopup="true"
       >
-        {/* Avatar Circle with Presence Beacon */}
+        {/* Avatar Circle */}
         <div className="relative shrink-0">
           <div className={`w-8 h-8 rounded-full bg-gradient-to-tr ${getRoleGradient(role)} flex items-center justify-center text-white font-black text-xs shadow-xs tracking-wider border-2 border-white`}>
             {currentUser.initials || currentUser.name.slice(0, 2).toUpperCase()}
           </div>
-          <span
-            className={`absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full ring-2 ring-white ${getPresenceColor(
-              presenceStatus
-            )}`}
-            title={getPresenceLabel(presenceStatus)}
-          />
         </div>
 
         {/* User Name & ID Info (Desktop) */}
@@ -198,11 +138,6 @@ export const UserProfileMenu: React.FC<UserProfileMenuProps> = ({
                 <div className={`w-13 h-13 rounded-2xl bg-gradient-to-tr ${getRoleGradient(role)} flex items-center justify-center text-white font-black text-lg shadow-lg border-2 border-white/20`}>
                   {currentUser.initials || currentUser.name.slice(0, 2).toUpperCase()}
                 </div>
-                <span
-                  className={`absolute -bottom-1 -right-1 w-4 h-4 rounded-full ring-2 ring-slate-900 ${getPresenceColor(
-                    presenceStatus
-                  )}`}
-                />
               </div>
 
               <div className="flex-1 min-w-0">
@@ -223,31 +158,6 @@ export const UserProfileMenu: React.FC<UserProfileMenuProps> = ({
               </div>
             </div>
 
-            {/* Presence (local status indicator) */}
-            <div className="mt-3.5 pt-3 border-t border-slate-700/60">
-              <div className="flex items-center justify-between text-[11px] text-slate-400 mb-1.5">
-                <span className="font-semibold uppercase tracking-wider text-[10px] text-slate-400">Clinical Presence</span>
-                <span className="text-cyan-300 font-medium">{getPresenceLabel(presenceStatus)}</span>
-              </div>
-              <div className="grid grid-cols-4 gap-1">
-                {(['available', 'reporting', 'in_procedure', 'away'] as UserPresenceStatus[]).map((status) => (
-                  <button
-                    key={status}
-                    onClick={() => setPresenceStatus(status)}
-                    className={`py-1 px-1.5 rounded-lg text-[10px] font-bold capitalize transition-colors flex items-center justify-center space-x-1 cursor-pointer ${
-                      presenceStatus === status
-                        ? 'bg-white/20 text-white shadow-xs border border-white/30'
-                        : 'bg-white/5 text-slate-400 hover:bg-white/10 hover:text-slate-200'
-                    }`}
-                  >
-                    <span className={`w-1.5 h-1.5 rounded-full ${getPresenceColor(status).split(' ')[0]}`} />
-                    <span className="truncate">
-                      {status === 'available' ? 'Online' : status === 'in_procedure' ? 'Scan' : status === 'reporting' ? 'Report' : 'Away'}
-                    </span>
-                  </button>
-                ))}
-              </div>
-            </div>
           </div>
 
           {/* Tenant switcher — only when this identity legitimately belongs to

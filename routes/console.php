@@ -11,16 +11,11 @@ use Illuminate\Support\Facades\Schedule;
 
 // Housekeeping (runs via `php artisan schedule:run` every minute in prod cron)
 Schedule::command('sanctum:prune-expired --hours=24')->hourly();
-Schedule::command('model:prune')->daily()->when(fn () => config('queue.default') !== 'sync');
-Schedule::command('app:appointment-reminder')->everyFiveMinutes();
+Schedule::command('app:appointment-reminder')->hourly();
 Schedule::command('ris:subscription-sweep')->dailyAt('03:10');
-Schedule::call(function () {
-    // Trim API log files to last 30 days
-    $log = storage_path('logs/api.log');
-    if (is_file($log) && filemtime($log) < now()->subDays(30)->getTimestamp()) {
-        @unlink($log);
-    }
-})->daily();
+// NOTE: `model:prune` and the api.log trim were removed — no model is
+// Prunable, and the APILog middleware was never attached to any route, so
+// storage/logs/api.log can never exist for a trim job to manage.
 
 Artisan::command('inspire', function () {
     $this->comment(Illuminate\Foundation\Inspiring::quote());

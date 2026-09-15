@@ -55,8 +55,11 @@ class Appointment extends Model
         'preparing_at',
         'in_progress_at',
         'acquired_at',
+        'reading_at',
         'reported_at',
         'delivered_at',
+        'called_at',
+        'reminder_sent_at',
     ];
 
     protected $casts = [
@@ -66,8 +69,11 @@ class Appointment extends Model
         'preparing_at' => 'datetime',
         'in_progress_at' => 'datetime',
         'acquired_at' => 'datetime',
+        'reading_at' => 'datetime',
         'reported_at' => 'datetime',
         'delivered_at' => 'datetime',
+        'called_at' => 'datetime',
+        'reminder_sent_at' => 'datetime',
     ];
 
     protected static function booted()

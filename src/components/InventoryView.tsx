@@ -469,7 +469,11 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
             </div>
             <p className="text-[11px] text-emerald-600 font-semibold mt-0.5 flex items-center space-x-1">
               <ShieldCheck className="w-3.5 h-3.5 text-emerald-500" />
-              <span>Anaphylaxis Kits 100% Stocked</span>
+              <span>
+                {emergencyPharmacyCount > 0
+                  ? `${inventoryItems.filter(i => i.category === 'pharmacy_emergency' && i.currentStock > (i.minThreshold || 0)).length}/${emergencyPharmacyCount} above threshold`
+                  : 'No emergency SKUs registered yet'}
+              </span>
             </p>
           </div>
         </div>
@@ -490,7 +494,9 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
               {adverseReactions.length} <span className="text-xs font-semibold text-slate-400">Reports</span>
             </div>
             <p className="text-[11px] text-purple-700 font-semibold mt-0.5">
-              100% Resolved On-Site (Zero ICU)
+              {adverseReactions.length > 0
+                ? `${adverseReactions.filter(r => r.outcome === 'resolved_on_site').length} resolved on-site / ${adverseReactions.filter(r => r.outcome === 'referred_to_er').length} referred to ER`
+                : 'No contrast reactions recorded'}
             </p>
           </div>
         </div>

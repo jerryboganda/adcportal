@@ -43,68 +43,73 @@ export const DoseCaptureModal: React.FC<DoseCaptureModalProps> = ({
     ? 'W/kg (SAR Peak)'
     : 'MI / TIs';
 
-  const [doseValue, setDoseValue] = useState<number>(
-    isCt ? 7.8 : isXray ? 0.14 : isMammo ? 1.45 : isMri ? 1.8 : 0.4
-  );
+  // Measurement fields start EMPTY on purpose: dose, kVp, slices etc. are
+  // per-patient machine readings — pre-filling "typical" numbers would invite
+  // signing invented clinical data into the dose record.
+  const [doseValue, setDoseValue] = useState<number | ''>('');
   const [doseUnit, setDoseUnit] = useState<string>(defaultUnit);
-  const [dlpValue, setDlpValue] = useState<number>(isCt ? 345 : 0);
-  const [kvp, setKvp] = useState<number>(isCt ? 120 : isXray ? 85 : isMammo ? 28 : 0);
-  const [mas, setMas] = useState<number>(isCt ? 220 : isXray ? 12 : isMammo ? 95 : 0);
-  const [seriesCount, setSeriesCount] = useState<number>(isCt ? 4 : isMri ? 5 : isMammo ? 4 : isUltrasound ? 2 : 2);
-  const [sliceCount, setSliceCount] = useState<number>(isCt ? 280 : isMri ? 120 : isMammo ? 4 : isUltrasound ? 32 : 2);
-  
+  const [dlpValue, setDlpValue] = useState<number | ''>('');
+  const [kvp, setKvp] = useState<number | ''>('');
+  const [mas, setMas] = useState<number | ''>('');
+  const [seriesCount, setSeriesCount] = useState<number | ''>('');
+  const [sliceCount, setSliceCount] = useState<number | ''>('');
+
   // Available contrast media items from live inventory
   const contrastInventory = inventoryItems.filter(
     i => i.category === 'contrast_ct' || i.category === 'contrast_mri'
   );
 
-  const defaultAgent = appointment.service.requiresContrast
-    ? (isMri
-        ? contrastInventory.find(i => i.category === 'contrast_mri')?.name || 'Gadobutrol (Gadovist)'
-        : contrastInventory.find(i => i.category === 'contrast_ct')?.name || 'Iohexol (Omnipaque 350)')
-    : 'None';
+  const [contrastAgent, setContrastAgent] = useState<string>(
+    appointment.service.requiresContrast && contrastInventory.length > 0
+      ? contrastInventory.find(i => (isMri ? i.category === 'contrast_mri' : i.category === 'contrast_ct'))?.name ?? ''
+      : 'None'
+  );
+  const [manualAgent, setManualAgent] = useState<string>('');
+  const [contrastVolumeMl, setContrastVolumeMl] = useState<number | ''>('');
+  const [contrastFlowRate, setContrastFlowRate] = useState<string>(appointment.service.requiresContrast ? '' : 'N/A');
+  const [cannulaSite, setCannulaSite] = useState<string>(appointment.service.requiresContrast ? '' : 'None');
+  const [salineFlushMl, setSalineFlushMl] = useState<number | ''>('');
+  const [validationError, setValidationError] = useState<string | null>(null);
 
-  const [contrastAgent, setContrastAgent] = useState<string>(defaultAgent);
-  const [contrastVolumeMl, setContrastVolumeMl] = useState<number>(appointment.service.requiresContrast ? (isMri ? 15 : 75) : 0);
-  const [contrastFlowRate, setContrastFlowRate] = useState<string>(appointment.service.requiresContrast ? '3.5 mL/s' : 'N/A');
-  const [cannulaSite, setCannulaSite] = useState<string>(appointment.service.requiresContrast ? 'Right Antecubital (20G)' : 'None');
-  const [salineFlushMl, setSalineFlushMl] = useState<number>(appointment.service.requiresContrast ? 30 : 0);
-  
   // Selected inventory item object
   const selectedInventoryItem = contrastInventory.find(
     i => i.name.toLowerCase() === contrastAgent.toLowerCase() || contrastAgent.toLowerCase().includes(i.name.toLowerCase())
   );
-  
-  const [techniqueNotes, setTechniqueNotes] = useState(
-    isCt
-      ? 'Standard volumetric helical scan with 1.0mm axial reconstructions and coronal/sagittal reformats. Patient held breath well.'
-      : isMri
-      ? 'T1, T2, and STIR multi-planar sequences acquired with dedicated spine matrix coil. No motion artifacts.'
-      : isXray
-      ? 'PA and Lateral projections acquired in full inspiratory effort. Optimal contrast resolution.'
-      : isMammo
-      ? 'Standard CC and MLO views of bilateral breasts acquired under standard automatic exposure control.'
-      : 'Target organ scanned in real-time B-mode and color Doppler. Representative static clips and images stored.'
-  );
+
+  // A contrast agent recorded by free text (no matching tracked SKU) — the
+  // server's fuzzy matcher will auto-deduct when it recognizes a catalog item.
+  const effectiveAgent = contrastAgent === 'None' ? 'None' : (selectedInventoryItem ? contrastAgent : manualAgent.trim());
+
+  const [techniqueNotes, setTechniqueNotes] = useState('');
   const [qcPassed, setQcPassed] = useState<boolean>(true);
   const [techName, setTechName] = useState('');
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (doseValue === '' || Number(doseValue) <= 0) {
+      setValidationError('Enter the dose index shown on the console — a dose record cannot be filed empty or zero.');
+      return;
+    }
+    if (appointment.service.requiresContrast && effectiveAgent === 'None') {
+      setValidationError('This study requires IV contrast — record the agent actually administered.');
+      return;
+    }
+    setValidationError(null);
+
     const doseLog: DoseLog = {
       appointmentId: appointment.id,
-      doseValue,
+      doseValue: Number(doseValue),
       doseUnit,
-      dlpValue: isCt ? dlpValue : undefined,
-      kvp: kvp > 0 ? kvp : undefined,
-      mas: mas > 0 ? mas : undefined,
-      seriesCount,
-      sliceCount,
-      contrastAgent: contrastAgent === 'None' ? undefined : contrastAgent,
-      contrastVolumeMl: contrastAgent === 'None' ? 0 : contrastVolumeMl,
-      contrastFlowRate: contrastAgent === 'None' ? undefined : contrastFlowRate,
-      cannulaSite: contrastAgent === 'None' ? undefined : cannulaSite,
-      salineFlushMl: contrastAgent === 'None' ? undefined : salineFlushMl,
+      dlpValue: isCt && dlpValue !== '' ? Number(dlpValue) : undefined,
+      kvp: kvp !== '' && Number(kvp) > 0 ? Number(kvp) : undefined,
+      mas: mas !== '' && Number(mas) > 0 ? Number(mas) : undefined,
+      seriesCount: seriesCount === '' ? 0 : Number(seriesCount),
+      sliceCount: sliceCount === '' ? 0 : Number(sliceCount),
+      contrastAgent: effectiveAgent === 'None' ? undefined : effectiveAgent,
+      contrastVolumeMl: effectiveAgent === 'None' || contrastVolumeMl === '' ? 0 : Number(contrastVolumeMl),
+      contrastFlowRate: effectiveAgent === 'None' ? undefined : (contrastFlowRate.trim() || undefined),
+      cannulaSite: effectiveAgent === 'None' ? undefined : (cannulaSite.trim() || undefined),
+      salineFlushMl: effectiveAgent === 'None' || salineFlushMl === '' ? undefined : Number(salineFlushMl),
       techniqueNotes: techniqueNotes.trim() || undefined,
       qcPassed,
       recordedAt: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
@@ -137,6 +142,12 @@ export const DoseCaptureModal: React.FC<DoseCaptureModalProps> = ({
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4 overflow-y-auto pr-1 flex-1">
+          {validationError && (
+            <div className="rounded-xl bg-rose-50 border border-rose-200 px-3 py-2 text-xs font-semibold text-rose-700">
+              {validationError}
+            </div>
+          )}
+
           {/* Study Summary Banner */}
           <div className="bg-slate-50 p-3 rounded-xl border border-slate-200 flex items-center justify-between text-xs text-slate-700">
             <div>
@@ -170,7 +181,7 @@ export const DoseCaptureModal: React.FC<DoseCaptureModalProps> = ({
                   type="number"
                   step="0.01"
                   value={doseValue}
-                  onChange={(e) => setDoseValue(Number(e.target.value))}
+                  onChange={(e) => setDoseValue(e.target.value === '' ? '' : Number(e.target.value))}
                   className="w-full bg-white text-slate-900 font-mono font-bold p-2 rounded-lg border border-slate-300 text-xs focus:outline-none focus:ring-1 focus:ring-purple-500"
                 />
               </div>
@@ -192,7 +203,7 @@ export const DoseCaptureModal: React.FC<DoseCaptureModalProps> = ({
                   <input
                     type="number"
                     value={dlpValue}
-                    onChange={(e) => setDlpValue(Number(e.target.value))}
+                    onChange={(e) => setDlpValue(e.target.value === '' ? '' : Number(e.target.value))}
                     className="w-full bg-white text-slate-900 font-mono p-1.5 rounded-md border border-slate-300 text-xs focus:outline-none focus:ring-1 focus:ring-purple-500"
                   />
                 </div>
@@ -201,7 +212,7 @@ export const DoseCaptureModal: React.FC<DoseCaptureModalProps> = ({
                   <input
                     type="number"
                     value={kvp}
-                    onChange={(e) => setKvp(Number(e.target.value))}
+                    onChange={(e) => setKvp(e.target.value === '' ? '' : Number(e.target.value))}
                     className="w-full bg-white text-slate-900 font-mono p-1.5 rounded-md border border-slate-300 text-xs focus:outline-none focus:ring-1 focus:ring-purple-500"
                   />
                 </div>
@@ -210,7 +221,7 @@ export const DoseCaptureModal: React.FC<DoseCaptureModalProps> = ({
                   <input
                     type="number"
                     value={mas}
-                    onChange={(e) => setMas(Number(e.target.value))}
+                    onChange={(e) => setMas(e.target.value === '' ? '' : Number(e.target.value))}
                     className="w-full bg-white text-slate-900 font-mono p-1.5 rounded-md border border-slate-300 text-xs focus:outline-none focus:ring-1 focus:ring-purple-500"
                   />
                 </div>
@@ -224,7 +235,7 @@ export const DoseCaptureModal: React.FC<DoseCaptureModalProps> = ({
                   <input
                     type="number"
                     value={kvp}
-                    onChange={(e) => setKvp(Number(e.target.value))}
+                    onChange={(e) => setKvp(e.target.value === '' ? '' : Number(e.target.value))}
                     className="w-full bg-white text-slate-900 font-mono p-1.5 rounded-md border border-slate-300 text-xs focus:outline-none focus:ring-1 focus:ring-purple-500"
                   />
                 </div>
@@ -233,7 +244,7 @@ export const DoseCaptureModal: React.FC<DoseCaptureModalProps> = ({
                   <input
                     type="number"
                     value={mas}
-                    onChange={(e) => setMas(Number(e.target.value))}
+                    onChange={(e) => setMas(e.target.value === '' ? '' : Number(e.target.value))}
                     className="w-full bg-white text-slate-900 font-mono p-1.5 rounded-md border border-slate-300 text-xs focus:outline-none focus:ring-1 focus:ring-purple-500"
                   />
                 </div>
@@ -251,7 +262,7 @@ export const DoseCaptureModal: React.FC<DoseCaptureModalProps> = ({
                 type="number"
                 min="1"
                 value={seriesCount}
-                onChange={(e) => setSeriesCount(Number(e.target.value))}
+                onChange={(e) => setSeriesCount(e.target.value === '' ? '' : Number(e.target.value))}
                 className="w-full bg-white text-slate-900 font-mono p-2 rounded-lg border border-slate-300 text-xs focus:outline-none focus:ring-1 focus:ring-purple-500"
               />
             </div>
@@ -263,7 +274,7 @@ export const DoseCaptureModal: React.FC<DoseCaptureModalProps> = ({
                 type="number"
                 min="1"
                 value={sliceCount}
-                onChange={(e) => setSliceCount(Number(e.target.value))}
+                onChange={(e) => setSliceCount(e.target.value === '' ? '' : Number(e.target.value))}
                 className="w-full bg-white text-slate-900 font-mono p-2 rounded-lg border border-slate-300 text-xs focus:outline-none focus:ring-1 focus:ring-purple-500"
               />
             </div>
@@ -298,34 +309,29 @@ export const DoseCaptureModal: React.FC<DoseCaptureModalProps> = ({
                     const agent = e.target.value;
                     setContrastAgent(agent);
                     if (agent === 'None') {
-                      setContrastVolumeMl(0);
+                      setContrastVolumeMl('');
                       setContrastFlowRate('N/A');
                       setCannulaSite('None');
-                    } else if (contrastVolumeMl === 0) {
-                      setContrastVolumeMl(isMri ? 15 : 75);
-                      setContrastFlowRate('3.5 mL/s');
-                      setCannulaSite('Right Antecubital (20G)');
                     }
                   }}
                   className="w-full bg-white text-slate-800 p-2 rounded-lg border border-slate-300 text-xs focus:outline-none focus:ring-1 focus:ring-purple-500 cursor-pointer font-medium"
                 >
                   <option value="None">None (Plain / Non-Contrast Study)</option>
-                  {contrastInventory.length > 0 ? (
-                    contrastInventory.map(item => (
-                      <option key={item.id} value={item.name}>
-                        {item.name} ({item.currentStock} in stock • Lot {item.batches[0]?.batchNumber || 'N/A'})
-                      </option>
-                    ))
-                  ) : (
-                    <>
-                      <option value="Iohexol (Omnipaque 350)">Iohexol (Omnipaque 350)</option>
-                      <option value="Iopromide (Ultravist 370)">Iopromide (Ultravist 370)</option>
-                      <option value="Iodixanol (Visipaque 320)">Iodixanol (Visipaque 320 - Iso-osmolar)</option>
-                      <option value="Gadobutrol (Gadovist)">Gadobutrol (Gadovist)</option>
-                      <option value="Gadoterate (Dotarem)">Gadoterate (Dotarem)</option>
-                    </>
-                  )}
+                  {contrastInventory.map(item => (
+                    <option key={item.id} value={item.name}>
+                      {item.name} ({item.currentStock} in stock • Lot {item.batches[0]?.batchNumber || 'unbatched'})
+                    </option>
+                  ))}
                 </select>
+                {contrastAgent !== 'None' && !selectedInventoryItem && (
+                  <input
+                    type="text"
+                    value={manualAgent}
+                    onChange={(e) => setManualAgent(e.target.value)}
+                    placeholder="Agent not tracked in inventory — type the name actually administered"
+                    className="w-full mt-1.5 bg-white text-slate-900 p-2 rounded-lg border border-slate-300 text-xs focus:outline-none focus:ring-1 focus:ring-purple-500"
+                  />
+                )}
               </div>
 
               <div>
@@ -334,7 +340,7 @@ export const DoseCaptureModal: React.FC<DoseCaptureModalProps> = ({
                   type="number"
                   value={contrastVolumeMl}
                   disabled={contrastAgent === 'None'}
-                  onChange={(e) => setContrastVolumeMl(Number(e.target.value))}
+                  onChange={(e) => setContrastVolumeMl(e.target.value === '' ? '' : Number(e.target.value))}
                   className="w-full bg-white text-slate-900 font-mono p-2 rounded-lg border border-slate-300 text-xs focus:outline-none focus:ring-1 focus:ring-purple-500 disabled:bg-slate-100 disabled:opacity-50 font-bold"
                 />
               </div>
@@ -345,10 +351,10 @@ export const DoseCaptureModal: React.FC<DoseCaptureModalProps> = ({
                 <div className="flex items-center space-x-2">
                   <span className="text-[10px] font-bold text-slate-400 uppercase">Active Consignment Lot:</span>
                   <span className="font-mono font-bold text-slate-800 text-[11px]">
-                    {selectedInventoryItem.batches[0]?.batchNumber || 'BATCH-AUTO'}
+                    {selectedInventoryItem.batches[0]?.batchNumber || 'Unbatched stock'}
                   </span>
                   <span className="text-[10px] text-slate-500">
-                    (Exp: {selectedInventoryItem.batches[0]?.expiryDate || '2026-12-31'})
+                    (Exp: {selectedInventoryItem.batches[0]?.expiryDate || 'not recorded'})
                   </span>
                 </div>
                 <span className="text-[10px] text-cyan-800 font-semibold">
@@ -382,7 +388,7 @@ export const DoseCaptureModal: React.FC<DoseCaptureModalProps> = ({
                   <input
                     type="number"
                     value={salineFlushMl}
-                    onChange={(e) => setSalineFlushMl(Number(e.target.value))}
+                    onChange={(e) => setSalineFlushMl(e.target.value === '' ? '' : Number(e.target.value))}
                     className="w-full bg-white text-slate-900 font-mono p-1.5 rounded-md border border-slate-300 text-xs focus:outline-none focus:ring-1 focus:ring-purple-500 font-bold"
                   />
                 </div>

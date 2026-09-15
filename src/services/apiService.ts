@@ -231,9 +231,11 @@ export async function createBooking(input: BookingInput): Promise<BookingResult>
 export type WorkflowAction =
   | 'checkin'
   | 'no_show'
+  | 'call'
   | 'prepare'
   | 'start'
   | 'complete'
+  | 'send_to_reading'
   | 'cancel'
   | 'reject';
 
@@ -283,11 +285,6 @@ export async function updateStudy(appointmentId: string, updates: Partial<Appoin
 
 // ==================== screening ====================
 
-export async function getScreening(appointmentId: string): Promise<{ form: ScreeningForm | null; answers: StudyScreeningAnswer[] }> {
-  const { data } = await http.get(`/studies/${appointmentId}/screening`);
-  return { form: data.data.form, answers: data.data.answers ?? [] };
-}
-
 export async function submitScreening(
   appointmentId: string,
   answers: Array<{ questionId: string; answerValue: string; overrideReason?: string }>
@@ -311,12 +308,22 @@ export interface ReportInput {
   signAs?: 'final' | 'preliminary';
 }
 
+/** Create the first report — or a new ADDENDUM version when one is already signed. */
 export async function saveReport(appointmentId: string, input: ReportInput): Promise<{ study: Appointment; notifications: AppNotification[] }> {
   const { data } = await http.post(`/studies/${appointmentId}/reports`, {
     ...input,
     templateId: input.templateId ? Number(input.templateId) : undefined,
   });
   return { study: normalizeStudy(data.data.study), notifications: data.notifications ?? [] };
+}
+
+/** Edit the current UNSIGNED draft (signed reports are immutable — use saveReport for an addendum). */
+export async function updateReport(reportId: string, input: ReportInput): Promise<Appointment> {
+  const { data } = await http.put(`/reports/${reportId}`, {
+    ...input,
+    templateId: input.templateId ? Number(input.templateId) : undefined,
+  });
+  return normalizeStudy(data.data.study);
 }
 
 export async function releaseReport(
@@ -342,11 +349,12 @@ export function invoicePdfUrl(invoiceId: string): string {
 export async function createInvoice(
   appointmentId: string,
   items: Array<{ serviceId?: number; description: string; quantity: number; unitPrice: number; discount?: number }>,
-  options: { discountNotes?: string; taxRate?: number; notes?: string; initialPayment?: { amount: number; method: InvoicePayment['method']; reference?: string } }
+  options: { discountAmount?: number; discountNotes?: string; taxRate?: number; notes?: string; initialPayment?: { amount: number; method: InvoicePayment['method']; reference?: string } }
 ): Promise<Invoice> {
   const { data } = await http.post(`/studies/${appointmentId}/invoices`, {
     items: items.map(it => ({ ...it, serviceId: it.serviceId ? Number(it.serviceId) : undefined })),
     taxRate: options.taxRate ?? 0,
+    discountAmount: options.discountAmount && options.discountAmount > 0 ? options.discountAmount : undefined,
     notes: options.notes,
     initialPayment: options.initialPayment,
     issueNow: true,
@@ -479,7 +487,7 @@ export async function deleteReportTemplate(id: string): Promise<void> {
 
 // ==================== inventory ====================
 
-export async function createInventoryItem(input: Omit<InventoryItem, 'id'>): Promise<InventoryItem> {
+export async function createInventoryItem(input: Omit<InventoryItem, 'id'>): Promise<{ item: InventoryItem; openingTransactions: InventoryTransaction[] }> {
   const { data } = await http.post('/inventory/items', {
     code: input.code,
     name: input.name,
@@ -487,7 +495,7 @@ export async function createInventoryItem(input: Omit<InventoryItem, 'id'>): Pro
     category: input.category,
     modality: input.modality,
     unit: input.unit,
-    currentStock: input.currentStock,
+    currentStock: input.batches.length > 0 ? 0 : input.currentStock,
     minThreshold: input.minThreshold,
     unitCost: input.unitCost,
     sellingPrice: input.sellingPrice,
@@ -501,7 +509,10 @@ export async function createInventoryItem(input: Omit<InventoryItem, 'id'>): Pro
       receivedDate: b.receivedDate,
     })),
   });
-  return data.data.item;
+  return {
+    item: data.data.item,
+    openingTransactions: data.data.openingTransactions ?? [],
+  };
 }
 
 export async function createInventoryTransaction(input: {
@@ -615,7 +626,6 @@ export async function fetchAuditLogs(): Promise<AuditLogEntry[]> {
 }
 
 // ==================== notifications ====================
-
 export async function markNotificationsRead(ids: string[]): Promise<void> {
   await http.post('/notifications/mark-read', { ids: ids.map(Number) });
 }
@@ -640,11 +650,6 @@ export async function exportBackup(): Promise<Record<string, unknown>> {
 }
 
 // ==================== tenant context ====================
-
-export async function fetchMemberships(): Promise<TenantMembership[]> {
-  const { data } = await http.get('/memberships');
-  return data.data.memberships ?? [];
-}
 
 export async function switchTenant(businessId: number): Promise<SessionUser> {
   const { data } = await http.post('/tenant/switch', { businessId });
@@ -907,11 +912,6 @@ export async function updateTenantFeatures(id: string, overrides: Record<string,
 export async function fetchTenantUsage(id: string): Promise<UsageSummary> {
   const { data } = await http.get(`/platform/tenants/${id}/usage`);
   return data.data.usage;
-}
-
-export async function fetchTenantAudit(id: string): Promise<PlatformAuditEntry[]> {
-  const { data } = await http.get(`/platform/tenants/${id}/audit`);
-  return data.data.audit ?? [];
 }
 
 export async function exportTenantData(id: string): Promise<Record<string, unknown>> {

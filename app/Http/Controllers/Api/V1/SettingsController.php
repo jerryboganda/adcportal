@@ -55,6 +55,9 @@ class SettingsController extends BaseApiController
             'requireScreeningSignOff' => ['nullable', 'boolean'],
             'enableCriticalFindingsAlerts' => ['nullable', 'boolean'],
             'autoSendWhatsappReport' => ['nullable', 'boolean'],
+            'sendAppointmentReminders' => ['nullable', 'boolean'],
+            'reminderHours' => ['nullable', 'integer', 'min:1', 'max:168'],
+            'referralCommissionPercent' => ['nullable', 'numeric', 'min:0', 'max:100'],
         ]);
 
         Setting::updateOrCreate(

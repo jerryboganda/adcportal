@@ -25,8 +25,10 @@ import {
   Check
 } from 'lucide-react';
 import { Invoice, Appointment, Patient, InvoiceItem, InvoicePayment, ClinicProfileSettings } from '../types';
-import { generateInvoicePdf, generateShiftClosingPdf, ShiftClosingData } from '../utils/pdfGenerator';
+import { generateShiftClosingPdf, ShiftClosingData } from '../utils/pdfGenerator';
+import { invoicePdfUrl } from '../services/apiService';
 import { PrintableInvoiceModal } from './PrintableInvoiceModal';
+import { Barcode } from './Barcode';
 
 interface BillingViewProps {
   invoices: Invoice[];
@@ -212,7 +214,9 @@ export const BillingView: React.FC<BillingViewProps> = ({
     const apt = appointments.find(a => a.id === selectedAptId);
     if (!apt) return;
 
-    // Calculate discount
+    // Cash discount: computed from the cashier's input and PASSED THROUGH —
+    // the server persists it as invoice-level manual_discount and re-derives
+    // the authoritative totals from it.
     let calculatedDiscount = 0;
     if (discountType === 'percent') {
       calculatedDiscount = Math.round((apt.service.price * Math.min(100, Math.max(0, discountValue))) / 100);
@@ -248,7 +252,8 @@ export const BillingView: React.FC<BillingViewProps> = ({
 
     onCreateInvoice(selectedAptId, calculatedDiscount, finalNotes, extraItems, initialPayObj);
 
-    // Reset modal
+    // Reset modal only after the request is dispatched; the app shell flashes
+    // the server-confirmed invoice number on success.
     setCreateModalOpen(false);
     setSelectedAptId('');
     setDiscountValue(0);
@@ -308,11 +313,22 @@ export const BillingView: React.FC<BillingViewProps> = ({
   };
 
   const handleGenerateShiftClosingPdf = () => {
+    // Real cash-window: the first cash payment received today, not an assumed
+    // opening time — the settlement sheet must only state facts.
+    const todayKey = new Date().toDateString();
+    const firstCashToday = invoices
+      .flatMap(inv => inv.payments)
+      .filter(p => p.method === 'cash')
+      .map(p => new Date(`${todayKey} ${p.paidAt}`))
+      .filter(d => !isNaN(d.getTime()))
+      .sort((a, b) => a.getTime() - b.getTime())[0];
     const shiftData: ShiftClosingData = {
       shiftDate: new Date().toISOString().split('T')[0],
       shiftName,
       cashierName: shiftCashier,
-      openedAt: '08:00 AM',
+      openedAt: firstCashToday
+        ? firstCashToday.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+        : 'No cash collected today',
       closedAt: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       invoicesCount: invoices.filter(i => i.status !== 'void').length,
       totalInvoiced,
@@ -663,14 +679,14 @@ export const BillingView: React.FC<BillingViewProps> = ({
                             <Receipt className="w-3.5 h-3.5" />
                           </button>
 
-                          {/* Download PDF Invoice */}
-                          <button
-                            onClick={() => generateInvoicePdf(inv, clinicSettings)}
-                            title="Download Official A4 Tax Invoice (PDF)"
-                            className="p-1.5 rounded bg-slate-100 hover:bg-slate-200 text-cyan-700 border border-slate-200 transition-colors cursor-pointer"
+                          {/* Download PDF Invoice — the server-rendered document of record */}
+                          <a
+                            href={invoicePdfUrl(inv.id)}
+                            title="Download Official A4 Tax Invoice (PDF of record)"
+                            className="p-1.5 rounded bg-slate-100 hover:bg-slate-200 text-cyan-700 border border-slate-200 transition-colors cursor-pointer inline-flex"
                           >
                             <Download className="w-3.5 h-3.5" />
-                          </button>
+                          </a>
 
                           {/* Add Item */}
                           {!isVoided && onAddInvoiceItem && (
@@ -1237,12 +1253,12 @@ export const BillingView: React.FC<BillingViewProps> = ({
                 )}
               </div>
 
-              {/* Barcode representation */}
-              <div className="text-center pt-2 border-t border-dashed border-slate-300 space-y-1">
-                <div className="tracking-widest font-black text-xs text-slate-600">||||| | |||| |||||| || |</div>
-                <div className="text-[9px] text-slate-400 font-sans">
-                  Keep receipt for report dispatch. Reports available on portal with MRN.
-                </div>
+              {/* Scannable Code128 barcode of the invoice number */}
+              <div className="text-center pt-2 border-t border-dashed border-slate-300 space-y-1 flex justify-center">
+                <Barcode value={thermalReceiptInvoice.invoiceNumber} height={34} width={1} />
+              </div>
+              <div className="text-[9px] text-slate-400 font-sans text-center">
+                Keep receipt for report dispatch. Reports available on portal with MRN.
               </div>
             </div>
 
@@ -1636,6 +1652,7 @@ export const BillingView: React.FC<BillingViewProps> = ({
       {printableInvoice && (
         <PrintableInvoiceModal
           invoice={printableInvoice}
+          appointments={appointments}
           clinicSettings={clinicSettings}
           onClose={() => setPrintableInvoice(null)}
         />

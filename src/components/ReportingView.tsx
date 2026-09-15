@@ -25,6 +25,7 @@ import {
 } from 'lucide-react';
 import { Appointment, RadiologyReport, ReportTemplate, ClinicProfileSettings } from '../types';
 import { generateRadiologyReportPdf } from '../utils/pdfGenerator';
+import { reportPdfUrl } from '../services/apiService';
 
 interface ReportingViewProps {
   currentUser: { name: string; role: string };
@@ -33,10 +34,10 @@ interface ReportingViewProps {
   templates: ReportTemplate[];
   selectedAppointment: Appointment | null;
   onSelectAppointment: (apt: Appointment) => void;
-  onSaveReport: (aptId: string, reportData: Partial<RadiologyReport>, isFinalize: boolean) => void;
-  onRejectToTech: (aptId: string, reason: string) => void;
+  onSaveReport: (aptId: string, reportData: Partial<RadiologyReport>, isFinalize: boolean) => Promise<void>;
+  onRejectToTech: (aptId: string, reason: string) => Promise<void>;
   onReleaseReport: (aptId: string, channel: 'hand' | 'email' | 'portal') => void;
-  onAddTemplate?: (template: Omit<ReportTemplate, 'id'>) => void;
+  onAddTemplate?: (template: Omit<ReportTemplate, 'id'>) => Promise<void>;
 }
 
 export const ReportingView: React.FC<ReportingViewProps> = ({
@@ -165,8 +166,9 @@ export const ReportingView: React.FC<ReportingViewProps> = ({
     showToast(`Inserted Macro: ${title}`);
   };
 
-  // Handle Save / Finalize
-  const handleSave = (isFinal: boolean) => {
+  // Handle Save / Finalize. The toast fires only after the server confirms —
+  // a success message before the response would be a lie on failure.
+  const handleSave = async (isFinal: boolean) => {
     if (!apt) return;
     if (isFinal && !impression.trim()) {
       alert('Please provide an Impression / Conclusion before finalizing the report.');
@@ -181,47 +183,58 @@ export const ReportingView: React.FC<ReportingViewProps> = ({
       impression,
       recommendations,
       criticalFlag,
-      type: isFinal ? 'final' : 'draft',
-      version: apt.report?.version ? (isFinal ? apt.report.version : apt.report.version) : 1,
     };
 
-    onSaveReport(apt.id, reportPayload, isFinal);
-    showToast(isFinal ? 'Report Finalized & Electronically Signed' : 'Draft Saved Successfully');
+    try {
+      await onSaveReport(apt.id, reportPayload, isFinal);
+      showToast(isFinal ? 'Report Finalized & Electronically Signed' : 'Draft Saved Successfully');
+    } catch {
+      // The app shell already surfaced the server error.
+    }
   };
 
-  // Handle Addendum submission
-  const handleSaveAddendum = () => {
+  // Handle Addendum submission: a signed report is immutable, so the addendum
+  // is stored as a NEW VERSIONED report (type=addendum) and signed in the same
+  // request — never spliced into the signed findings text.
+  const handleSaveAddendum = async () => {
     if (!apt || !addendumText.trim()) return;
-    const existingFindings = apt.report?.findings || findings;
-    const addendumHeader = `\n\n--- ADDENDUM / AMENDMENT (${new Date().toLocaleDateString()} ${new Date().toLocaleTimeString()}) by Consultant Radiologist ---\n${addendumText.trim()}`;
 
-    onSaveReport(
-      apt.id,
-      {
-        findings: `${existingFindings}${addendumHeader}`,
-        type: 'addendum',
-        version: (apt.report?.version || 1) + 1,
-      },
-      true
-    );
-    setAddendumModalOpen(false);
-    setAddendumText('');
-    showToast('Addendum successfully signed and appended to official report.');
+    const stamped = `[ADDENDUM — ${new Date().toLocaleString()} by ${currentUser?.name ?? 'Radiologist'}]\n${addendumText.trim()}`;
+
+    try {
+      await onSaveReport(
+        apt.id,
+        {
+          findings: stamped,
+          impression: 'See addendum; prior impression unchanged.',
+        },
+        true
+      );
+      setAddendumModalOpen(false);
+      setAddendumText('');
+      showToast('Addendum signed and recorded as a new official report version.');
+    } catch {
+      // The app shell already surfaced the server error.
+    }
   };
 
   // Handle Structured Rejection
-  const handleConfirmReject = () => {
+  const handleConfirmReject = async () => {
     if (!apt) return;
     const fullReason = rejectNotes.trim() ? `[${rejectCategory}] - ${rejectNotes.trim()}` : rejectCategory;
-    onRejectToTech(apt.id, fullReason);
-    setRejectModalOpen(false);
-    setRejectNotes('');
-    showToast(`Study rejected to technologist worklist: "${rejectCategory}"`);
+    try {
+      await onRejectToTech(apt.id, fullReason);
+      setRejectModalOpen(false);
+      setRejectNotes('');
+      showToast(`Study rejected to technologist worklist: "${rejectCategory}"`);
+    } catch {
+      // The app shell already surfaced the server error.
+    }
   };
 
   // Save new custom template
-  const handleSaveCustomTemplate = () => {
-    if (!newTemplateName.trim() || !apt) return;
+  const handleSaveCustomTemplate = async () => {
+    if (!newTemplateName.trim() || !apt || !onAddTemplate) return;
     const newTpl: Omit<ReportTemplate, 'id'> = {
       modalityId: apt.modalityId,
       name: newTemplateName.trim(),
@@ -233,8 +246,12 @@ export const ReportingView: React.FC<ReportingViewProps> = ({
       recommendations,
     };
 
-    if (onAddTemplate) {
-      onAddTemplate(newTpl);
+    try {
+      await onAddTemplate(newTpl);
+    } catch {
+      setSaveTemplateModalOpen(false);
+      setNewTemplateName('');
+      return;
     }
     setSaveTemplateModalOpen(false);
     setNewTemplateName('');
@@ -990,6 +1007,7 @@ export const ReportingView: React.FC<ReportingViewProps> = ({
                       <Lock className="w-4 h-4 text-emerald-600" />
                       <span>
                         Finalized & Electronically Signed by {apt.report?.signedBy || 'Consultant Radiologist'} ({apt.report?.signedAt})
+                        {apt.report ? ` — v${apt.report.version}${apt.report.type === 'addendum' ? ' · ADDENDUM' : ''}` : ''}
                       </span>
                     </div>
 
@@ -1020,24 +1038,27 @@ export const ReportingView: React.FC<ReportingViewProps> = ({
 
                       {apt.referrer?.phone && (
                         <a
-                          href={`https://wa.me/${apt.referrer.phone.replace(/[^0-9]/g, '')}?text=${encodeURIComponent(`Dr. ${apt.referrer.name}, Radiology Report for patient ${apt.patient.name} (${apt.service?.name || 'Radiology Study'}, Token: ${apt.tokenNumber}) has been finalized and verified by ${clinicSettings?.name?.trim() || 'PolytronX - RIS'}. Review online: ${window.location.origin}/report/${apt.patient.mrn}`)}`}
-                          target="_blank"
-                          rel="noreferrer"
-                          onClick={() => onReleaseReport(apt.id, 'portal')}
-                          className="flex items-center space-x-1.5 px-3 py-1.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-800 text-xs font-bold border border-emerald-300 cursor-pointer shadow-xs"
-                        >
-                          <MessageSquare className="w-3.5 h-3.5 text-emerald-600" />
-                          <span>WhatsApp to Doctor</span>
-                        </a>
+                        href={`https://wa.me/${apt.referrer.phone.replace(/[^0-9]/g, '')}?text=${encodeURIComponent(`Dr. ${apt.referrer.name}, Radiology Report for patient ${apt.patient.name} (${apt.service?.name || 'Radiology Study'}, Token: ${apt.tokenNumber}) has been finalized and verified by ${clinicSettings?.name?.trim() || 'PolytronX - RIS'}. Review online: ${window.location.origin}/report/${apt.patient.mrn}`)}`}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="flex items-center space-x-1.5 px-3 py-1.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-800 text-xs font-bold border border-emerald-300 cursor-pointer shadow-xs"
+                        title="Opens WhatsApp with a prefilled message. Use Dispatch Log to record the handoff — WhatsApp delivery cannot be verified here."
+                      >
+                        <MessageSquare className="w-3.5 h-3.5 text-emerald-600" />
+                        <span>WhatsApp to Doctor</span>
+                      </a>
                       )}
 
-                      <button
-                        onClick={() => generateRadiologyReportPdf(apt, apt.report!, clinicSettings)}
-                        className="flex items-center space-x-1.5 px-3.5 py-1.5 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-bold shadow-md shadow-cyan-600/20 cursor-pointer"
-                      >
-                        <Download className="w-3.5 h-3.5" />
-                        <span>Download PDF</span>
-                      </button>
+                      {apt.report && (
+                        <a
+                          href={reportPdfUrl(apt.report.id)}
+                          className="flex items-center space-x-1.5 px-3.5 py-1.5 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-bold shadow-md shadow-cyan-600/20 cursor-pointer"
+                          title="Downloads the server-generated, signed PDF of record"
+                        >
+                          <Download className="w-3.5 h-3.5" />
+                          <span>Download PDF</span>
+                        </a>
+                      )}
                     </div>
                   </div>
                 ) : (
@@ -1351,13 +1372,20 @@ export const ReportingView: React.FC<ReportingViewProps> = ({
                 <span className="font-bold text-sm text-slate-900">Official Diagnostic Report Preview</span>
               </div>
               <div className="flex items-center space-x-2">
+                {!apt.report?.lockedAt && (
+                  <span className="rounded-full bg-amber-100 border border-amber-300 text-amber-800 px-2.5 py-1 text-[11px] font-bold">
+                    DRAFT PREVIEW — NOT SIGNED
+                  </span>
+                )}
                 <button
                   onClick={() => {
+                    // Preview reflects the REAL report state: no fabricated
+                    // signature. Unsigned drafts download labelled as drafts.
                     const tempRep: RadiologyReport = {
                       id: apt.report?.id || `rep-${apt.id}`,
                       appointmentId: apt.id,
                       version: apt.report?.version || 1,
-                      type: 'final',
+                      type: apt.report?.lockedAt ? apt.report.type : 'draft',
                       clinicalHistory,
                       technique,
                       comparison,
@@ -1365,9 +1393,9 @@ export const ReportingView: React.FC<ReportingViewProps> = ({
                       impression,
                       recommendations,
                       criticalFlag,
-                      authoredBy: currentUser.name,
-                      signedBy: currentUser.name,
-                      signedAt: new Date().toLocaleDateString(),
+                      authoredBy: apt.report?.authoredBy || currentUser.name,
+                      signedBy: apt.report?.lockedAt ? apt.report.signedBy : undefined,
+                      signedAt: apt.report?.lockedAt ? apt.report.signedAt : undefined,
                       releases: [],
                     };
                     generateRadiologyReportPdf(apt, tempRep, clinicSettings);
@@ -1375,7 +1403,7 @@ export const ReportingView: React.FC<ReportingViewProps> = ({
                   className="flex items-center space-x-1 px-3 py-1.5 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white font-bold text-xs cursor-pointer shadow-xs"
                 >
                   <Download className="w-3.5 h-3.5" />
-                  <span>Download PDF</span>
+                  <span>{apt.report?.lockedAt ? 'Download PDF' : 'Download Draft Preview'}</span>
                 </button>
                 <button onClick={() => setPdfPreviewModalOpen(false)} className="p-1.5 text-slate-400 hover:text-slate-700">
                   <X className="w-5 h-5" />

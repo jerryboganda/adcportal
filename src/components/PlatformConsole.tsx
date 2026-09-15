@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Activity, Archive, ArrowLeft, BarChart3, Building2, CheckCircle2, ChevronRight, Copy, CreditCard,
-  Download, HeartPulse, KeyRound, LifeBuoy, LogOut, Pause, Pencil, Play, Plus, RefreshCw, RotateCcw, ScrollText,
+  Download, Edit2, HeartPulse, KeyRound, LifeBuoy, LogOut, Pause, Pencil, Play, Plus, RefreshCw, RotateCcw, ScrollText,
   Search, Server, ShieldCheck, Trash2, Users as UsersIcon, XCircle,
 } from 'lucide-react';
 import * as api from '../services/apiService';
@@ -181,7 +181,6 @@ export const PlatformConsole: React.FC<{
             tenantId={selectedTenantId}
             user={user}
             onBack={() => setSelectedTenantId(null)}
-            onEnterTenant={onEnterTenant}
             notify={notify}
             fail={fail}
           />
@@ -473,10 +472,9 @@ const TenantDetail: React.FC<{
   tenantId: string;
   user: SessionUser;
   onBack: () => void;
-  onEnterTenant: (businessId: number) => Promise<void>;
   notify: (k: 'error' | 'success', m: string) => void;
   fail: (e: any, f: string) => void;
-}> = ({ tenantId, user, onBack, onEnterTenant, notify, fail }) => {
+}> = ({ tenantId, user, onBack, notify, fail }) => {
   const [tenant, setTenant] = useState<Tenant360 | null>(null);
   const [tab, setTab] = useState<'overview' | 'users' | 'facilities' | 'deployment' | 'branding' | 'integrations' | 'lifecycle' | 'audit' | 'features'>('overview');
   const [confirmTerminate, setConfirmTerminate] = useState('');
@@ -1662,6 +1660,10 @@ const IntegrationsTab: React.FC<{
   const [secrets, setSecrets] = useState<Record<string, string>>({});
   const [rotateFor, setRotateFor] = useState<TenantIntegrationRecord | null>(null);
   const [rotateValues, setRotateValues] = useState<Record<string, string>>({});
+  const [editFor, setEditFor] = useState<TenantIntegrationRecord | null>(null);
+  const [editName, setEditName] = useState('');
+  const [editFacilityId, setEditFacilityId] = useState('');
+  const [editConfig, setEditConfig] = useState<Record<string, string>>({});
 
   const load = useCallback(async () => {
     try {
@@ -1713,6 +1715,25 @@ const IntegrationsTab: React.FC<{
       setSecrets({});
     } catch (err) {
       fail(err, 'Failed to create the integration.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const saveEdit = async () => {
+    if (!editFor) return;
+    setBusy(true);
+    try {
+      const updated = await api.updateTenantIntegration(tenant.id, editFor.id, {
+        name: editName.trim(),
+        facilityId: editFacilityId || null,
+        config: editConfig,
+      });
+      setPayload(updated);
+      notify('success', `${editName.trim()} updated.`);
+      setEditFor(null);
+    } catch (err) {
+      fail(err, 'Failed to update the integration.');
     } finally {
       setBusy(false);
     }
@@ -1812,6 +1833,9 @@ const IntegrationsTab: React.FC<{
 
               {canManage && (
                 <div className="mt-3 flex flex-wrap items-center gap-2">
+                  <button disabled={busy} onClick={() => { setEditFor(i); setEditName(i.name); setEditFacilityId(i.facilityId ?? ''); setEditConfig({ ...i.config }); }} className={btnGhost}>
+                    <Edit2 size={13} /> Edit
+                  </button>
                   <button disabled={busy} onClick={() => run(() => api.probeTenantIntegration(tenant.id, i.id), `Health check ran for ${i.name}.`)} className={btnGhost}>
                     <Activity size={13} /> Run health check
                   </button>
@@ -1823,6 +1847,34 @@ const IntegrationsTab: React.FC<{
                   <button disabled={busy} onClick={() => run(() => api.deleteTenantIntegration(tenant.id, i.id), `${i.name} deleted.`)} className="inline-flex items-center gap-1 rounded-lg border border-rose-300 bg-rose-50 px-3 py-1.5 text-xs font-semibold text-rose-700 hover:bg-rose-100">
                     <Trash2 size={13} /> Delete
                   </button>
+                </div>
+              )}
+
+              {editFor?.id === i.id && (
+                <div className="mt-3 space-y-2 rounded-lg border border-cyan-200 bg-cyan-50/40 p-3">
+                  <div className="grid md:grid-cols-2 gap-2">
+                    <label className="space-y-1"><span className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Name</span>
+                      <input className={field} value={editName} onChange={e => setEditName(e.target.value)} />
+                    </label>
+                    <label className="space-y-1"><span className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Facility (optional)</span>
+                      <select className={field} value={editFacilityId} onChange={e => setEditFacilityId(e.target.value)}>
+                        <option value="">All facilities</option>
+                        {tenant.facilities.map(f => <option key={f.id} value={f.id}>{f.name}</option>)}
+                      </select>
+                    </label>
+                  </div>
+                  <div className="grid md:grid-cols-3 gap-2">
+                    {(payload.catalog.find(c => c.type === i.type)?.requiredKeys ?? Object.keys(i.config)).map(key => (
+                      <label key={key} className="space-y-1"><span className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">{key}</span>
+                        <input className={field} value={editConfig[key] ?? ''} onChange={e => setEditConfig({ ...editConfig, [key]: e.target.value })} />
+                      </label>
+                    ))}
+                  </div>
+                  <p className="text-[11px] text-slate-500">Configuration is replaced wholesale on save; stored credentials are untouched — use Rotate credentials to change those.</p>
+                  <div className="flex gap-2">
+                    <button disabled={busy || !editName.trim()} onClick={saveEdit} className={btnPrimarySm}>Save changes</button>
+                    <button disabled={busy} onClick={() => setEditFor(null)} className={btnGhost}>Cancel</button>
+                  </div>
                 </div>
               )}
 
@@ -2583,18 +2635,20 @@ const NewPlatformUserModal: React.FC<{
 const AuditSection: React.FC<{ notify: (k: 'error' | 'success', m: string) => void; fail: (e: any, f: string) => void }> = ({ notify, fail }) => {
   const [entries, setEntries] = useState<PlatformAuditEntry[]>([]);
   const [filter, setFilter] = useState('');
+  const [tenantFilter, setTenantFilter] = useState('');
   const [loading, setLoading] = useState(true);
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      setEntries(await api.fetchPlatformAudit());
+      // Server-side tenant scoping; the free-text box narrows the fetched window client-side.
+      setEntries(await api.fetchPlatformAudit({ tenantId: tenantFilter.trim() || undefined }));
     } catch (err) {
       fail(err, 'Failed to load platform audit.');
     } finally {
       setLoading(false);
     }
-  }, [fail]);
+  }, [fail, tenantFilter]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -2606,6 +2660,12 @@ const AuditSection: React.FC<{ notify: (k: 'error' | 'success', m: string) => vo
     <div className="space-y-4">
       <div className="flex items-center gap-3">
         <h2 className="text-lg font-bold mr-auto">Platform audit</h2>
+        <input
+          value={tenantFilter}
+          onChange={e => setTenantFilter(e.target.value)}
+          placeholder="Tenant id… (server filter)"
+          className="w-40 rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-cyan-500 focus:outline-none"
+        />
         <input value={filter} onChange={e => setFilter(e.target.value)} placeholder="Filter action / module…" className="w-56 rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-cyan-500 focus:outline-none" />
       </div>
       <div className="rounded-xl border border-slate-200 bg-white overflow-hidden">

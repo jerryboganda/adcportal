@@ -10,6 +10,7 @@ use App\Services\EntitlementService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rules\Password;
 
 /**
@@ -43,31 +44,37 @@ class StaffUserController extends BaseApiController
             EntitlementService::enforce($business, 'users', 'user seat');
         }
 
-        $user = User::create([
-            'name' => $validated['name'],
-            'email' => $validated['email'],
-            'password' => $validated['password'],
-            'mobile_no' => $validated['phone'] ?? null,
-            'email_verified_at' => now(),
-            'type' => 'staff',
-            'active_status' => (int) ($validated['isActive'] ?? true),
-            'business_id' => $this->tenantId(),
-            'created_by' => $this->tenantId(),
-            'department' => $validated['department'] ?? null,
-            'initials' => $this->initials($validated['name']),
-            'capabilities' => $this->capabilities($validated),
-            'lang' => 'en',
-        ]);
+        // Account + role + membership must land atomically: a partial staff
+        // row (user without role/membership) is an unusable, invisible account.
+        $user = DB::transaction(function () use ($validated) {
+            $user = User::create([
+                'name' => $validated['name'],
+                'email' => $validated['email'],
+                'password' => $validated['password'],
+                'mobile_no' => $validated['phone'] ?? null,
+                'email_verified_at' => now(),
+                'type' => 'staff',
+                'active_status' => (int) ($validated['isActive'] ?? true),
+                'business_id' => $this->tenantId(),
+                'created_by' => $this->tenantId(),
+                'department' => $validated['department'] ?? null,
+                'initials' => $this->initials($validated['name']),
+                'capabilities' => $this->capabilities($validated),
+                'lang' => 'en',
+            ]);
 
-        $this->assignRole($user, $validated['role']);
+            $this->assignRole($user, $validated['role']);
 
-        TenantMembership::create([
-            'user_id' => $user->id,
-            'business_id' => $this->tenantId(),
-            'role' => $validated['role'],
-            'is_default' => false,
-            'status' => 'active',
-        ]);
+            TenantMembership::create([
+                'user_id' => $user->id,
+                'business_id' => $this->tenantId(),
+                'role' => $validated['role'],
+                'is_default' => false,
+                'status' => 'active',
+            ]);
+
+            return $user;
+        });
 
         $this->audit('user_created', $user, [
             'summary' => "Provisioned user account for {$user->name} ({$validated['role']})",

@@ -30,9 +30,11 @@ import { Appointment } from '../types';
 interface QueueBoardViewProps {
   appointments: Appointment[];
   clinicName?: string;
+  /** Persists the call server-side (across terminals) — the chime stays local. */
+  onCallPatient?: (aptId: string) => void;
 }
 
-export const QueueBoardView: React.FC<QueueBoardViewProps> = ({ appointments, clinicName }) => {
+export const QueueBoardView: React.FC<QueueBoardViewProps> = ({ appointments, clinicName, onCallPatient }) => {
   const [currentTime, setCurrentTime] = useState(new Date());
   const [calledToken, setCalledToken] = useState<{ token: string; room: string; service: string; modality: string } | null>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -40,7 +42,6 @@ export const QueueBoardView: React.FC<QueueBoardViewProps> = ({ appointments, cl
   const [voiceEnabled, setVoiceEnabled] = useState(true);
   const [voiceLanguage, setVoiceLanguage] = useState<'bilingual' | 'english' | 'urdu'>('bilingual');
   const [selectedModalityFilter, setSelectedModalityFilter] = useState<string>('all');
-  const [callHistory, setCallHistory] = useState<{ token: string; room: string; time: string; modality: string }[]>([]);
 
   const [tickerIndex, setTickerIndex] = useState(0);
   const tickerMessages = [
@@ -86,13 +87,22 @@ export const QueueBoardView: React.FC<QueueBoardViewProps> = ({ appointments, cl
   const preparing = appointments.filter(a => a.workflowState === 'preparing' && activeModalityFilter(a));
   const upNext = appointments.filter(a => a.workflowState === 'checked_in' && activeModalityFilter(a));
 
+  // Server-persisted call log: every terminal (and the audit trail) sees the
+  // same handover, not just this browser session.
+  const recentCalls = appointments
+    .filter(a => a.calledAt && activeModalityFilter(a))
+    .sort((a, b) => new Date(b.calledAt!).getTime() - new Date(a.calledAt!).getTime())
+    .slice(0, 5);
+
+  // A call = persist server-side (shared state + audit) AND chime locally.
+  const callPatient = (apt: Appointment) => {
+    onCallPatient?.(apt.id);
+    triggerChime(apt.tokenNumber, apt.roomNumber, apt.service.name, apt.modality.code);
+  };
+
   // High-fidelity Hospital Chime & Web Speech API Synthesis
   const triggerChime = (token: string, room: string, serviceName: string, modalityCode: string) => {
     setCalledToken({ token, room, service: serviceName, modality: modalityCode });
-    
-    // Add to call history
-    const callTime = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    setCallHistory(prev => [{ token, room, time: callTime, modality: modalityCode }, ...prev.slice(0, 4)]);
 
     // 1. Dual-tone Harmonic Medical Chime (Web Audio API)
     try {
@@ -454,7 +464,7 @@ export const QueueBoardView: React.FC<QueueBoardViewProps> = ({ appointments, cl
                       </span>
 
                       <button
-                        onClick={() => triggerChime(apt.tokenNumber, apt.roomNumber, apt.service.name, apt.modality.code)}
+                        onClick={() => callPatient(apt)}
                         title="Re-Chime on TV with Voice Announcement"
                         className="px-2.5 py-1 rounded-lg bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-cyan-700 dark:text-cyan-300 border border-slate-300 dark:border-slate-700 text-xs font-bold cursor-pointer shadow-xs flex items-center gap-1"
                       >
@@ -540,7 +550,7 @@ export const QueueBoardView: React.FC<QueueBoardViewProps> = ({ appointments, cl
                         {apt.roomNumber}
                       </span>
                       <button
-                        onClick={() => triggerChime(apt.tokenNumber, apt.roomNumber, apt.service.name, apt.modality.code)}
+                        onClick={() => callPatient(apt)}
                         className="text-xs text-cyan-600 hover:text-cyan-500 dark:text-cyan-400 font-black uppercase flex items-center gap-1 mt-1 cursor-pointer ml-auto bg-cyan-50 dark:bg-cyan-950/60 px-2 py-0.5 rounded border border-cyan-200 dark:border-cyan-800"
                       >
                         <Volume2 className="w-3 h-3" /> Call
@@ -559,17 +569,20 @@ export const QueueBoardView: React.FC<QueueBoardViewProps> = ({ appointments, cl
                 <span className="flex items-center gap-1">
                   <RotateCcw className="w-3 h-3" /> Recent Calls Handover:
                 </span>
-                <span className="font-mono text-[10px]">Session log</span>
+                <span className="font-mono text-[10px]">Server log</span>
               </div>
               <div className="flex flex-wrap items-center gap-2 pt-1">
-                {callHistory.map((item, i) => (
+                {recentCalls.map((apt) => (
                   <span
-                    key={i}
+                    key={apt.id}
                     className="px-2 py-0.5 rounded bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 font-mono text-[10px] font-bold text-slate-700 dark:text-slate-300"
                   >
-                    #{item.token} • {item.time}
+                    #{apt.tokenNumber} • {apt.calledAt}
                   </span>
                 ))}
+                {recentCalls.length === 0 && (
+                  <span className="text-[10px] italic opacity-60">No calls recorded yet for this modality.</span>
+                )}
               </div>
             </div>
           </div>

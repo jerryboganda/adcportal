@@ -17,7 +17,7 @@ class Invoice extends Model
 
     protected $fillable = [
         'invoice_number', 'patient_id', 'appointment_id', 'status',
-        'subtotal', 'discount_total', 'tax_rate', 'tax_amount',
+        'subtotal', 'discount_total', 'manual_discount', 'tax_rate', 'tax_amount',
         'total', 'paid_total', 'notes',
         'issued_by', 'issued_at', 'voided_by', 'voided_at',
         'business_id', 'created_by',
@@ -26,6 +26,7 @@ class Invoice extends Model
     protected $casts = [
         'subtotal' => 'decimal:2',
         'discount_total' => 'decimal:2',
+        'manual_discount' => 'decimal:2',
         'tax_rate' => 'decimal:2',
         'tax_amount' => 'decimal:2',
         'total' => 'decimal:2',
@@ -88,6 +89,29 @@ class Invoice extends Model
     {
         $this->paid_total = (float) $this->payments()->sum('amount');
         $this->save();
+    }
+
+    /**
+     * Single source of truth for invoice money math (StudyController and
+     * BillingController both previously carried private copies of this).
+     * Totals = Σ line totals − Σ item discounts − manual cash discount, plus
+     * tax on the discounted remainder. Never negative.
+     */
+    public function recalculateTotals(): void
+    {
+        $this->refresh();
+        $subtotal = (float) $this->items()->sum('line_total');
+        $itemDiscounts = (float) $this->items()->sum('discount');
+        $discountTotal = min($subtotal, $itemDiscounts + max(0, (float) $this->manual_discount));
+        $taxable = max(0, $subtotal - $discountTotal);
+        $taxAmount = round($taxable * ((float) $this->tax_rate / 100), 2);
+
+        $this->forceFill([
+            'subtotal' => round($subtotal, 2),
+            'discount_total' => round($discountTotal, 2),
+            'tax_amount' => $taxAmount,
+            'total' => round($taxable + $taxAmount, 2),
+        ])->save();
     }
 
     public function recalculateStatus(): void

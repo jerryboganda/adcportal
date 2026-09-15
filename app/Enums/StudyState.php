@@ -46,6 +46,7 @@ enum StudyState: string
             self::Preparing => 'preparing_at',
             self::InProgress => 'in_progress_at',
             self::Acquired => 'acquired_at',
+            self::Reading => 'reading_at',
             self::Reported => 'reported_at',
             self::Delivered => 'delivered_at',
             default => null,

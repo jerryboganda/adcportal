@@ -51,14 +51,6 @@ class RouteServiceProvider extends ServiceProvider
             ];
         });
 
-        RateLimiter::for('availability', function (Request $request) {
-            return Limit::perMinute(120)->by($request->user()?->id ?: $request->ip());
-        });
-
-        RateLimiter::for('booking', function (Request $request) {
-            return Limit::perMinute(10)->by($request->ip());
-        });
-
         // Noisy-neighbor guard: one aggregate API budget per ACTIVE tenant.
         // Keyed on the server-resolved active business (never a client id),
         // so switched members and support sessions count against the clinic

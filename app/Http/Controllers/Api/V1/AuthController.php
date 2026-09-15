@@ -57,6 +57,15 @@ class AuthController extends BaseApiController
             return response()->json(['message' => 'This account is disabled. Contact your clinic administrator.'], 403);
         }
 
+        // Patient accounts (walk-in registration creates them login-less) have
+        // no patient portal in this product; they must never reach the staff
+        // data plane, which hydrates full clinic PHI on bootstrap.
+        if ($user->type === 'customer') {
+            Auth::logout();
+
+            return response()->json(['message' => 'This account cannot sign in to the staff portal.'], 403);
+        }
+
         $user->forceFill(['last_login_at' => now()])->save();
 
         $this->audit('login', $user, ['summary' => "Signed in from {$request->ip()}"]);

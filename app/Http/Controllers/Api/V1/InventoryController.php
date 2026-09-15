@@ -10,6 +10,8 @@ use App\Services\InventoryService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\Rule;
 
 /**
  * Clinical inventory: SKU registry, stock movements (server-authoritative
@@ -43,31 +45,72 @@ class InventoryController extends BaseApiController
 
         $validated = $this->validateItem($request);
 
-        $item = InventoryItem::create([
-            'code' => strtoupper(trim($validated['code'])),
-            'name' => $validated['name'],
-            'generic_name' => $validated['genericName'] ?? $validated['name'],
-            'category' => $validated['category'],
-            'modality' => $validated['modality'] ?? 'ALL',
-            'unit' => $validated['unit'] ?? null,
-            'current_stock' => (int) ($validated['currentStock'] ?? 0),
-            'min_threshold' => (int) ($validated['minThreshold'] ?? 0),
-            'unit_cost' => (float) ($validated['unitCost'] ?? 0),
-            'selling_price' => (float) ($validated['sellingPrice'] ?? 0),
-            'is_billable' => (float) ($validated['sellingPrice'] ?? 0) > 0,
-            'requires_cold_chain' => $validated['category'] === 'contrast_mri',
-            'supplier' => $validated['supplier'] ?? null,
-            'storage_location' => $validated['storageLocation'] ?? null,
-            'batches' => $validated['batches'] ?? null,
-            'notes' => $validated['notes'] ?? null,
-            'business_id' => $this->tenantId(),
-        ]);
+        $item = DB::transaction(function () use ($validated) {
+            // Stock starts at zero; the opening quantities are brought in
+            // through InventoryService so the ledger, batch lines and stock
+            // math all come from the single authority (never fabricated
+            // client-side, never double-counted).
+            $item = InventoryItem::create([
+                'code' => strtoupper(trim($validated['code'])),
+                'name' => $validated['name'],
+                'generic_name' => $validated['genericName'] ?? $validated['name'],
+                'category' => $validated['category'],
+                'modality' => $validated['modality'] ?? 'ALL',
+                'unit' => $validated['unit'] ?? null,
+                'current_stock' => 0,
+                'min_threshold' => (int) ($validated['minThreshold'] ?? 0),
+                'unit_cost' => (float) ($validated['unitCost'] ?? 0),
+                'selling_price' => (float) ($validated['sellingPrice'] ?? 0),
+                'is_billable' => (float) ($validated['sellingPrice'] ?? 0) > 0,
+                'requires_cold_chain' => $validated['category'] === 'contrast_mri',
+                'supplier' => $validated['supplier'] ?? null,
+                'storage_location' => $validated['storageLocation'] ?? null,
+                'notes' => $validated['notes'] ?? null,
+                'business_id' => $this->tenantId(),
+            ]);
+
+            $service = app(InventoryService::class);
+            $openingTransactions = [];
+
+            $batches = $validated['batches'] ?? [];
+            if ($batches !== []) {
+                foreach ($batches as $batch) {
+                    if ((int) ($batch['quantity'] ?? 0) <= 0) {
+                        continue;
+                    }
+                    $openingTransactions[] = $service->recordTransaction($item, [
+                        'type' => 'stock_in',
+                        'quantity' => (int) $batch['quantity'],
+                        'batch_number' => $batch['batchNumber'] ?? null,
+                        'expiry_date' => $batch['expiryDate'] ?? null,
+                        'notes' => 'Opening stock on SKU creation.',
+                    ]);
+                }
+            } elseif ((int) ($validated['currentStock'] ?? 0) > 0) {
+                $openingTransactions[] = $service->recordTransaction($item, [
+                    'type' => 'stock_in',
+                    'quantity' => (int) $validated['currentStock'],
+                    'notes' => 'Opening stock on SKU creation.',
+                ]);
+            }
+
+            return [$item, $openingTransactions];
+        });
+
+        [$item, $openingTransactions] = $item;
 
         $this->audit('inventory_created', $item, [
             'summary' => "Created inventory SKU {$item->code} ({$item->name}) with opening stock {$item->current_stock}.",
         ]);
 
-        return response()->json(['data' => ['item' => ApiShape::inventoryItem($item)]], 201);
+        return response()->json([
+            'data' => [
+                'item' => ApiShape::inventoryItem($item->fresh()),
+                'openingTransactions' => collect($openingTransactions)
+                    ->map(fn ($tx) => ApiShape::inventoryTransaction($tx->fresh('performer')))
+                    ->all(),
+            ],
+        ], 201);
     }
 
     public function storeTransaction(Request $request): JsonResponse
@@ -131,6 +174,12 @@ class InventoryController extends BaseApiController
             'notes' => ['nullable', 'string', 'max:2000'],
         ]);
 
+        // A reaction record may reference a study — but only THIS clinic's
+        // studies; a foreign appointment id must 404, never attach.
+        if (! empty($validated['appointmentId'])) {
+            \App\Models\Appointment::forClinic($this->tenantId())->findOrFail($validated['appointmentId']);
+        }
+
         $reaction = AdverseReaction::create([
             'appointment_id' => $validated['appointmentId'] ?? null,
             'token_number' => strtoupper($validated['tokenNumber']),
@@ -159,7 +208,9 @@ class InventoryController extends BaseApiController
     private function validateItem(Request $request): array
     {
         return $request->validate([
-            'code' => ['required', 'string', 'max:50', 'unique:ris_inventory_items,code'],
+            // SKU codes are unique PER TENANT — a global unique index would
+            // let clinic A's catalog leak into clinic B's validation errors.
+            'code' => ['required', 'string', 'max:50', Rule::unique('ris_inventory_items', 'code')->where(fn ($q) => $q->where('business_id', $this->tenantId()))],
             'name' => ['required', 'string', 'max:255'],
             'genericName' => ['nullable', 'string', 'max:255'],
             'category' => ['required', 'in:contrast_ct,contrast_mri,cannula_syringes,ppe_safety,pharmacy_emergency,general_consumable'],

@@ -15,7 +15,6 @@ interface NewBookingModalProps {
   modalities: Modality[];
   services: Service[];
   referrers: Referrer[];
-  existingAppointments: Appointment[];
   onCreateBooking: (newApt: Partial<Appointment>, newPatient?: Partial<Patient>) => void;
   onClose: () => void;
 }
@@ -25,7 +24,6 @@ export const NewBookingModal: React.FC<NewBookingModalProps> = ({
   modalities,
   services,
   referrers,
-  existingAppointments,
   onCreateBooking,
   onClose,
 }) => {
@@ -42,11 +40,13 @@ export const NewBookingModal: React.FC<NewBookingModalProps> = ({
   const [newBloodGroup, setNewBloodGroup] = useState('');
   const [newAllergies, setNewAllergies] = useState('');
 
-  // Study parameters
-  const [selectedModalityId, setSelectedModalityId] = useState<number>(modalities[0]?.id || 1);
+  // Study parameters. No magic fallback ids: if a tenant has not configured
+  // modalities/services yet, booking must be blocked, not silently booked
+  // against invented ids.
+  const [selectedModalityId, setSelectedModalityId] = useState<number | ''>(modalities[0]?.id ?? '');
   const filteredServices = services.filter(s => s.modalityId === selectedModalityId);
-  const [selectedServiceId, setSelectedServiceId] = useState<number>(filteredServices[0]?.id || services[0]?.id || 101);
-  const [selectedReferrerId, setSelectedReferrerId] = useState<number>(referrers[0]?.id || 1);
+  const [selectedServiceId, setSelectedServiceId] = useState<number | ''>(filteredServices[0]?.id ?? '');
+  const [selectedReferrerId, setSelectedReferrerId] = useState<number | ''>('');
   const [priority, setPriority] = useState<Priority>('routine');
   const [scheduledTime, setScheduledTime] = useState('11:30 AM');
   const [notes, setNotes] = useState('');
@@ -55,33 +55,22 @@ export const NewBookingModal: React.FC<NewBookingModalProps> = ({
   const handleModalityChange = (modId: number) => {
     setSelectedModalityId(modId);
     const validServices = services.filter(s => s.modalityId === modId);
-    if (validServices.length > 0) {
-      setSelectedServiceId(validServices[0].id);
-    }
+    setSelectedServiceId(validServices[0]?.id ?? '');
   };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    const modality = modalities.find(m => m.id === selectedModalityId) || modalities[0];
-    const service = services.find(s => s.id === selectedServiceId) || services[0];
+    if (!selectedServiceId) return;
+    const service = services.find(s => s.id === selectedServiceId);
+    if (!service) return;
     const referrer = referrers.find(r => r.id === selectedReferrerId);
 
-    // Auto-generate token number e.g. "DX-03", "MR-03"
-    const modCount = existingAppointments.filter(a => a.modalityId === modality.id).length + 1;
-    const tokenNumber = `${modality.code}-${String(modCount).padStart(2, '0')}`;
-
-    let roomNumber = `Room ${modality.id} (${modality.name.split(' ')[0]} Suite)`;
-    if (modality.code === 'DX') roomNumber = 'Room 1 (X-Ray Suite A)';
-    if (modality.code === 'US') roomNumber = 'Room 2 (Ultrasound Suite)';
-    if (modality.code === 'CT') roomNumber = 'Room 3 (CT 128-Slice)';
-    if (modality.code === 'MR') roomNumber = 'Room 4 (MRI 1.5T Suite)';
-    if (modality.code === 'MG') roomNumber = 'Room 5 (Mammography Suite)';
+    // Token number, room assignment and the patient MRN are SERVER-AUTHORITATIVE:
+    // they are minted by the API and returned on the created study. The client
+    // never invents identifiers.
 
     if (isNewPatient) {
-      const generatedMrn = `PX-2026-${Math.floor(10000 + Math.random() * 90000)}`;
       const newPatientData: Partial<Patient> = {
-        id: `pat-${Date.now()}`,
-        mrn: generatedMrn,
         name: newName,
         phone: newPhone,
         age: Number(newAge),
@@ -92,43 +81,25 @@ export const NewBookingModal: React.FC<NewBookingModalProps> = ({
 
       onCreateBooking(
         {
-          tokenNumber,
           serviceId: service.id,
-          service,
-          modalityId: modality.id,
-          modality,
           referrerId: referrer?.id,
-          referrer,
           priority,
           time: scheduledTime,
           date: new Date().toISOString().split('T')[0],
-          workflowState: 'booked',
-          screeningRequired: service.requiresScreening || service.requiresContrast,
-          screeningCleared: !(service.requiresScreening || service.requiresContrast),
-          roomNumber,
           notes,
         },
         newPatientData
       );
     } else {
-      const existingPatient = patients.find(p => p.id === selectedPatientId) || patients[0];
+      const existingPatient = patients.find(p => p.id === selectedPatientId);
+      if (!existingPatient) return;
       onCreateBooking({
         patientId: existingPatient.id,
-        patient: existingPatient,
-        tokenNumber,
         serviceId: service.id,
-        service,
-        modalityId: modality.id,
-        modality,
         referrerId: referrer?.id,
-        referrer,
         priority,
         time: scheduledTime,
         date: new Date().toISOString().split('T')[0],
-        workflowState: 'booked',
-        screeningRequired: service.requiresScreening || service.requiresContrast,
-        screeningCleared: !(service.requiresScreening || service.requiresContrast),
-        roomNumber,
         notes,
       });
     }
@@ -264,6 +235,7 @@ export const NewBookingModal: React.FC<NewBookingModalProps> = ({
                   onChange={(e) => handleModalityChange(Number(e.target.value))}
                   className="w-full bg-white text-slate-900 p-2.5 rounded-xl border border-slate-300 text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-cyan-500 cursor-pointer shadow-xs"
                 >
+                  {modalities.length === 0 && <option value="">No modalities configured</option>}
                   {modalities.map(m => (
                     <option key={m.id} value={m.id}>
                       {m.name} ({m.code})
@@ -279,6 +251,9 @@ export const NewBookingModal: React.FC<NewBookingModalProps> = ({
                   onChange={(e) => setSelectedServiceId(Number(e.target.value))}
                   className="w-full bg-white text-slate-900 p-2.5 rounded-xl border border-slate-300 text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-cyan-500 cursor-pointer shadow-xs"
                 >
+                  {filteredServices.length === 0 && (
+                    <option value="">No procedures configured for this modality</option>
+                  )}
                   {filteredServices.map(s => (
                     <option key={s.id} value={s.id}>
                       {s.name} - Rs. {s.price.toLocaleString()}
@@ -318,9 +293,10 @@ export const NewBookingModal: React.FC<NewBookingModalProps> = ({
               <span className="text-[11px] text-slate-600 font-medium block mb-1 font-semibold">Referring Doctor</span>
               <select
                 value={selectedReferrerId}
-                onChange={(e) => setSelectedReferrerId(Number(e.target.value))}
+                onChange={(e) => setSelectedReferrerId(e.target.value === '' ? '' : Number(e.target.value))}
                 className="w-full bg-white text-slate-900 p-2.5 rounded-xl border border-slate-300 text-xs cursor-pointer shadow-xs"
               >
+                <option value="">Self / Walk-in (no referrer)</option>
                 {referrers.map(r => (
                   <option key={r.id} value={r.id}>
                     {r.name} ({r.specialty})
@@ -354,7 +330,8 @@ export const NewBookingModal: React.FC<NewBookingModalProps> = ({
             </button>
             <button
               type="submit"
-              className="flex-1 flex items-center justify-center space-x-1.5 px-4 py-2 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white font-bold text-xs shadow-md shadow-cyan-600/30 cursor-pointer"
+              disabled={!selectedServiceId}
+              className="flex-1 flex items-center justify-center space-x-1.5 px-4 py-2 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white font-bold text-xs shadow-md shadow-cyan-600/30 cursor-pointer disabled:bg-slate-300 disabled:cursor-not-allowed disabled:shadow-none"
             >
               <PlusCircle className="w-4 h-4" />
               <span>Confirm & Generate Token</span>

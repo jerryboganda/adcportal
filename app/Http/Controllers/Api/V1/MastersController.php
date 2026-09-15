@@ -14,6 +14,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use Illuminate\Validation\Rule;
 
 /**
  * Master data maintained by clinic admins: modalities, rooms, procedures
@@ -150,9 +151,26 @@ class MastersController extends BaseApiController
             abort(404);
         }
 
+        // Soft-deleting keeps past studies renderable, but a service still
+        // referenced by booked studies must not vanish from the booking
+        // catalog — history would lose its procedure name/price anchor.
+        if ($service->appointments()->exists()) {
+            abort(422, 'Cannot delete a service that has studies booked against it. Deactivate it instead.');
+        }
+
         $service->delete();
 
         return $this->ok(['deleted' => true]);
+    }
+
+    /** Tenant-scoped modality existence: another clinic's modality id must fail validation. */
+    private function modalityRule(bool $required = true): array
+    {
+        return [
+            $required ? 'required' : 'nullable',
+            'integer',
+            Rule::exists('modalities', 'id')->where(fn ($q) => $q->where('business_id', $this->tenantId())),
+        ];
     }
 
     private function validateService(Request $request): array
@@ -160,7 +178,7 @@ class MastersController extends BaseApiController
         return $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'code' => ['required', 'string', 'max:40'],
-            'modalityId' => ['required', 'integer', 'exists:modalities,id'],
+            'modalityId' => $this->modalityRule(),
             'price' => ['required', 'numeric', 'min:0'],
             'durationMinutes' => ['nullable', 'integer', 'min:5', 'max:480'],
             'preparationInstructions' => ['nullable', 'string', 'max:2000'],
@@ -251,7 +269,7 @@ class MastersController extends BaseApiController
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'description' => ['nullable', 'string', 'max:2000'],
-            'modalityId' => ['nullable', 'integer', 'exists:modalities,id'],
+            'modalityId' => $this->modalityRule(false),
             'questions' => ['required', 'array', 'min:1'],
             'questions.*.questionText' => ['required', 'string', 'max:1000'],
             'questions.*.helpText' => ['nullable', 'string', 'max:500'],
@@ -410,7 +428,7 @@ class MastersController extends BaseApiController
     {
         return $request->validate([
             'name' => ['required', 'string', 'max:255'],
-            'modalityId' => ['required', 'integer', 'exists:modalities,id'],
+            'modalityId' => $this->modalityRule(),
             'clinicalHistory' => ['nullable', 'string', 'max:5000'],
             'technique' => ['nullable', 'string', 'max:5000'],
             'findings' => ['nullable', 'string'],

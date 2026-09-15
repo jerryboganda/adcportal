@@ -59,6 +59,7 @@ import { onUnauthorized, initCsrf } from './services/api';
 type BootStatus = 'loading' | 'unauthenticated' | 'ready' | 'platform' | 'gated';
 
 const ACTIVE_TAB_KEY = 'polytronx_ris_active_tab_v2';
+const TERMINAL_LOCK_KEY = 'polytronx_ris_terminal_locked';
 
 export const App: React.FC = () => {
   const [bootStatus, setBootStatus] = useState<BootStatus>('loading');
@@ -95,11 +96,23 @@ export const App: React.FC = () => {
     () => (localStorage.getItem(ACTIVE_TAB_KEY) as ActiveTab) || 'dashboard'
   );
   const [notificationCenterOpen, setNotificationCenterOpen] = useState(false);
-  const [isTerminalLocked, setIsTerminalLocked] = useState(false);
+  // Terminal lock survives a page refresh (sessionStorage): a lock that
+  // disappears on reload would be theatre, not security.
+  const [isTerminalLocked, setIsTerminalLocked] = useState<boolean>(
+    () => sessionStorage.getItem(TERMINAL_LOCK_KEY) === '1'
+  );
 
   useEffect(() => {
     localStorage.setItem(ACTIVE_TAB_KEY, activeTab);
   }, [activeTab]);
+
+  useEffect(() => {
+    if (isTerminalLocked) {
+      sessionStorage.setItem(TERMINAL_LOCK_KEY, '1');
+    } else {
+      sessionStorage.removeItem(TERMINAL_LOCK_KEY);
+    }
+  }, [isTerminalLocked]);
 
   // ==================== bootstrap ====================
 
@@ -291,12 +304,24 @@ export const App: React.FC = () => {
     runTransition(aptId, 'cancel', { reason }).catch(() => undefined);
   }, [runTransition]);
 
+  /** PACS QC verified by the technologist: hand the study to the reading radiologist. */
+  const handleSendToReading = useCallback((aptId: string) => {
+    runTransition(aptId, 'send_to_reading').catch(() => undefined);
+  }, [runTransition]);
+
+  /** Queue-board call: persisted server-side so every terminal sees the same "now serving". */
+  const handleCallPatient = useCallback((aptId: string) => {
+    runTransition(aptId, 'call').catch(() => undefined);
+  }, [runTransition]);
+
   const handleRejectToTech = useCallback(async (aptId: string, reason: string) => {
     try {
       await runTransition(aptId, 'reject', { reason });
       showFlash('success', 'Study rejected back to Technologist.');
-    } catch {
-      // Flash already shown by runTransition.
+    } catch (err: any) {
+      // Flash already shown by runTransition; rethrow so the caller does not
+      // toast success over a failure.
+      throw err;
     }
   }, [runTransition, showFlash]);
 
@@ -334,26 +359,37 @@ export const App: React.FC = () => {
   // ==================== reporting ====================
 
   const handleSaveReport = useCallback(async (aptId: string, reportData: Partial<RadiologyReport>, isFinalize: boolean) => {
+    const apt = appointments.find(a => a.id === aptId);
+    const existing = apt?.report;
+    // Unsigned draft → edit it (PUT). Signed report → a save creates a new
+    // ADDENDUM version server-side. Nothing is ever duplicated silently.
+    const editableDraft = existing && !existing.lockedAt ? existing : null;
+    const payload = {
+      clinicalHistory: reportData.clinicalHistory ?? '',
+      technique: reportData.technique ?? '',
+      comparison: reportData.comparison ?? '',
+      findings: reportData.findings ?? '',
+      impression: reportData.impression ?? '',
+      recommendations: reportData.recommendations ?? '',
+      criticalFlag: reportData.criticalFlag ?? false,
+      signNow: isFinalize,
+      signAs: 'final' as const,
+    };
     try {
-      const { study, notifications: incoming } = await api.saveReport(aptId, {
-        clinicalHistory: reportData.clinicalHistory ?? '',
-        technique: reportData.technique ?? '',
-        comparison: reportData.comparison ?? '',
-        findings: reportData.findings ?? '',
-        impression: reportData.impression ?? '',
-        recommendations: reportData.recommendations ?? '',
-        criticalFlag: reportData.criticalFlag ?? false,
-        signNow: isFinalize,
-        signAs: 'final',
-      });
-      replaceStudy(study);
-      adoptNotifications(incoming);
+      if (editableDraft) {
+        const study = await api.updateReport(editableDraft.id, payload);
+        replaceStudy(study);
+      } else {
+        const { study, notifications: incoming } = await api.saveReport(aptId, payload);
+        replaceStudy(study);
+        adoptNotifications(incoming);
+      }
       showFlash('success', isFinalize ? 'Report signed and saved.' : 'Draft report saved.');
     } catch (err: any) {
       fail(err, 'Could not save the report.');
       throw err;
     }
-  }, [adoptNotifications, fail, replaceStudy, showFlash]);
+  }, [appointments, adoptNotifications, fail, replaceStudy, showFlash]);
 
   const handleReleaseReport = useCallback(async (aptId: string, channel: 'hand' | 'email' | 'portal') => {
     const apt = appointments.find(a => a.id === aptId);
@@ -392,12 +428,11 @@ export const App: React.FC = () => {
 
   const handleCreateInvoice = useCallback(async (
     appointmentId: string,
-    _discount: number,
+    discountAmount: number,
     notes: string,
     extraItems?: InvoiceItem[],
     initialPayment?: { amount: number; method: InvoicePayment['method']; reference: string }
   ) => {
-    void _discount; // discount is embedded per line item by the billing modal
     const apt = appointments.find(a => a.id === appointmentId);
     if (!apt) return;
 
@@ -408,6 +443,9 @@ export const App: React.FC = () => {
 
     try {
       const invoice = await api.createInvoice(appointmentId, items, {
+        // Cash discount is server-authoritative: it travels in the contract
+        // and folds into the persisted totals (never recomputed client-side).
+        discountAmount: discountAmount > 0 ? discountAmount : undefined,
         notes,
         initialPayment: initialPayment && initialPayment.amount > 0 ? initialPayment : undefined,
       });
@@ -509,6 +547,13 @@ export const App: React.FC = () => {
     } catch (err: any) { fail(err, 'Could not update the modality.'); }
   }, [fail]);
 
+  const handleDeleteModality = useCallback(async (modalityId: number) => {
+    try {
+      await api.deleteModality(String(modalityId));
+      setModalities(prev => prev.filter(m => m.id !== modalityId));
+    } catch (err: any) { fail(err, 'Could not delete the modality.'); }
+  }, [fail]);
+
   const handleAddReferrer = useCallback(async (newRef: Omit<Referrer, 'id'>) => {
     try {
       const referrer = await api.createReferrer(newRef);
@@ -559,7 +604,10 @@ export const App: React.FC = () => {
     try {
       const template = await api.createReportTemplate(newTpl);
       setTemplates(prev => [...prev, template]);
-    } catch (err: any) { fail(err, 'Could not create the template.'); }
+    } catch (err: any) {
+      fail(err, 'Could not create the template.');
+      throw err; // callers decide whether a success toast is honest
+    }
   }, [fail]);
 
   const handleUpdateTemplate = useCallback(async (updatedTpl: ReportTemplate) => {
@@ -608,7 +656,10 @@ export const App: React.FC = () => {
       const clinic = await api.updateClinicSettings(newSettings);
       setClinicSettings(clinic);
       showFlash('success', 'Clinic profile saved.');
-    } catch (err: any) { fail(err, 'Could not save the clinic profile.'); }
+    } catch (err: any) {
+      fail(err, 'Could not save the clinic profile.');
+      throw err; // caller decides whether its own success state is honest
+    }
   }, [fail, showFlash]);
 
   const handleAddDicomNode = useCallback(async (newNode: Omit<DicomNodeConfig, 'id'>) => {
@@ -659,23 +710,15 @@ export const App: React.FC = () => {
 
   const handleCreateInventoryItem = useCallback(async (item: Omit<InventoryItem, 'id'>) => {
     try {
-      const created = await api.createInventoryItem(item);
+      const { item: created, openingTransactions } = await api.createInventoryItem(item);
       setInventoryItems(prev => [created, ...prev]);
-      if (created.currentStock > 0) {
-        setInventoryTransactions(prev => [{
-          id: `local-${created.id}-opening`,
-          itemId: created.id,
-          itemName: created.name,
-          type: 'stock_in',
-          quantity: created.currentStock,
-          batchNumber: created.batches[0]?.batchNumber ?? '',
-          timestamp: 'Just now',
-          performedBy: user?.name ?? 'You',
-          notes: 'Opening stock on SKU creation.',
-        }, ...prev]);
+      // The server records the opening-stock movements itself; the client
+      // renders exactly what the ledger returned — never synthesized rows.
+      if (openingTransactions.length > 0) {
+        setInventoryTransactions(prev => [...openingTransactions, ...prev]);
       }
     } catch (err: any) { fail(err, 'Could not create the SKU.'); }
-  }, [fail, user]);
+  }, [fail]);
 
   const handleStockMovement = useCallback(async (input: {
     itemId: string;
@@ -719,28 +762,52 @@ export const App: React.FC = () => {
   }, [adoptNotifications, fail, showFlash]);
 
   // ==================== notifications ====================
+  // Optimistic updates with ROLLBACK: a swallowed failure used to silently
+  // resurrect on the next bootstrap (server never saw the change).
 
   const handleMarkNotifAsRead = useCallback((id: string) => {
     setNotifications(prev => prev.map(n => (n.id === id ? { ...n, isRead: true } : n)));
-    api.markNotificationsRead([id]).catch(() => undefined);
-  }, []);
+    api.markNotificationsRead([id]).catch(() => {
+      setNotifications(prev => prev.map(n => (n.id === id ? { ...n, isRead: false } : n)));
+      showFlash('error', 'Could not mark the notification as read.');
+    });
+  }, [showFlash]);
 
   const handleMarkAllNotifsAsRead = useCallback(() => {
     setNotifications(prev => prev.map(n => ({ ...n, isRead: true })));
-    api.markAllNotificationsRead().catch(() => undefined);
-  }, []);
+    api.markAllNotificationsRead().catch(() => {
+      setNotifications(prev => prev.map(n => ({ ...n, isRead: false })));
+      showFlash('error', 'Could not mark all notifications as read.');
+    });
+  }, [showFlash]);
 
   const handleClearAllNotifs = useCallback(() => {
+    const previous = notifications;
     setNotifications([]);
-    api.clearNotifications().catch(() => undefined);
-  }, []);
+    api.clearNotifications().catch(() => {
+      setNotifications(previous);
+      showFlash('error', 'Could not clear the notifications.');
+    });
+  }, [notifications, showFlash]);
 
   const handleDeleteNotif = useCallback((id: string) => {
+    const previous = notifications;
     setNotifications(prev => prev.filter(n => n.id !== id));
-    api.deleteNotification(id).catch(() => undefined);
-  }, []);
+    api.deleteNotification(id).catch(() => {
+      setNotifications(previous);
+      showFlash('error', 'Could not delete the notification.');
+    });
+  }, [notifications, showFlash]);
 
   // ==================== backup ====================
+
+  // The settings audit tab re-reads the server trail on demand instead of
+  // only ever showing the login-time bootstrap snapshot.
+  const handleRefreshAuditLogs = useCallback(async () => {
+    try {
+      setAuditLogs(await api.fetchAuditLogs());
+    } catch (err: any) { fail(err, 'Could not refresh the audit log.'); }
+  }, [fail]);
 
   const handleExportBackup = useCallback(async () => {
     try {
@@ -918,6 +985,7 @@ export const App: React.FC = () => {
             onOpenScreeningModal={(apt) => setScreeningModalApt(apt)}
             onStartAcquisition={handleStartAcquisition}
             onOpenDoseModal={(apt) => setDoseModalApt(apt)}
+            onSendToReading={handleSendToReading}
             onCancelStudy={handleCancelStudy}
             onUpdateAppointment={handleUpdateAppointment}
           />
@@ -952,7 +1020,11 @@ export const App: React.FC = () => {
         )}
 
         {activeTab === 'queue' && (
-          <QueueBoardView appointments={appointments} clinicName={clinicSettings.name} />
+          <QueueBoardView
+            appointments={appointments}
+            clinicName={clinicSettings.name}
+            onCallPatient={handleCallPatient}
+          />
         )}
 
         {activeTab === 'inventory' && (
@@ -980,6 +1052,7 @@ export const App: React.FC = () => {
             onDeleteService={handleDeleteService}
             onAddModality={handleAddModality}
             onUpdateModality={handleUpdateModality}
+            onDeleteModality={handleDeleteModality}
             onAddReferrer={handleAddReferrer}
             onUpdateReferrer={handleUpdateReferrer}
             onDeleteReferrer={handleDeleteReferrer}
@@ -999,6 +1072,7 @@ export const App: React.FC = () => {
             patients={patients}
             modalities={modalities}
             doctorDispatches={doctorDispatches}
+            clinicSettings={clinicSettings}
             onAddReferrer={handleAddReferrer}
             onUpdateReferrer={handleUpdateReferrer}
             onDeleteReferrer={handleDeleteReferrer}
@@ -1022,6 +1096,7 @@ export const App: React.FC = () => {
             notificationTemplates={notificationTemplates}
             onUpdateNotificationTemplate={handleUpdateNotificationTemplate}
             auditLogs={auditLogs}
+            onRefreshAuditLogs={handleRefreshAuditLogs}
             onExportBackup={handleExportBackup}
           />
         )}
@@ -1051,7 +1126,6 @@ export const App: React.FC = () => {
           modalities={modalities}
           services={services}
           referrers={referrers}
-          existingAppointments={appointments}
           onCreateBooking={handleCreateBooking}
           onClose={() => setBookingModalOpen(false)}
         />

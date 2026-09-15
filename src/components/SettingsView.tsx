@@ -44,7 +44,7 @@ interface SettingsViewProps {
   onDeleteStaffUser: (userId: string) => void;
 
   clinicSettings: ClinicProfileSettings;
-  onUpdateClinicSettings: (settings: ClinicProfileSettings) => void;
+  onUpdateClinicSettings: (settings: ClinicProfileSettings) => Promise<void>;
 
   dicomNodes: DicomNodeConfig[];
   onAddDicomNode: (node: Omit<DicomNodeConfig, 'id'>) => void;
@@ -56,6 +56,7 @@ interface SettingsViewProps {
   onUpdateNotificationTemplate: (template: NotificationTemplate) => void;
 
   auditLogs: AuditLogEntry[];
+  onRefreshAuditLogs?: () => Promise<void>;
 
   onExportBackup: () => void;
 }
@@ -77,6 +78,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   notificationTemplates,
   onUpdateNotificationTemplate,
   auditLogs,
+  onRefreshAuditLogs,
   onExportBackup,
 }) => {
   const [activeSection, setActiveSection] = useState<SettingsSection>('users');
@@ -207,11 +209,15 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
     setUserModalOpen(false);
   };
 
-  const handleSaveClinicProfile = (e: React.FormEvent) => {
+  const handleSaveClinicProfile = async (e: React.FormEvent) => {
     e.preventDefault();
-    onUpdateClinicSettings(profileForm);
-    setProfileSavedToast(true);
-    setTimeout(() => setProfileSavedToast(false), 3500);
+    try {
+      await onUpdateClinicSettings(profileForm);
+      setProfileSavedToast(true);
+      setTimeout(() => setProfileSavedToast(false), 3500);
+    } catch {
+      // The app shell already surfaced the server error.
+    }
   };
 
   const handleOpenNodeModal = (node?: DicomNodeConfig) => {
@@ -772,6 +778,49 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                   <span>Auto-Send WhatsApp on Report Sign-off</span>
                 </label>
               </div>
+
+              {/* Patient Reminders & Referrer Commission */}
+              <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-4 pt-3 border-t border-slate-100 items-center">
+                <label className="flex items-center space-x-2 text-xs text-slate-700 cursor-pointer font-medium">
+                  <input
+                    type="checkbox"
+                    checked={profileForm.sendAppointmentReminders}
+                    onChange={e => setProfileForm({ ...profileForm, sendAppointmentReminders: e.target.checked })}
+                    className="rounded text-cyan-600 focus:ring-cyan-500"
+                  />
+                  <span>Email Patient Appointment Reminders</span>
+                </label>
+
+                <div>
+                  <span className="text-[11px] text-slate-600 font-medium block mb-1">Reminder window (hours before study)</span>
+                  <input
+                    type="number"
+                    min={1}
+                    max={168}
+                    disabled={!profileForm.sendAppointmentReminders}
+                    value={profileForm.reminderHours}
+                    onChange={e => setProfileForm({ ...profileForm, reminderHours: Number(e.target.value) || 24 })}
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-slate-800 focus:ring-1 focus:ring-cyan-500 disabled:opacity-50"
+                  />
+                </div>
+
+                <div>
+                  <span className="text-[11px] text-slate-600 font-medium block mb-1">Referrer commission share (%)</span>
+                  <input
+                    type="number"
+                    min={0}
+                    max={100}
+                    step="0.5"
+                    value={profileForm.referralCommissionPercent}
+                    onChange={e => setProfileForm({ ...profileForm, referralCommissionPercent: Number(e.target.value) || 0 })}
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-slate-800 focus:ring-1 focus:ring-cyan-500"
+                  />
+                </div>
+              </div>
+              <p className="mt-2 text-[11px] text-slate-400">
+                Reminders require platform SMTP to be configured; each study is reminded at most once. The commission share is
+                applied to the per-doctor settlement sheet in the Doctor Network module.
+              </p>
             </div>
 
             <div className="pt-4 border-t border-slate-200 flex justify-end">
@@ -980,6 +1029,15 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                 <option value="Reception">Reception Desk</option>
                 <option value="Settings">Settings & Security</option>
               </select>
+              {onRefreshAuditLogs && (
+                <button
+                  onClick={() => onRefreshAuditLogs()}
+                  className="text-xs font-bold px-3 py-1.5 rounded-lg bg-cyan-600 hover:bg-cyan-500 text-white shadow-xs cursor-pointer"
+                  title="Re-read the audit trail from the server"
+                >
+                  Refresh
+                </button>
+              )}
             </div>
           </div>
 

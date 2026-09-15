@@ -45,6 +45,7 @@ interface MasterDataViewProps {
   onDeleteService?: (serviceId: number) => void;
   onAddModality?: (newMod: Omit<Modality, 'id'>) => void;
   onUpdateModality?: (updatedMod: Modality) => void;
+  onDeleteModality?: (modalityId: number) => void;
   onAddReferrer?: (newRef: Omit<Referrer, 'id'>) => void;
   onUpdateReferrer?: (updatedRef: Referrer) => void;
   onDeleteReferrer?: (refId: number) => void;
@@ -78,6 +79,7 @@ export const MasterDataView: React.FC<MasterDataViewProps> = ({
   onDeleteService,
   onAddModality,
   onUpdateModality,
+  onDeleteModality,
   onAddReferrer,
   onUpdateReferrer,
   onDeleteReferrer,
@@ -587,16 +589,31 @@ export const MasterDataView: React.FC<MasterDataViewProps> = ({
 
                   <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-xs">
                     <span className="text-slate-400 text-[11px]">Primary Imaging Suite</span>
-                    <button
-                      onClick={() => {
-                        setEditingModality(mod);
-                        setModalityModalOpen(true);
-                      }}
-                      className="text-cyan-600 hover:text-cyan-800 font-semibold text-xs flex items-center space-x-1 cursor-pointer"
-                    >
-                      <Edit2 className="w-3 h-3" />
-                      <span>Configure Suite</span>
-                    </button>
+                    <div className="flex items-center space-x-3">
+                      <button
+                        onClick={() => {
+                          setEditingModality(mod);
+                          setModalityModalOpen(true);
+                        }}
+                        className="text-cyan-600 hover:text-cyan-800 font-semibold text-xs flex items-center space-x-1 cursor-pointer"
+                      >
+                        <Edit2 className="w-3 h-3" />
+                        <span>Configure Suite</span>
+                      </button>
+                      {onDeleteModality && (
+                        <button
+                          onClick={() => {
+                            if (confirm(`Delete modality suite: "${mod.name}"? Suites with procedures assigned cannot be deleted.`)) {
+                              onDeleteModality(mod.id);
+                            }
+                          }}
+                          className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-md transition-colors cursor-pointer"
+                          title="Delete Modality Suite"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+                    </div>
                   </div>
                 </div>
               );
@@ -937,7 +954,7 @@ export const MasterDataView: React.FC<MasterDataViewProps> = ({
             if (editingTemplate && onUpdateTemplate) {
               onUpdateTemplate({ ...tplData, id: editingTemplate.id });
             } else if (onAddTemplate) {
-              onAddTemplate(tplData);
+              onAddTemplate(tplData).catch(() => undefined);
             }
             setTemplateModalOpen(false);
             setEditingTemplate(null);

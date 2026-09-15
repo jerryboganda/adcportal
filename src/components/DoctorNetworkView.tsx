@@ -41,6 +41,7 @@ interface DoctorNetworkViewProps {
   patients: Patient[];
   modalities: Modality[];
   doctorDispatches: DoctorDispatchLog[];
+  clinicSettings?: ClinicProfileSettings;
   onAddReferrer: (ref: Omit<Referrer, 'id'>) => void;
   onUpdateReferrer: (ref: Referrer) => void;
   onDeleteReferrer: (refId: number) => void;
@@ -62,7 +63,8 @@ export const DoctorNetworkView: React.FC<DoctorNetworkViewProps> = ({
   onAddReferrer,
   onUpdateReferrer,
   onDeleteReferrer,
-  onAddDoctorDispatch,
+  onAddDoctorDispatch,,
+  clinicSettings,
 }) => {
   const [activeSubTab, setActiveSubTab] = useState<DoctorSubTab>('directory');
   const [selectedDoctorId, setSelectedDoctorId] = useState<number | 'all'>('all');
@@ -626,9 +628,9 @@ export const DoctorNetworkView: React.FC<DoctorNetworkViewProps> = ({
                 <p className="text-xs text-slate-500">Itemized audit of referred investigation revenue and clinical collaboration incentives.</p>
               </div>
               <div className="flex items-center space-x-2">
-                <span className="text-xs text-slate-500 font-medium">Default Share Rate:</span>
+                <span className="text-xs text-slate-500 font-medium">Configured Share Rate:</span>
                 <span className="px-2.5 py-1 bg-emerald-50 text-emerald-700 font-bold text-xs rounded-lg border border-emerald-200">
-                  Referral incentive (per catalogue fee)
+                  {clinicSettings?.referralCommissionPercent ?? 0}% of catalogue fee
                 </span>
               </div>
             </div>
@@ -637,7 +639,8 @@ export const DoctorNetworkView: React.FC<DoctorNetworkViewProps> = ({
               {referrers.map(doctor => {
                 const docAppointments = appointments.filter(a => a.referrerId === doctor.id);
                 const totalReferredBill = docAppointments.reduce((sum, a) => sum + (a.service?.price || 5500), 0);
-                const estimatedShare = Math.round(totalReferredBill * 0.12);
+                const commissionRate = (clinicSettings?.referralCommissionPercent ?? 0) / 100;
+                const estimatedShare = Math.round(totalReferredBill * commissionRate);
 
                 return (
                   <div key={doctor.id} className="p-4 rounded-xl border border-slate-200 bg-slate-50/50 hover:bg-white transition-all flex flex-col justify-between space-y-4 shadow-xs hover:border-emerald-300">
@@ -657,7 +660,7 @@ export const DoctorNetworkView: React.FC<DoctorNetworkViewProps> = ({
                           <span className="font-bold text-slate-900 font-mono">Rs. {totalReferredBill.toLocaleString()}</span>
                         </div>
                         <div className="flex justify-between">
-                          <span className="text-slate-500">Accrued Share (12%):</span>
+                          <span className="text-slate-500">Accrued Share ({clinicSettings?.referralCommissionPercent ?? 0}%):</span>
                           <span className="font-bold text-emerald-700 font-mono">Rs. {estimatedShare.toLocaleString()}</span>
                         </div>
                       </div>
@@ -958,7 +961,7 @@ export const DoctorNetworkView: React.FC<DoctorNetworkViewProps> = ({
                 </div>
               </div>
               <div className="flex justify-between pt-2 border-t border-slate-200">
-                <span>Period: Current Active Cycle (August 2026)</span>
+                <span>Period: {new Date().toLocaleDateString(undefined, { month: 'long', year: 'numeric' })}</span>
                 <span className="font-semibold text-sky-700">Specialty: {settlementDoctor.specialty}</span>
               </div>
             </div>
@@ -977,7 +980,7 @@ export const DoctorNetworkView: React.FC<DoctorNetworkViewProps> = ({
                 <tbody className="divide-y divide-slate-100 text-slate-700">
                   {appointments.filter(a => a.referrerId === settlementDoctor.id).map(apt => {
                     const fee = apt.service?.price || 0;
-                    const share = Math.round(fee * 0.12);
+                    const share = Math.round(fee * (clinicSettings?.referralCommissionPercent ?? 0) / 100);
                     return (
                       <tr key={apt.id}>
                         <td className="p-2.5 font-mono font-bold text-sky-700">{apt.tokenNumber}</td>

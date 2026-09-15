@@ -396,28 +396,34 @@ class PlatformTenantController extends PlatformController
 
         $initialPassword = $validated['password'] ?? \Illuminate\Support\Str::password(16);
 
-        $user = User::create([
-            'name' => $validated['name'],
-            'email' => $validated['email'],
-            'password' => $initialPassword,
-            'mobile_no' => $validated['phone'] ?? null,
-            'email_verified_at' => now(),
-            'type' => 'staff',
-            'active_status' => (int) ($validated['isActive'] ?? true),
-            'business_id' => $tenant->id,
-            'created_by' => $tenant->id,
-            'lang' => 'en',
-        ]);
+        // Atomic user + role + membership: never leave a half-provisioned
+        // tenant account behind on a partial failure.
+        $user = DB::transaction(function () use ($validated, $tenant, $initialPassword) {
+            $user = User::create([
+                'name' => $validated['name'],
+                'email' => $validated['email'],
+                'password' => $initialPassword,
+                'mobile_no' => $validated['phone'] ?? null,
+                'email_verified_at' => now(),
+                'type' => 'staff',
+                'active_status' => (int) ($validated['isActive'] ?? true),
+                'business_id' => $tenant->id,
+                'created_by' => $tenant->id,
+                'lang' => 'en',
+            ]);
 
-        $this->assignTenantRole($tenant, $user, $validated['role']);
+            $this->assignTenantRole($tenant, $user, $validated['role']);
 
-        TenantMembership::create([
-            'user_id' => $user->id,
-            'business_id' => $tenant->id,
-            'role' => $validated['role'],
-            'is_default' => false,
-            'status' => 'active',
-        ]);
+            TenantMembership::create([
+                'user_id' => $user->id,
+                'business_id' => $tenant->id,
+                'role' => $validated['role'],
+                'is_default' => false,
+                'status' => 'active',
+            ]);
+
+            return $user;
+        });
 
         AuditLog::record('tenant_user_created', $user, [
             'summary' => "Platform created {$validated['role']} account {$user->email} for {$tenant->name}.",

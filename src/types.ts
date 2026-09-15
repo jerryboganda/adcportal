@@ -170,6 +170,8 @@ export interface Appointment {
   readingAt?: string;
   reportedAt?: string;
   deliveredAt?: string;
+  /** Server-stamped when the queue board calls this token (shared across terminals). */
+  calledAt?: string;
   doseLog?: DoseLog;
   report?: RadiologyReport;
   roomNumber: string;
@@ -204,6 +206,8 @@ export interface Invoice {
   appointmentToken: string;
   subtotal: number;
   discountTotal: number;
+  /** Cash discount applied at invoice level (server-authoritative). */
+  manualDiscount: number;
   taxRate: number;
   taxAmount: number;
   total: number;
@@ -230,10 +234,13 @@ export interface ReportTemplate {
   recommendations: string;
 }
 
-export type StaffRole = 'admin' | 'radiologist' | 'technologist' | 'receptionist' | 'billing' | 'nurse';
+// Roles the backend can issue (see StaffUserController validation + seed).
+// There is deliberately no 'nurse': the server never assigns one, and a role
+// the API cannot issue must not exist in the client vocabulary.
+export type StaffRole = 'admin' | 'radiologist' | 'technologist' | 'receptionist' | 'billing';
 
 /** Role vocabulary used by the SPA shell (server-issued, never client-picked). */
-export type AppRole = 'admin' | 'radiologist' | 'technologist' | 'receptionist' | 'billing' | 'patient';
+export type AppRole = 'admin' | 'radiologist' | 'technologist' | 'receptionist' | 'billing';
 
 export interface StaffUser {
   id: string;
@@ -271,6 +278,11 @@ export interface ClinicProfileSettings {
   requireScreeningSignOff: boolean;
   enableCriticalFindingsAlerts: boolean;
   autoSendWhatsappReport: boolean;
+  /** Opt-in patient email reminders (idempotent, window-based). */
+  sendAppointmentReminders: boolean;
+  reminderHours: number;
+  /** Referrer commission share (%) used by the settlement sheet. */
+  referralCommissionPercent: number;
 }
 
 export interface DicomNodeConfig {
@@ -415,8 +427,6 @@ export interface AdverseReactionReport {
   supervisingDoctor: string;
   notes?: string;
 }
-
-export type UserPresenceStatus = 'available' | 'in_procedure' | 'reporting' | 'away' | 'busy';
 
 export type ActiveTab =
   | 'dashboard'
