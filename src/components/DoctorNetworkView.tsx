@@ -32,7 +32,8 @@ import {
   Appointment,
   Patient,
   DoctorDispatchLog,
-  Modality
+  Modality,
+  ClinicProfileSettings
 } from '../types';
 
 interface DoctorNetworkViewProps {

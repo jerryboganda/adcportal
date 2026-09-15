@@ -62,7 +62,7 @@ interface MasterDataViewProps {
     }>;
   }) => void;
   onUpdateForm?: (updatedForm: ScreeningForm) => void;
-  onAddTemplate?: (newTpl: Omit<ReportTemplate, 'id'>) => void;
+  onAddTemplate?: (newTpl: Omit<ReportTemplate, 'id'>) => void | Promise<void>;
   onUpdateTemplate?: (updatedTpl: ReportTemplate) => void;
   onDeleteTemplate?: (templateId: string) => void;
   onExportBackup?: () => void;
