@@ -7,6 +7,7 @@ use App\Http\Controllers\Api\V1\BootstrapController;
 use App\Http\Controllers\Api\V1\InventoryController;
 use App\Http\Controllers\Api\V1\MastersController;
 use App\Http\Controllers\Api\V1\Platform\PlatformAuditController;
+use App\Http\Controllers\Api\V1\Platform\PlatformInfrastructureController;
 use App\Http\Controllers\Api\V1\Platform\PlatformOverviewController;
 use App\Http\Controllers\Api\V1\Platform\PlatformPlanController;
 use App\Http\Controllers\Api\V1\Platform\PlatformSupportSessionController;
@@ -176,6 +177,10 @@ Route::middleware(['auth', 'platform'])->prefix('platform')->group(function () {
     Route::post('/tenants/{tenant}/facilities', [PlatformTenantController::class, 'storeFacility'])->whereNumber('tenant');
     Route::patch('/tenants/{tenant}/facilities/{location}', [PlatformTenantController::class, 'updateFacility'])->whereNumber('tenant')->whereNumber('location');
     Route::delete('/tenants/{tenant}/facilities/{location}', [PlatformTenantController::class, 'destroyFacility'])->whereNumber('tenant')->whereNumber('location');
+
+    // Deployment topology: placement catalog + per-tenant re-placement
+    Route::get('/infrastructure', [PlatformInfrastructureController::class, 'index']);
+    Route::patch('/tenants/{tenant}/deployment', [PlatformInfrastructureController::class, 'updateDeployment'])->whereNumber('tenant');
 
     // Plans
     Route::get('/plans', [PlatformPlanController::class, 'index']);

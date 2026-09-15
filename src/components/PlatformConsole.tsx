@@ -2,12 +2,14 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Activity, Archive, ArrowLeft, BarChart3, Building2, CheckCircle2, ChevronRight, Copy, CreditCard,
   Download, KeyRound, LifeBuoy, LogOut, Pause, Pencil, Play, Plus, RefreshCw, RotateCcw, ScrollText,
-  Search, ShieldCheck, Trash2, Users as UsersIcon, XCircle,
+  Search, Server, ShieldCheck, Trash2, Users as UsersIcon, XCircle,
 } from 'lucide-react';
 import * as api from '../services/apiService';
 import { SessionUser } from '../services/apiService';
 import {
+  DeploymentCatalog,
   Entitlements,
+  InfrastructureSummary,
   Plan,
   PlatformAuditEntry,
   PlatformOverviewStats,
@@ -30,13 +32,13 @@ import {
  * capabilities; this UI only mirrors what the role already holds.
  */
 
-type Section = 'overview' | 'tenants' | 'plans' | 'usage' | 'support' | 'users' | 'audit';
+type Section = 'overview' | 'tenants' | 'plans' | 'usage' | 'infrastructure' | 'support' | 'users' | 'audit';
 
 const ROLE_CAPABILITIES: Record<string, string[]> = {
   super_admin: ['*'],
-  ops: ['tenants.view', 'tenants.manage', 'tenants.lifecycle', 'provisioning.manage', 'usage.view', 'health.view', 'audit.view', 'platform.users.view'],
+  ops: ['tenants.view', 'tenants.manage', 'tenants.lifecycle', 'provisioning.manage', 'usage.view', 'health.view', 'audit.view', 'platform.users.view', 'infrastructure.manage', 'integrations.manage', 'operations.manage'],
   billing: ['tenants.view', 'plans.manage', 'subscriptions.manage', 'usage.view', 'audit.view'],
-  support: ['tenants.view', 'support.manage', 'health.view', 'audit.view'],
+  support: ['tenants.view', 'support.manage', 'health.view', 'audit.view', 'operations.manage'],
   auditor: ['tenants.view', 'usage.view', 'health.view', 'audit.view'],
 };
 
@@ -114,6 +116,7 @@ export const PlatformConsole: React.FC<{
     { key: 'tenants', label: 'Tenants', icon: <Building2 size={15} /> },
     { key: 'plans', label: 'Plans', icon: <CreditCard size={15} /> },
     { key: 'usage', label: 'Usage', icon: <BarChart3 size={15} /> },
+    { key: 'infrastructure', label: 'Infrastructure', icon: <Server size={15} /> },
     { key: 'support', label: 'Support Sessions', icon: <LifeBuoy size={15} /> },
     { key: 'users', label: 'Platform Users', icon: <ShieldCheck size={15} /> },
     { key: 'audit', label: 'Audit', icon: <ScrollText size={15} /> },
@@ -179,6 +182,7 @@ export const PlatformConsole: React.FC<{
             {section === 'tenants' && <TenantsSection user={user} onOpenTenant={setSelectedTenantId} notify={notify} fail={fail} />}
             {section === 'plans' && <PlansSection notify={notify} fail={fail} />}
             {section === 'usage' && <UsageSection notify={notify} fail={fail} />}
+            {section === 'infrastructure' && <InfrastructureSection user={user} notify={notify} fail={fail} />}
             {section === 'support' && <SupportSection user={user} onEnterTenant={onEnterTenant} notify={notify} fail={fail} />}
             {section === 'users' && <PlatformUsersSection user={user} notify={notify} fail={fail} />}
             {section === 'audit' && <AuditSection notify={notify} fail={fail} />}
@@ -464,7 +468,7 @@ const TenantDetail: React.FC<{
   fail: (e: any, f: string) => void;
 }> = ({ tenantId, user, onBack, onEnterTenant, notify, fail }) => {
   const [tenant, setTenant] = useState<Tenant360 | null>(null);
-  const [tab, setTab] = useState<'overview' | 'users' | 'facilities' | 'lifecycle' | 'audit' | 'features'>('overview');
+  const [tab, setTab] = useState<'overview' | 'users' | 'facilities' | 'deployment' | 'lifecycle' | 'audit' | 'features'>('overview');
   const [confirmTerminate, setConfirmTerminate] = useState('');
   const [suspendReason, setSuspendReason] = useState('');
   const [busy, setBusy] = useState(false);
@@ -823,6 +827,8 @@ const TenantDetail: React.FC<{
           )}
         </div>
       )}
+
+      {tab === 'deployment' && <DeploymentTab tenant={tenant} user={user} onChanged={load} notify={notify} fail={fail} />}
 
       {tab === 'features' && <FeatureOverridesTab tenant={tenant} onChanged={load} notify={notify} fail={fail} />}
 

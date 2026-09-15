@@ -503,6 +503,36 @@ export interface TenantCounts {
   studies: number;
 }
 
+/** Control-plane infrastructure placement of one tenant (master-prompt §59/§60). */
+export interface TenantDeployment {
+  region: string | null;
+  deploymentStamp: string | null;
+  isolationProfile: string | null;
+  databaseCluster: string | null;
+  storageRegion: string | null;
+}
+
+export interface DeploymentOption {
+  key: string;
+  label: string;
+}
+
+export interface DeploymentCatalog {
+  regions: { key: string; label: string; storage: string }[];
+  deploymentStamps: DeploymentOption[];
+  isolationProfiles: DeploymentOption[];
+}
+
+export interface InfrastructureSummary {
+  catalog: DeploymentCatalog;
+  placement: {
+    regions: { key: string; tenants: number }[];
+    deploymentStamps: { key: string; tenants: number }[];
+    isolationProfiles: { key: string; tenants: number }[];
+  };
+  unplacedTenants: number;
+}
+
 export interface TenantRecord {
   id: string;
   name: string;
@@ -515,6 +545,7 @@ export interface TenantRecord {
   isActive: boolean;
   createdAt?: string;
   counts: TenantCounts;
+  deployment: TenantDeployment;
 }
 
 export interface TenantLifecycleEntry {

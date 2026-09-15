@@ -10,6 +10,7 @@ import {
   DoctorDispatchLog,
   DoseLog,
   Entitlements,
+  InfrastructureSummary,
   InventoryItem,
   InventoryTransaction,
   Invoice,
@@ -695,6 +696,25 @@ export async function fetchTenant360(id: string): Promise<Tenant360> {
 
 export async function updateTenantSubscription(id: string, updates: { name?: string; planId?: string | null; subscriptionEndsAt?: string | null; trialEndsAt?: string | null }): Promise<TenantRecord> {
   const { data } = await http.patch(`/platform/tenants/${id}`, updates);
+  return data.data.tenant;
+}
+
+// ==================== platform: deployment topology ====================
+
+export async function fetchInfrastructure(): Promise<InfrastructureSummary> {
+  const { data } = await http.get('/platform/infrastructure');
+  return data.data;
+}
+
+export async function updateTenantDeployment(id: string, input: {
+  region: string;
+  deploymentStamp: string;
+  isolationProfile: string;
+  databaseCluster?: string | null;
+  storageRegion?: string | null;
+  reason?: string;
+}): Promise<TenantRecord> {
+  const { data } = await http.patch(`/platform/tenants/${id}/deployment`, input);
   return data.data.tenant;
 }
 

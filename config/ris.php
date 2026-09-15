@@ -43,16 +43,47 @@ return [
         'ops' => [
             'tenants.view', 'tenants.manage', 'tenants.lifecycle', 'provisioning.manage',
             'usage.view', 'health.view', 'audit.view', 'platform.users.view',
+            'infrastructure.manage', 'integrations.manage', 'operations.manage',
         ],
         'billing' => [
             'tenants.view', 'plans.manage', 'subscriptions.manage', 'usage.view', 'audit.view',
         ],
         'support' => [
-            'tenants.view', 'support.manage', 'health.view', 'audit.view',
+            'tenants.view', 'support.manage', 'health.view', 'audit.view', 'operations.manage',
         ],
         'auditor' => [
             'tenants.view', 'usage.view', 'health.view', 'audit.view',
         ],
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Deployment topology (control-plane metadata)
+    |--------------------------------------------------------------------------
+    |
+    | Per-tenant region / stamp / isolation metadata so one control plane can
+    | manage pooled, isolated and dedicated deployments consistently. These are
+    | operator-owned infrastructure descriptors: the platform console offers
+    | exactly the values declared here and the API validates against them, so a
+    | tenant can never be pinned to a region, stamp or isolation profile the
+    | operator has not declared. Adding a region/stamp is a config change (and
+    | therefore a deploy) — never an untracked database edit.
+    |
+    */
+
+    'regions' => [
+        'default' => ['label' => 'Default region', 'storage' => 'default'],
+    ],
+
+    'deployment_stamps' => [
+        'stamp-a' => ['label' => 'Shared stamp A'],
+    ],
+
+    'isolation_profiles' => [
+        'pooled' => 'Pooled (shared database + tenant-scoped rows)',
+        'schema' => 'Schema isolation',
+        'database' => 'Database per tenant',
+        'dedicated' => 'Dedicated deployment',
     ],
 
     /*

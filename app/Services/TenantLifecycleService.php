@@ -72,6 +72,13 @@ class TenantLifecycleService
                 'subscription_ends_at' => $subscriptionEndsAt,
                 'tenant_code' => strtoupper(Str::random(3)).'-'.random_int(1000, 9999),
                 'created_by' => $admin->id,
+                // Every tenant starts on the operator's declared default placement;
+                // moving it later is an explicit, audited control-plane action.
+                'region' => array_key_first(config('ris.regions', ['default' => []])) ?: 'default',
+                'deployment_stamp' => array_key_first(config('ris.deployment_stamps', ['stamp-a' => []])) ?: 'stamp-a',
+                'isolation_profile' => 'pooled',
+                'database_cluster' => 'primary',
+                'storage_region' => array_key_first(config('ris.regions', ['default' => []])) ?: 'default',
             ]);
 
             $admin->forceFill([

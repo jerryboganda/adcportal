@@ -636,6 +636,23 @@ class ApiShape
         'platform_user_created' => ['Platform Access', 'Platform User Created', 'success'],
         'platform_user_updated' => ['Platform Access', 'Platform User Updated', 'success'],
         'tenant_updated' => ['Platform', 'Tenant Updated', 'success'],
+        'tenant_deployment_updated' => ['Platform Infrastructure', 'Tenant Deployment Placement Changed', 'warning'],
+        'tenant_branding_updated' => ['Platform', 'Tenant Branding Updated', 'success'],
+        'tenant_domain_added' => ['Platform', 'Tenant Domain Added', 'success'],
+        'tenant_domain_removed' => ['Platform', 'Tenant Domain Removed', 'warning'],
+        'tenant_integration_created' => ['Platform Integrations', 'Tenant Integration Created', 'success'],
+        'tenant_integration_updated' => ['Platform Integrations', 'Tenant Integration Updated', 'success'],
+        'tenant_integration_deleted' => ['Platform Integrations', 'Tenant Integration Deleted', 'warning'],
+        'tenant_integration_probed' => ['Platform Integrations', 'Tenant Integration Health Probe', 'success'],
+        'tenant_integration_secret_rotated' => ['Platform Integrations', 'Tenant Integration Secret Rotated', 'warning'],
+        'entitlements_reconciled' => ['Platform', 'Entitlements Reconciled', 'success'],
+        'provisioning_retried' => ['Platform', 'Provisioning Retried', 'warning'],
+        'tenant_user_created' => ['Platform', 'Tenant User Created', 'success'],
+        'tenant_user_updated' => ['Platform', 'Tenant User Updated', 'success'],
+        'tenant_user_password_reset' => ['Platform', 'Tenant User Password Rotated', 'warning'],
+        'tenant_facility_created' => ['Platform', 'Tenant Facility Created', 'success'],
+        'tenant_facility_updated' => ['Platform', 'Tenant Facility Updated', 'success'],
+        'tenant_facility_deleted' => ['Platform', 'Tenant Facility Deleted', 'warning'],
     ];
 
     public static function auditEntry(AuditLog $log): array
@@ -720,6 +737,14 @@ class ApiShape
             'subscriptionEndsAt' => $b->subscription_ends_at?->toIso8601String(),
             'isActive' => $b->isSubscribable(),
             'createdAt' => $b->created_at?->toDateString(),
+            // Control-plane infrastructure placement (master-prompt §59/§60).
+            'deployment' => [
+                'region' => $b->region,
+                'deploymentStamp' => $b->deployment_stamp,
+                'isolationProfile' => $b->isolation_profile,
+                'databaseCluster' => $b->database_cluster,
+                'storageRegion' => $b->storage_region,
+            ],
             'counts' => [
                 'users' => $b->users()->count(),
                 'studies' => $b->appointments()->count(),

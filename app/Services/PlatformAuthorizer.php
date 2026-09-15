@@ -15,6 +15,7 @@ class PlatformAuthorizer
         'tenants.view', 'tenants.manage', 'tenants.lifecycle', 'provisioning.manage',
         'plans.manage', 'subscriptions.manage', 'usage.view', 'health.view',
         'audit.view', 'support.manage', 'platform.users.view', 'platform.users.manage',
+        'infrastructure.manage', 'integrations.manage', 'operations.manage',
     ];
 
     public static function capabilities(User $user): array

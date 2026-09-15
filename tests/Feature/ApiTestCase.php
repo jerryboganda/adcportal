@@ -55,6 +55,13 @@ abstract class ApiTestCase extends TestCase
             'subscription_ends_at' => now()->addYear(),
             'tenant_code' => strtoupper(substr(md5($name), 0, 3)).'-'.random_int(1000, 9999),
             'created_by' => $admin->id,
+            // Mirrors TenantLifecycleService::provision: every tenant is placed
+            // on the operator's declared default deployment placement.
+            'region' => array_key_first(config('ris.regions', ['default' => []])) ?: 'default',
+            'deployment_stamp' => array_key_first(config('ris.deployment_stamps', ['stamp-a' => []])) ?: 'stamp-a',
+            'isolation_profile' => 'pooled',
+            'database_cluster' => 'primary',
+            'storage_region' => array_key_first(config('ris.regions', ['default' => []])) ?: 'default',
         ]);
 
         $admin->forceFill([

@@ -26,6 +26,11 @@ class Business extends Model
         'offboarded_at',
         'terminated_at',
         'data_retention_until',
+        'region',
+        'deployment_stamp',
+        'isolation_profile',
+        'database_cluster',
+        'storage_region',
     ];
 
     protected $casts = [
