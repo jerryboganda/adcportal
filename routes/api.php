@@ -7,7 +7,9 @@ use App\Http\Controllers\Api\V1\BootstrapController;
 use App\Http\Controllers\Api\V1\InventoryController;
 use App\Http\Controllers\Api\V1\MastersController;
 use App\Http\Controllers\Api\V1\Platform\PlatformAuditController;
+use App\Http\Controllers\Api\V1\Platform\PlatformBrandingController;
 use App\Http\Controllers\Api\V1\Platform\PlatformInfrastructureController;
+use App\Http\Controllers\Api\V1\Platform\PlatformIntegrationController;
 use App\Http\Controllers\Api\V1\Platform\PlatformOverviewController;
 use App\Http\Controllers\Api\V1\Platform\PlatformPlanController;
 use App\Http\Controllers\Api\V1\Platform\PlatformSupportSessionController;
@@ -194,6 +196,14 @@ Route::middleware(['auth', 'platform'])->prefix('platform')->group(function () {
     Route::post('/tenants/{tenant}/domains/{domain}/verify', [PlatformBrandingController::class, 'verifyDomain'])->whereNumber('tenant')->whereNumber('domain');
     Route::post('/tenants/{tenant}/domains/{domain}/primary', [PlatformBrandingController::class, 'makePrimary'])->whereNumber('tenant')->whereNumber('domain');
     Route::delete('/tenants/{tenant}/domains/{domain}', [PlatformBrandingController::class, 'destroyDomain'])->whereNumber('tenant')->whereNumber('domain');
+
+    // Tenant integration registry (encrypted secrets, tenant/facility scoped)
+    Route::get('/tenants/{tenant}/integrations', [PlatformIntegrationController::class, 'index'])->whereNumber('tenant');
+    Route::post('/tenants/{tenant}/integrations', [PlatformIntegrationController::class, 'store'])->whereNumber('tenant');
+    Route::patch('/tenants/{tenant}/integrations/{integration}', [PlatformIntegrationController::class, 'update'])->whereNumber('tenant')->whereNumber('integration');
+    Route::post('/tenants/{tenant}/integrations/{integration}/secrets', [PlatformIntegrationController::class, 'rotateSecrets'])->whereNumber('tenant')->whereNumber('integration');
+    Route::post('/tenants/{tenant}/integrations/{integration}/probe', [PlatformIntegrationController::class, 'probe'])->whereNumber('tenant')->whereNumber('integration');
+    Route::delete('/tenants/{tenant}/integrations/{integration}', [PlatformIntegrationController::class, 'destroy'])->whereNumber('tenant')->whereNumber('integration');
 
     // Plans
     Route::get('/plans', [PlatformPlanController::class, 'index']);
