@@ -15,6 +15,9 @@
 | `audit.view` | ✓ | ✓ | ✓ | ✓ | ✓ |
 | `support.manage` (break-glass sessions) | ✓ | — | — | ✓ | — |
 | `platform.users.view` / `.manage` | ✓ / ✓ | ✓ / — | — | — | — |
+| `infrastructure.manage` (tenant re-placement) | ✓ | ✓ | — | — | — |
+| `integrations.manage` (registry, secrets, probes) | ✓ | ✓ | — | — | — |
+| `operations.manage` (§80 dashboard, job retry/discard, entitlement reconciliation) | ✓ | ✓ | — | ✓ | — |
 
 Clinical data access for platform actors: **none** without an active support session (then: full operational set for that one tenant, audited, expiring).
 

@@ -8,6 +8,8 @@ flowchart TB
         LE[TenantLifecycleService]
         FE[FeatureResolver + EntitlementService]
         SS[SupportSessionService]
+        DT[Deployment topology + white-label + integration registry]
+        OPS["TenantHealthService + JobInspector + EntitlementReconciler"]
         AUD[audit_logs + tenant_lifecycle_events]
     end
 
@@ -20,6 +22,8 @@ flowchart TB
     Users --> PC
     Users --> SPA
     PC --> PA --> LE & FE & SS
+    PA --> DT
+    PA --> OPS
     PA --> AUD
     SPA --> API
     API --> TM
@@ -49,3 +53,8 @@ flowchart TB
 | Quotas | 403 `quota_exceeded` | `EntitlementService::enforce` (studies, users) |
 | Module features | 403 `feature_disabled` | `FeatureResolver` + `denyFeatureUnlessEnabled` (inventory, dicom, dispatch) |
 | Audit | every controller action + lifecycle events + support sessions | `AuditLog` (business-attributed) + `TenantLifecycleEvent` |
+| Tenant placement | config-owned catalog + server-side re-validation | `PlatformInfrastructureController` + `config/ris.php` (`regions`, `deployment_stamps`, `isolation_profiles`) |
+| Tenant brand / host | presentation only — **never** authorization | `TenantBrandingService` (session-resolved tenant; DNS TXT ownership proof) |
+| Integration secrets | encrypted at rest, write-only | `TenantIntegration` (`secrets` cast `encrypted:array`) |
+| Failure inspection | payload never returned, never unserialized | `JobInspector` (property names via `ReflectionClass`) |
+| Route integrity | build fails if a routed action does not exist | `RouteIntegrityTest` |

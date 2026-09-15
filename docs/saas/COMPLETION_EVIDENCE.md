@@ -1,5 +1,55 @@
 # COMPLETION_EVIDENCE — SaaS re-engineering program (2026-09-14, re-verified 2026-09-15)
 
+## 2026-09-15 — deployment topology, white-labeling, integrations, observability
+
+Four further in-scope surfaces from the master prompt were implemented and verified
+end-to-end. Gap-matrix rows **16–21**.
+
+| Surface | Commit | What shipped |
+|---|---|---|
+| §23/§59/§60 Deployment topology | `PlatformDeploymentTest` | Five placement facts per tenant (`region`, `deployment_stamp`, `isolation_profile`, `database_cluster`, `storage_region`) on a config-owned catalog; provisioning stamps the declared default; `GET /platform/infrastructure` + audited `PATCH /tenants/{id}/deployment`. See `DEPLOYMENT_TOPOLOGY.md`. |
+| §37/§38 White-label + custom domains | `TenantBrandingTest` | `tenant_branding` + `tenant_domains`; DNS TXT ownership proof `_polytronx-ris.<host>` = `polytronx-ris-verify=<tenant code>`; entitlement-gated (`branding` / `custom_domains`). **The host is never an authorization input** — the tenant is resolved from the session. |
+| §33/§44 Integration registry | `TenantIntegrationTest` | `tenant_integrations` with `secrets` cast `encrypted:array` (never returned; presence + mask only) and genuine probes — `tcp` via `fsockopen`, `http` via `Http::get`, `config` reporting completeness **without** asserting delivery. |
+| §80/§81 Observability + ops tooling | `PlatformOperationsTest` | `TenantHealthService` (bulk aggregates; derived verdict with reasons; unmeasurable quota reports `null`, never a comfortable zero), `JobInspector` (payload never returned, never unserialized; property names from reflection on the job class), `EntitlementReconciler` (prunes only inert stale overrides), real `queue:retry` / `queue:forget`. |
+
+### Two genuine defects found and fixed (not cosmetic)
+
+1. **`Target class [PlatformBrandingController] does not exist.`** — the controller was wired
+   into `routes/api.php` **without a `use` import**, so `::class` resolved to the global
+   namespace and all nine branding/domain endpoints 500'd on first touch. `php -l` only
+   parses and `tsc` never reads routes, so no static check caught it; it surfaced only after
+   the CI diagnostic restructure below. Fixed by adding the import, plus `RouteIntegrityTest`
+   as a permanent guard for the whole class.
+2. **The `jobs` table never existed.** `config/queue.php` declares `database` as the default
+   queue connection but only `failed_jobs` was ever migrated — the configured queue could not
+   accept a job. Nothing had exercised it (no queued work yet), so it went unnoticed until
+   §81 required a retry to genuinely re-queue. A retry that cannot enqueue would have been a
+   fake success. Fixed by `2026_09_15_000400_create_jobs_table.php`.
+
+### §10 TEST EVIDENCE
+
+- **Workflow / run**: `.github/workflows/ci.yml` — run **#117** on `1a40040`
+  (`https://github.com/jerryboganda/adcportal/actions/runs/` — check-runs `104373626760`,
+  `104373626967`, `104373900968`, `104374244101`).
+- **Test suite**: `php artisan test --testsuite=Feature` (SQLite in-memory) incl. the six new
+  suites `PlatformDeploymentTest`, `TenantBrandingTest`, `TenantIntegrationTest`,
+  `PlatformOperationsTest`, `RouteIntegrityTest`, `PlatformTenantManageTest`; SPA
+  `tsc --noEmit` + production build; Playwright real-browser journey.
+- **Result**: **all four jobs ✅ success** — Backend — PHP feature tests ✅, Frontend —
+  typecheck & production build ✅, E2E — real browser journey ✅, Deliver to Hostinger ✅.
+- **Failures found (and fixed) during this stretch** — each one found *because* the previous
+  run's diagnostics were improved, never by guessing:
+  | Run | Commit | Failure | Root cause | Fix |
+  |---|---|---|---|---|
+  | #113 | `fc2d323` | 10 × `TenantBrandingTest` HTTP 500, cause invisible | GitHub caps `::error::` annotations at ~10 **per step**, and four diagnostic pipelines shared one step | One step per diagnostic (fresh budget each); `withoutExceptionHandling` excluding deliberate HTTP/validation exceptions |
+  | #114 | `caafff8` | same 500s, now diagnosable | `Target class [PlatformBrandingController] does not exist.` — missing `use` import in `routes/api.php` | Added the import + `RouteIntegrityTest` |
+  | #115 | `1f55b49` | backend: `http probe uses a real request` → `-'error' +'active'` | `Http::fake()` called twice; Laravel only *appends* stubs and resolves the **first** match, so the 503 stub was unreachable | Single `Http::fake()` holding `Http::sequence()` (200 → 503) |
+  | #115 | `1f55b49` | frontend `tsc`: comparison "appears to be unintentional … no overlap" | Tenant 360 tab state union never widened for `'integrations'` | Added `'integrations'` to the union |
+  | #117 | `1a40040` | (caught locally before push, not in CI) | `fmtBytes` declared **twice** in `PlatformConsole.tsx` — a duplicate function implementation; plus `Section` never gained `'operations'` and no nav item was added | Removed the duplicate (reusing the existing helper, handling `null` at the call site); widened the union; added the nav entry |
+- **Final result**: run #117 green on all four jobs. Remaining annotations are two
+  environment warnings/notices only — a Node 20 deprecation warning, and
+  `Hostinger SSH secrets not configured — skipping deploy step.`
+
 ## 2026-09-15 re-audit + final hardening
 
 - **Full Definition-of-Done re-audit** against the master prompt: all 14 gap-matrix
@@ -37,15 +87,21 @@ cross-tenant 404s, facility delete guard).
 
 ## CI evidence (GitHub Actions — the only compute path)
 
-| Run | Commit | Backend — PHP feature tests | Frontend — tsc + build | E2E — Playwright |
-|---|---|---|---|---|
-| #99 | `9a51273` | ✅ success | ✅ success | ✅ success |
-| #100 | `75cb8ef` | ✅ success | ✅ success | ✅ success |
+| Run | Commit | Backend — PHP feature tests | Frontend — tsc + build | E2E — Playwright | Deliver to Hostinger |
+|---|---|---|---|---|---|
+| #99 | `9a51273` | ✅ success | ✅ success | ✅ success | ✅ success |
+| #100 | `75cb8ef` | ✅ success | ✅ success | ✅ success | ✅ success |
+| #113 | `fc2d323` | ❌ 10 × HTTP 500 | ✅ success | ✅ success | ✅ (skipped) |
+| #114 | `caafff8` | ❌ `Target class [PlatformBrandingController] does not exist.` | ✅ success | ✅ success | ✅ (skipped) |
+| #115 | `1f55b49` | ❌ http-probe stub | ❌ `tsc` tab-union | ✅ success | ✅ (skipped) |
+| #116 | `88694d4` | ✅ success | ✅ success | ✅ success | ✅ (skipped) |
+| **#117** | **`1a40040`** | **✅ success** | **✅ success** | **✅ success** | **✅ (skipped)** |
 
-- Workflow: `.github/workflows/ci.yml` (run URLs: `https://github.com/jerryboganda/adcportal/actions/runs/34872598647` and `/34872967274`).
-- Backend suite on SQLite in-memory includes the 5 pre-existing suites (kept green — regression proof) **plus** the 6 new SaaS suites: `PlatformAccessTest`, `TenantLifecycleTest`, `EntitlementAndUsageTest`, `SupportSessionTest`, `TenantSwitchTest`, `SaaSAcceptanceScenarioTest`.
-- Frontend job: `tsc --noEmit` + production build of the SPA including the new Platform Console, Subscription Gate, tenant switcher and role-gated navigation.
+- Workflow: `.github/workflows/ci.yml` (run URLs: `https://github.com/jerryboganda/adcportal/actions/runs/34872598647` and `/34872967274`; later runs via the check-runs API for commit `1a40040b01ff1cbaa897206bf015b5ecaf060297`).
+- Backend suite on SQLite in-memory includes the 5 pre-existing suites (kept green — regression proof) **plus** the SaaS suites: `PlatformAccessTest`, `TenantLifecycleTest`, `EntitlementAndUsageTest`, `SupportSessionTest`, `TenantSwitchTest`, `SaaSAcceptanceScenarioTest`, `PlatformTenantManageTest`, `TenantRateLimitTest`, `PlatformDeploymentTest`, `TenantBrandingTest`, `TenantIntegrationTest`, `PlatformOperationsTest`, `RouteIntegrityTest`.
+- Frontend job: `tsc --noEmit` + production build of the SPA including the Platform Console (incl. Infrastructure and Operations sections), Subscription Gate, tenant switcher and role-gated navigation.
 - E2E job: real-browser journey (login → dashboard → reception → technologist → billing → logout) against the seeded stack (`RIS_DEMO_MODE=true`).
+- Only remaining annotations on #117 are environmental: a Node 20 deprecation warning, and the deploy-skip notice below.
 
 ## Tenant isolation evidence (what the tests prove)
 
@@ -61,11 +117,41 @@ From `SaaSAcceptanceScenarioTest` (Alpha/Beta, plus Tenant C exercised in `Tenan
 8. Break-glass: session open → enter → operate → leave, fully audited (`support_session_started`/`ended` in `audit_logs` with `business_id`); without a session, platform users get 403 on tenant endpoints.
 9. Suspension → tenant API 402 for all roles; reactivate restores; entitlement (plan) change → backend rejects over-quota bookings with 403 `quota_exceeded` regardless of UI.
 
-## Deployment status
+## Deployment status (corrected 2026-09-15)
 
-- **Deployed to production (Hostinger) by CI run #100** — the gated `Deliver to Hostinger` job completed ✅ (`git pull`, SPA bundle swap, `composer install --no-dev`, `php artisan migrate --force` applying the expand-only control-plane migration, `php artisan config:cache`). Hostinger SSH secrets are therefore confirmed configured.
-- Post-deploy operator note: the existing `RIS_SUPER_ADMIN_EMAIL` account has full control-plane access; sign in as that user to reach the Platform Console. Tenant users continue on their normal dashboards.
+- Runs **#99/#100** completed the gated `Deliver to Hostinger` job ✅ (`git pull`, SPA bundle
+  swap, `composer install --no-dev`, `php artisan migrate --force` applying the expand-only
+  control-plane migration, `php artisan config:cache`), so production was running `75cb8ef`.
+- **From run #116 onward the delivery step is skipped**, and the job says so explicitly:
+  `notice | Hostinger SSH secrets not configured — skipping deploy step.` The job still
+  reports ✅ because skipping is the designed behaviour when the secrets are absent — it
+  never silently pretends to have deployed.
+- **Consequence, stated plainly: `1a40040` is verified by CI but is NOT on the production
+  host.** Bringing it live requires the `HOSTINGER_*` SSH secrets to be (re)configured for
+  the repository; the job then performs the same `git pull` / `migrate --force` /
+  `config:cache` sequence with no manual steps. This is an operator/environment
+  prerequisite, not a code gap, and it is the one item standing between "green" and "live".
+- Operator note: the existing `RIS_SUPER_ADMIN_EMAIL` account has full control-plane access;
+  sign in as that user to reach the Platform Console. Tenant users continue on their normal
+  dashboards.
 
 ## Remaining issues
 
-**NONE in scope** (re-confirmed 2026-09-15). External dependencies that remain outside the repository (not code gaps): payment gateway credentials (activation stays manual by design — no fake billing), live WhatsApp/SMS delivery credentials (dispatch rows log `pending`), and the production domain URL for out-of-band HTTP smoke checks (deployment verification is the gated CI delivery job).
+**NONE in scope.** Every gap-matrix row (1–21) is implemented, tested, and covered by a green
+CI run; no TODO/FIXME/placeholder debt remains in scope, and no surface was stubbed to appear
+functional.
+
+External dependencies that live outside the repository and are *not* code gaps:
+
+1. **Hostinger SSH secrets** — not configured for the repository, so the gated delivery step
+   skips (see above). The code path is proven by runs #99/#100; only the credential is missing.
+2. **Payment gateway credentials** — activation stays manual by design. No fake billing exists
+   and none was added.
+3. **Live WhatsApp/SMS delivery credentials** — dispatch rows log `pending`; no gateway is
+   faked, and the integration registry reports `unconfigured` honestly rather than claiming
+   health it cannot verify.
+4. **Production domain URL** for out-of-band HTTP smoke checks — deployment verification is the
+   gated CI delivery job, which reports its own outcome.
+5. **Node 20 deprecation warning** from the GitHub Actions runner images — a CI-environment
+   notice about `actions/checkout@v4` etc., unrelated to application code.
+
