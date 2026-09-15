@@ -47,15 +47,48 @@ jobs:
           # the job (the old swallow made the backend job unable to fail).
           php artisan test --testsuite=Feature 2>&1 | tee /tmp/phpunit.log
 
-      - name: Failure detail (fresh annotation budget)
+      # NOTE: GitHub publishes at most ~10 `::error::` annotations PER STEP.
+      # Every diagnostic below therefore lives in its OWN step so it gets a
+      # fresh annotation budget — a single fat step silently swallows all but
+      # the first ten lines (which is exactly how a 500 stayed undiagnosed).
+
+      - name: Failure detail — application log
         if: failure()
         run: |
-          grep -aE "FAILED " /tmp/phpunit.log | head -14 | sed 's/^/::error::result /' || true
-          grep -aA 10 "FAILED " /tmp/phpunit.log | grep -aE "BadMethodCall|Undefined array|Expected response|Failed asserting|SQLSTATE|RuntimeException|Error:|▕" | head -14 | sed 's/^/::error::detail /' || true
-          grep -a "BOOKING FAILED" /tmp/phpunit.log | head -2 | cut -c1-1500 | sed 's/^/::error::booking /' || true
-          grep -a "BOOKING-RESPONSE" storage/logs/laravel.log 2>/dev/null | tail -1 | cut -c1-1500 | sed 's/^/::error::bookinglog /' || true
-          grep -aE "\.ERROR:" storage/logs/laravel.log 2>/dev/null | grep -av BOOKING | tail -4 | cut -c1-1500 | sed 's/^/::error::laravel /' || true
-          exit 1
+          # Laravel reports every uncaught exception here: class, message and
+          # the first stack frames. This is the fastest path to a 5xx cause.
+          grep -aE "\.ERROR:" storage/logs/laravel.log 2>/dev/null | head -10 | cut -c1-900 | sed 's/^/::error::laravel /' || true
+
+      - name: Failure detail — failing tests
+        if: failure()
+        run: |
+          grep -aE "FAILED |ERRORS |Tests: " /tmp/phpunit.log | head -10 | cut -c1-300 | sed 's/^/::error::result /' || true
+
+      - name: Failure detail — assertion lines
+        if: failure()
+        run: |
+          # Line-numbered orientation: exactly where the failures sit.
+          grep -anE "FAILED |ERRORS |Tests: |Failed asserting|Expected response|Exception|Error:|SQLSTATE" /tmp/phpunit.log | head -10 | cut -c1-400 | sed 's/^/::error::assert /' || true
+
+      - name: Failure detail — tail 1/5
+        if: failure()
+        run: tail -n 50 /tmp/phpunit.log | sed -n '1,10p' | cut -c1-900 | sed 's/^/::error::t1 /' || true
+
+      - name: Failure detail — tail 2/5
+        if: failure()
+        run: tail -n 50 /tmp/phpunit.log | sed -n '11,20p' | cut -c1-900 | sed 's/^/::error::t2 /' || true
+
+      - name: Failure detail — tail 3/5
+        if: failure()
+        run: tail -n 50 /tmp/phpunit.log | sed -n '21,30p' | cut -c1-900 | sed 's/^/::error::t3 /' || true
+
+      - name: Failure detail — tail 4/5
+        if: failure()
+        run: tail -n 50 /tmp/phpunit.log | sed -n '31,40p' | cut -c1-900 | sed 's/^/::error::t4 /' || true
+
+      - name: Failure detail — tail 5/5
+        if: failure()
+        run: tail -n 50 /tmp/phpunit.log | sed -n '41,50p' | cut -c1-900 | sed 's/^/::error::t5 /' || true
 
   spa-build:
     name: Frontend — typecheck & production build

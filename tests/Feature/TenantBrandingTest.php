@@ -6,6 +6,8 @@ use App\Models\TenantDomain;
 use App\Models\TenantFeatureOverride;
 use App\Models\User;
 use App\Services\TenantDomainVerifier;
+use Illuminate\Validation\ValidationException;
+use Symfony\Component\HttpKernel\Exception\HttpException;
 
 /**
  * White-labeling and custom domains (master-prompt §37/§38).
@@ -16,6 +18,20 @@ use App\Services\TenantDomainVerifier;
  */
 class TenantBrandingTest extends ApiTestCase
 {
+    /**
+     * A 5xx in this suite is always a bug, never an expected outcome, so let
+     * an unexpected exception surface as a real stack trace instead of a bare
+     * "received 500" (which is all the default handler leaves behind).
+     *
+     * HTTP exceptions are excluded on purpose: the tests below assert 403/404/
+     * 422 deliberately via abort(), and those must keep rendering normally.
+     */
+    protected function setUp(): void
+    {
+        parent::setUp();
+        $this->withoutExceptionHandling([HttpException::class, ValidationException::class]);
+    }
+
     private function platformUser(string $role = 'super_admin'): User
     {
         return User::create([
