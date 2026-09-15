@@ -14,6 +14,7 @@ use App\Http\Controllers\Api\V1\Platform\PlatformSupportSessionController;
 use App\Http\Controllers\Api\V1\Platform\PlatformTenantController;
 use App\Http\Controllers\Api\V1\Platform\PlatformUserController;
 use App\Http\Controllers\Api\V1\ReportController;
+use App\Http\Controllers\Api\V1\PublicTenantContextController;
 use App\Http\Controllers\Api\V1\SettingsController;
 use App\Http\Controllers\Api\V1\StaffUserController;
 use App\Http\Controllers\Api\V1\StudyController;
@@ -54,6 +55,10 @@ Route::post('/register', [AuthController::class, 'register'])->middleware('throt
 
 // Public plan catalog (signup + subscription gate views).
 Route::get('/plans', [PlatformPlanController::class, 'publicIndex']);
+
+// Public presentation lookup for the login screen: resolves the brand of a
+// DNS-verified custom domain. Cosmetic only — never an authorization input.
+Route::get('/tenant-context', [PublicTenantContextController::class, 'show'])->middleware('throttle:60,1');
 
 // ---------- authenticated: identity + context (never tenant-gated) ----------
 
@@ -181,6 +186,14 @@ Route::middleware(['auth', 'platform'])->prefix('platform')->group(function () {
     // Deployment topology: placement catalog + per-tenant re-placement
     Route::get('/infrastructure', [PlatformInfrastructureController::class, 'index']);
     Route::patch('/tenants/{tenant}/deployment', [PlatformInfrastructureController::class, 'updateDeployment'])->whereNumber('tenant');
+
+    // White-label branding + custom domain registry
+    Route::get('/tenants/{tenant}/branding', [PlatformBrandingController::class, 'index'])->whereNumber('tenant');
+    Route::put('/tenants/{tenant}/branding', [PlatformBrandingController::class, 'update'])->whereNumber('tenant');
+    Route::post('/tenants/{tenant}/domains', [PlatformBrandingController::class, 'storeDomain'])->whereNumber('tenant');
+    Route::post('/tenants/{tenant}/domains/{domain}/verify', [PlatformBrandingController::class, 'verifyDomain'])->whereNumber('tenant')->whereNumber('domain');
+    Route::post('/tenants/{tenant}/domains/{domain}/primary', [PlatformBrandingController::class, 'makePrimary'])->whereNumber('tenant')->whereNumber('domain');
+    Route::delete('/tenants/{tenant}/domains/{domain}', [PlatformBrandingController::class, 'destroyDomain'])->whereNumber('tenant')->whereNumber('domain');
 
     // Plans
     Route::get('/plans', [PlatformPlanController::class, 'index']);

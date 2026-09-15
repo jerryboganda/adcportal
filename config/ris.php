@@ -102,6 +102,30 @@ return [
         'inventory' => true,
         'dicom' => true,
         'dispatch' => true,
+        // White-label entitlements (master-prompt §18/§37/§38). Both default on
+        // so existing tenants keep their current behaviour; a plan or platform
+        // override can withhold them from lower tiers.
+        'branding' => true,
+        'custom_domains' => true,
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Platform brand (white-label fallback)
+    |--------------------------------------------------------------------------
+    |
+    | Used whenever a tenant has no branding row, and on the login screen when
+    | the request host matches no tenant domain. Purely presentational.
+    |
+    */
+
+    'platform_brand' => [
+        'app_name' => env('RIS_PLATFORM_APP_NAME', 'PolytronX - RIS'),
+        'primary_color' => '#0e7490',
+        'accent_color' => '#06b6d4',
+        'logo_url' => null,
+        'favicon_url' => null,
+        'email_from_address' => env('MAIL_FROM_ADDRESS'),
     ],
 
     /*

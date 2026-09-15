@@ -533,6 +533,48 @@ export interface InfrastructureSummary {
   unplacedTenants: number;
 }
 
+/** Presentation-only white-label overrides (master-prompt §37). */
+export interface TenantBranding {
+  appName: string;
+  primaryColor: string;
+  accentColor: string;
+  logoUrl: string | null;
+  faviconUrl: string | null;
+  loginMessage: string | null;
+  reportHeader: string | null;
+  reportFooter: string | null;
+  emailFromName: string;
+  emailFromAddress: string | null;
+  supportEmail: string | null;
+  supportPhone: string | null;
+}
+
+export interface TenantDomainRecord {
+  id: string;
+  host: string;
+  isPrimary: boolean;
+  verifiedAt: string | null;
+  createdAt?: string | null;
+}
+
+export interface TenantBrandingPayload {
+  branding: TenantBranding;
+  brandingOverridden: boolean;
+  domains: TenantDomainRecord[];
+  entitlements: { branding: boolean; customDomains: boolean };
+  verificationRecord: string;
+  /** Present on register/verify responses only. */
+  verification?: { record: string; type: string; value: string; found?: string[]; verified?: boolean };
+}
+
+/** Public login-screen lookup: cosmetic only, never an identity claim. */
+export interface PublicTenantContext extends TenantBranding {
+  tenantId: string | null;
+  tenantCode: string | null;
+  matched: boolean;
+  verified: boolean;
+}
+
 export interface TenantRecord {
   id: string;
   name: string;

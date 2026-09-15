@@ -34,10 +34,14 @@ import {
   StudyScreeningAnswer,
   SupportSessionInfo,
   Tenant360,
+  TenantBranding,
+  TenantBrandingPayload,
+  TenantDomainRecord,
   TenantFacilityRecord,
   TenantMembership,
   TenantRecord,
   TenantUserRecord,
+  PublicTenantContext,
   UsageSummary,
 } from '../types';
 
@@ -64,6 +68,7 @@ export interface BootstrapPayload {
   user: SessionUser;
   platform?: boolean;
   entitlements?: Entitlements | null;
+  branding?: TenantBranding | null;
   studies: Appointment[];
   invoices: Invoice[];
   patients: Patient[];
@@ -716,6 +721,47 @@ export async function updateTenantDeployment(id: string, input: {
 }): Promise<TenantRecord> {
   const { data } = await http.patch(`/platform/tenants/${id}/deployment`, input);
   return data.data.tenant;
+}
+
+// ==================== platform: white-label branding + domains ====================
+
+export async function fetchTenantBranding(id: string): Promise<TenantBrandingPayload> {
+  const { data } = await http.get(`/platform/tenants/${id}/branding`);
+  return data.data;
+}
+
+export async function updateTenantBranding(id: string, input: Partial<Omit<TenantBranding, 'emailFromName'>> & { emailFromName?: string }): Promise<TenantBrandingPayload> {
+  const { data } = await http.put(`/platform/tenants/${id}/branding`, input);
+  return data.data;
+}
+
+export async function addTenantDomain(id: string, host: string, isPrimary?: boolean): Promise<TenantBrandingPayload> {
+  const { data } = await http.post(`/platform/tenants/${id}/domains`, { host, isPrimary });
+  return data.data;
+}
+
+export async function verifyTenantDomain(id: string, domainId: string): Promise<TenantBrandingPayload> {
+  const { data } = await http.post(`/platform/tenants/${id}/domains/${domainId}/verify`);
+  return data.data;
+}
+
+export async function makeTenantDomainPrimary(id: string, domainId: string): Promise<TenantBrandingPayload> {
+  const { data } = await http.post(`/platform/tenants/${id}/domains/${domainId}/primary`);
+  return data.data;
+}
+
+export async function deleteTenantDomain(id: string, domainId: string): Promise<TenantBrandingPayload> {
+  const { data } = await http.delete(`/platform/tenants/${id}/domains/${domainId}`);
+  return data.data;
+}
+
+/**
+ * Public login-screen branding for the host the browser is on. Cosmetic only:
+ * the result never grants access to anything.
+ */
+export async function fetchPublicTenantContext(host?: string): Promise<PublicTenantContext> {
+  const { data } = await http.get('/tenant-context', { params: host ? { host } : undefined });
+  return data.data.branding;
 }
 
 // ==================== platform: tenant user administration ====================

@@ -46,6 +46,18 @@ class Business extends Model
         return $this->belongsTo(Plan::class);
     }
 
+    /** White-label presentation overrides (presentation only — never authz). */
+    public function branding()
+    {
+        return $this->hasOne(TenantBranding::class, 'business_id');
+    }
+
+    /** Registered custom hosts for this tenant. */
+    public function domains()
+    {
+        return $this->hasMany(TenantDomain::class, 'business_id');
+    }
+
     /** Subscribable tenants may use the product; suspended/expired may not. */
     public function isSubscribable(): bool
     {

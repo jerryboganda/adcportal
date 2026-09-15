@@ -640,6 +640,8 @@ class ApiShape
         'tenant_branding_updated' => ['Platform', 'Tenant Branding Updated', 'success'],
         'tenant_domain_added' => ['Platform', 'Tenant Domain Added', 'success'],
         'tenant_domain_removed' => ['Platform', 'Tenant Domain Removed', 'warning'],
+        'tenant_domain_updated' => ['Platform', 'Tenant Primary Domain Changed', 'success'],
+        'tenant_domain_verified' => ['Platform', 'Tenant Domain DNS Verified', 'success'],
         'tenant_integration_created' => ['Platform Integrations', 'Tenant Integration Created', 'success'],
         'tenant_integration_updated' => ['Platform Integrations', 'Tenant Integration Updated', 'success'],
         'tenant_integration_deleted' => ['Platform Integrations', 'Tenant Integration Deleted', 'warning'],

@@ -25,6 +25,7 @@ import {
   StaffUser,
   StudyScreeningAnswer,
   Entitlements,
+  TenantBranding,
 } from './types';
 import {
   AppRole,
@@ -78,6 +79,9 @@ export const App: React.FC = () => {
   const [staffUsers, setStaffUsers] = useState<StaffUser[]>([]);
   const [clinicSettings, setClinicSettings] = useState<ClinicProfileSettings | null>(null);
   const [entitlements, setEntitlements] = useState<Entitlements | null>(null);
+  // White-label presentation for the active tenant (server-resolved from the
+  // session, never from a client-supplied host).
+  const [branding, setBranding] = useState<TenantBranding | null>(null);
   const [dicomNodes, setDicomNodes] = useState<DicomNodeConfig[]>([]);
   const [notificationTemplates, setNotificationTemplates] = useState<api.NotificationTemplateT[]>([]);
   const [auditLogs, setAuditLogs] = useState<AuditLogEntry[]>([]);
@@ -127,6 +131,7 @@ export const App: React.FC = () => {
       setStaffUsers(payload.staff);
       setClinicSettings(payload.clinicSettings);
       setEntitlements(payload.entitlements ?? null);
+      setBranding(payload.branding ?? null);
       setDicomNodes(payload.dicomNodes);
       setNotificationTemplates(payload.notificationTemplates);
       setAuditLogs(payload.auditLogs);
@@ -865,6 +870,7 @@ export const App: React.FC = () => {
         inventoryItems={inventoryItems}
         role={role}
         entitlements={entitlements}
+        brandName={branding?.appName ?? null}
         onSelectAppointment={(apt) => setSelectedAppointment(apt)}
         onOpenBookingModal={() => setBookingModalOpen(true)}
         notifications={notifications}

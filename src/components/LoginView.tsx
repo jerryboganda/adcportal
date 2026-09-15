@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Activity, Building2, Loader2, Lock, Mail, Phone, ShieldCheck, User as UserIcon } from 'lucide-react';
-import { login, registerTenant, SessionUser } from '../services/apiService';
+import { fetchPublicTenantContext, login, registerTenant, SessionUser } from '../services/apiService';
+import { PublicTenantContext } from '../types';
 
 interface LoginViewProps {
   onAuthenticated: (user: SessionUser) => void;
@@ -9,6 +10,11 @@ interface LoginViewProps {
 /**
  * Real authentication gate. Session is a Laravel Sanctum cookie; roles and
  * permissions come from the server, never from the client.
+ *
+ * The brand shown here is resolved from the request host by the server
+ * (`GET /api/v1/tenant-context`) and is purely cosmetic: it never grants
+ * access to anything — the tenant for a session is always derived from the
+ * authenticated principal.
  */
 export const LoginView: React.FC<LoginViewProps> = ({ onAuthenticated }) => {
   const [mode, setMode] = useState<'login' | 'register'>('login');
@@ -19,6 +25,17 @@ export const LoginView: React.FC<LoginViewProps> = ({ onAuthenticated }) => {
   const [phone, setPhone] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  const [branding, setBranding] = useState<PublicTenantContext | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetchPublicTenantContext()
+      .then(ctx => { if (!cancelled) setBranding(ctx); })
+      .catch(() => { /* branding is cosmetic — never block sign-in on it */ });
+    return () => { cancelled = true; };
+  }, []);
+
+  const brandName = branding?.appName ?? 'PolytronX - RIS';
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -87,13 +104,26 @@ export const LoginView: React.FC<LoginViewProps> = ({ onAuthenticated }) => {
           </ul>
         </div>
 
-        <p className="text-xs text-slate-500">PolytronX - RIS — Radiology Information System</p>
+        <p className="text-xs text-slate-500">{brandName} — Radiology Information System</p>
       </div>
 
       {/* Form panel */}
       <div className="flex-1 flex items-center justify-center p-6">
         <div className="w-full max-w-md">
           <div className="bg-white rounded-2xl shadow-xl shadow-slate-200 border border-slate-200 p-8">
+            <div className="lg:hidden mb-5 flex items-center gap-2.5">
+              <div className="w-9 h-9 rounded-lg bg-slate-900 flex items-center justify-center">
+                <Activity className="w-5 h-5 text-cyan-400" />
+              </div>
+              <p className="font-bold text-sm text-slate-900">{brandName}</p>
+            </div>
+
+            {branding?.loginMessage && (
+              <p className="mb-5 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5 text-xs leading-relaxed text-slate-600">
+                {branding.loginMessage}
+              </p>
+            )}
+
             <div className="flex mb-6 rounded-lg bg-slate-100 p-1 text-sm font-semibold">
               <button
                 type="button"

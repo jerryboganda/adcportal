@@ -45,7 +45,7 @@ class BootstrapController extends BaseApiController
 
         // Patient-role users only need their own slice.
         if ($user->portalRole() === 'patient') {
-            return $this->patientBootstrap($user, $tenantId);
+            return $this->patientBootstrap($user, $tenantId, $tenant);
         }
 
         $studies = \App\Models\Appointment::forClinic($tenantId)
@@ -96,11 +96,14 @@ class BootstrapController extends BaseApiController
             'adverseReactions' => AdverseReaction::where('business_id', $tenantId)->orderByDesc('id')->get()
                 ->map(fn ($r) => ApiShape::adverseReaction($r))->all(),
             'entitlements' => $tenant ? \App\Services\EntitlementService::payload($tenant) : null,
+            // White-label presentation for this tenant (server-resolved from the
+            // authenticated principal — never from a client-supplied host).
+            'branding' => $tenant ? \App\Services\TenantBrandingService::forTenant($tenant) : null,
         ]);
     }
 
     /** Patients see their own studies/invoices only — enforced server-side. */
-    private function patientBootstrap(User $user, int $tenantId): JsonResponse
+    private function patientBootstrap(User $user, int $tenantId, ?\App\Models\Business $tenant = null): JsonResponse
     {
         $customer = Customer::where('user_id', $user->id)->where('business_id', $tenantId)->first();
 
@@ -130,6 +133,7 @@ class BootstrapController extends BaseApiController
             'clinicSettings' => ApiShape::clinicSettings($tenantId),
             'notifications' => AppNotification::where('business_id', $tenantId)->orderByDesc('id')->limit(50)->get()
                 ->map(fn ($n) => ApiShape::appNotification($n))->all(),
+            'branding' => $tenant ? \App\Services\TenantBrandingService::forTenant($tenant) : null,
         ]);
     }
 

@@ -53,6 +53,8 @@ interface NavbarProps {
   onOpenNotifications?: () => void;
   onExportBackup?: () => void;
   onLockTerminal?: () => void;
+  /** Tenant white-label application name (server-resolved; cosmetic only). */
+  brandName?: string | null;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
@@ -74,6 +76,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   onOpenNotifications,
   onExportBackup,
   onLockTerminal,
+  brandName,
 }) => {
   // Compute badge counts
   const statCount = appointments.filter(a => a.priority === 'stat' && !['reported', 'delivered', 'cancelled', 'no_show'].includes(a.workflowState)).length;
@@ -123,7 +126,7 @@ export const Navbar: React.FC<NavbarProps> = ({
               PX
             </div>
             <div className="hidden sm:block">
-              <span className="font-bold text-base sm:text-lg text-slate-900 tracking-tight block leading-tight">PolytronX - RIS</span>
+              <span className="font-bold text-base sm:text-lg text-slate-900 tracking-tight block leading-tight">{brandName?.trim() || 'PolytronX - RIS'}</span>
               <p className="text-[11px] text-slate-500 font-medium">Radiology Information System</p>
             </div>
           </div>

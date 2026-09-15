@@ -17,6 +17,8 @@ import {
   PlatformSupportSessionRecord,
   PlatformUserRecord,
   Tenant360,
+  TenantBranding,
+  TenantBrandingPayload,
   TenantFacilityRecord,
   TenantLifecycleEntry,
   TenantRecord,
@@ -468,7 +470,7 @@ const TenantDetail: React.FC<{
   fail: (e: any, f: string) => void;
 }> = ({ tenantId, user, onBack, onEnterTenant, notify, fail }) => {
   const [tenant, setTenant] = useState<Tenant360 | null>(null);
-  const [tab, setTab] = useState<'overview' | 'users' | 'facilities' | 'deployment' | 'lifecycle' | 'audit' | 'features'>('overview');
+  const [tab, setTab] = useState<'overview' | 'users' | 'facilities' | 'deployment' | 'branding' | 'lifecycle' | 'audit' | 'features'>('overview');
   const [confirmTerminate, setConfirmTerminate] = useState('');
   const [suspendReason, setSuspendReason] = useState('');
   const [busy, setBusy] = useState(false);
@@ -567,7 +569,7 @@ const TenantDetail: React.FC<{
       )}
 
       <div className="flex gap-1 overflow-x-auto border-b border-slate-200">
-        {(['overview', 'users', 'facilities', 'lifecycle', 'audit', 'features'] as const).map(t => (
+        {(['overview', 'users', 'facilities', 'deployment', 'branding', 'lifecycle', 'audit', 'features'] as const).map(t => (
           <button
             key={t}
             onClick={() => setTab(t)}
@@ -830,6 +832,8 @@ const TenantDetail: React.FC<{
 
       {tab === 'deployment' && <DeploymentTab tenant={tenant} user={user} onChanged={load} notify={notify} fail={fail} />}
 
+      {tab === 'branding' && <BrandingTab tenant={tenant} user={user} notify={notify} fail={fail} />}
+
       {tab === 'features' && <FeatureOverridesTab tenant={tenant} onChanged={load} notify={notify} fail={fail} />}
 
       {editOpen && (
@@ -877,6 +881,383 @@ const TenantDetail: React.FC<{
           onClose={() => setOneTimeSecret(null)}
         />
       )}
+    </div>
+  );
+};
+
+// ==================== white-label branding + custom domains ====================
+
+/**
+ * White-labeling for one tenant. Branding is presentation only; a custom host
+ * must pass DNS verification before it serves that brand, and a host never
+ * grants access to tenant data (the tenant is always resolved from the session).
+ */
+// ==================== deployment topology ====================
+
+/**
+ * Infrastructure placement of one tenant. The catalog comes from the server
+ * (config-owned), so the console can only offer placements the operator has
+ * actually declared; the API validates the same list again server-side.
+ */
+const DeploymentTab: React.FC<{
+  tenant: Tenant360;
+  user: SessionUser;
+  onChanged: () => void;
+  notify: (k: 'error' | 'success', m: string) => void;
+  fail: (e: any, f: string) => void;
+}> = ({ tenant, user, onChanged, notify, fail }) => {
+  const [catalog, setCatalog] = useState<DeploymentCatalog | null>(null);
+  const [form, setForm] = useState({
+    region: tenant.deployment.region ?? '',
+    deploymentStamp: tenant.deployment.deploymentStamp ?? '',
+    isolationProfile: tenant.deployment.isolationProfile ?? 'pooled',
+    databaseCluster: tenant.deployment.databaseCluster ?? '',
+    storageRegion: tenant.deployment.storageRegion ?? '',
+    reason: '',
+  });
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    api.fetchInfrastructure()
+      .then(summary => setCatalog(summary.catalog))
+      .catch(err => fail(err, 'Failed to load the deployment catalog.'));
+  }, [fail]);
+
+  const save = async () => {
+    setBusy(true);
+    try {
+      await api.updateTenantDeployment(tenant.id, {
+        region: form.region,
+        deploymentStamp: form.deploymentStamp,
+        isolationProfile: form.isolationProfile,
+        databaseCluster: form.databaseCluster || null,
+        storageRegion: form.storageRegion || null,
+        reason: form.reason || undefined,
+      });
+      notify('success', `Deployment placement updated for ${tenant.name}.`);
+      onChanged();
+    } catch (err) {
+      fail(err, 'Failed to update the deployment placement.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  if (!catalog) return <SectionSpinner label="Loading deployment catalog…" />;
+
+  const field = 'w-full rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs focus:border-cyan-500 focus:outline-none';
+  const label = 'text-[11px] font-semibold uppercase tracking-wide text-slate-500';
+  const editable = can(user, 'infrastructure.manage');
+
+  return (
+    <div className="rounded-xl border border-slate-200 bg-white p-4 space-y-3">
+      <p className="text-xs text-slate-500">
+        Where this tenant's data physically lives. Region, stamp and isolation profile come from the
+        operator's declared catalog; a change is audited and recorded in the tenant's lifecycle history.
+      </p>
+      <div className="grid md:grid-cols-2 gap-3">
+        <label className="space-y-1"><span className={label}>Region</span>
+          <select disabled={!editable} className={field} value={form.region} onChange={e => setForm({ ...form, region: e.target.value })}>
+            <option value="">— select —</option>
+            {catalog.regions.map(r => <option key={r.key} value={r.key}>{r.label}</option>)}
+          </select>
+        </label>
+        <label className="space-y-1"><span className={label}>Deployment stamp</span>
+          <select disabled={!editable} className={field} value={form.deploymentStamp} onChange={e => setForm({ ...form, deploymentStamp: e.target.value })}>
+            <option value="">— select —</option>
+            {catalog.deploymentStamps.map(s => <option key={s.key} value={s.key}>{s.label}</option>)}
+          </select>
+        </label>
+        <label className="space-y-1"><span className={label}>Isolation profile</span>
+          <select disabled={!editable} className={field} value={form.isolationProfile} onChange={e => setForm({ ...form, isolationProfile: e.target.value })}>
+            {catalog.isolationProfiles.map(p => <option key={p.key} value={p.key}>{p.label}</option>)}
+          </select>
+        </label>
+        <label className="space-y-1"><span className={label}>Database cluster</span>
+          <input disabled={!editable} className={field} value={form.databaseCluster} onChange={e => setForm({ ...form, databaseCluster: e.target.value })} placeholder="primary" />
+        </label>
+        <label className="space-y-1"><span className={label}>Storage region</span>
+          <input disabled={!editable} className={field} value={form.storageRegion} onChange={e => setForm({ ...form, storageRegion: e.target.value })} placeholder="defaults to the region" />
+        </label>
+        <label className="space-y-1"><span className={label}>Change reason (audited)</span>
+          <input disabled={!editable} className={field} value={form.reason} onChange={e => setForm({ ...form, reason: e.target.value })} placeholder="e.g. enterprise contract requires dedicated isolation" />
+        </label>
+      </div>
+      {editable ? (
+        <button onClick={save} disabled={busy || !form.region || !form.deploymentStamp} className={btnPrimarySm}>
+          <Server size={13} /> Save placement
+        </button>
+      ) : (
+        <p className="text-[11px] text-slate-500">Read-only: your platform role does not hold <code>infrastructure.manage</code>.</p>
+      )}
+    </div>
+  );
+};
+
+const InfrastructureSection: React.FC<{
+  user: SessionUser;
+  notify: (k: 'error' | 'success', m: string) => void;
+  fail: (e: any, f: string) => void;
+}> = ({ user, notify, fail }) => {
+  const [summary, setSummary] = useState<InfrastructureSummary | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      setSummary(await api.fetchInfrastructure());
+    } catch (err) {
+      fail(err, 'Failed to load infrastructure placement.');
+    } finally {
+      setLoading(false);
+    }
+  }, [fail]);
+
+  useEffect(() => { load(); }, [load]);
+
+  if (loading && !summary) return <SectionSpinner label="Loading infrastructure placement…" />;
+  if (!summary) return null;
+
+  const buckets: { title: string; rows: { key: string; tenants: number }[] }[] = [
+    { title: 'Tenants per region', rows: summary.placement.regions },
+    { title: 'Tenants per deployment stamp', rows: summary.placement.deploymentStamps },
+    { title: 'Tenants per isolation profile', rows: summary.placement.isolationProfiles },
+  ];
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center gap-3">
+        <h2 className="text-sm font-bold text-slate-800">Deployment topology</h2>
+        <button onClick={load} className={btnGhost}><RefreshCw size={13} /> Refresh</button>
+        <span className="ml-auto text-xs text-slate-500">
+          {can(user, 'infrastructure.manage') ? 'Re-place a tenant from its Deployment tab.' : 'Read-only for your platform role.'}
+        </span>
+      </div>
+
+      {summary.unplacedTenants > 0 && (
+        <div className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+          {summary.unplacedTenants} tenant(s) have no isolation profile recorded — re-place them from their tenant record.
+        </div>
+      )}
+
+      <div className="grid md:grid-cols-3 gap-3">
+        {buckets.map(b => (
+          <div key={b.title} className="rounded-xl border border-slate-200 bg-white p-4">
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">{b.title}</p>
+            <ul className="mt-2 space-y-1">
+              {b.rows.length === 0 && <li className="text-xs text-slate-400">No tenants.</li>}
+              {b.rows.map(r => (
+                <li key={r.key} className="flex items-center justify-between text-sm">
+                  <span className="font-medium text-slate-700">{r.key}</span>
+                  <span className="tabular-nums text-slate-500">{r.tenants}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        ))}
+      </div>
+
+      <div className="rounded-xl border border-slate-200 bg-white p-4">
+        <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Declared catalog</p>
+        <div className="mt-2 grid md:grid-cols-3 gap-3 text-sm">
+          <div>
+            <p className="text-xs font-semibold text-slate-600">Regions</p>
+            <ul className="mt-1 space-y-0.5">
+              {summary.catalog.regions.map(r => <li key={r.key} className="text-xs text-slate-600">{r.label} <span className="text-slate-400">({r.key} · storage {r.storage})</span></li>)}
+            </ul>
+          </div>
+          <div>
+            <p className="text-xs font-semibold text-slate-600">Stamps</p>
+            <ul className="mt-1 space-y-0.5">
+              {summary.catalog.deploymentStamps.map(s => <li key={s.key} className="text-xs text-slate-600">{s.label} <span className="text-slate-400">({s.key})</span></li>)}
+            </ul>
+          </div>
+          <div>
+            <p className="text-xs font-semibold text-slate-600">Isolation profiles</p>
+            <ul className="mt-1 space-y-0.5">
+              {summary.catalog.isolationProfiles.map(p => <li key={p.key} className="text-xs text-slate-600">{p.label} <span className="text-slate-400">({p.key})</span></li>)}
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const BrandingTab: React.FC<{
+  tenant: Tenant360;
+  user: SessionUser;
+  notify: (k: 'error' | 'success', m: string) => void;
+  fail: (e: any, f: string) => void;
+}> = ({ tenant, user, notify, fail }) => {
+  const [payload, setPayload] = useState<TenantBrandingPayload | null>(null);
+  const [form, setForm] = useState<TenantBranding | null>(null);
+  const [newHost, setNewHost] = useState('');
+  const [busy, setBusy] = useState(false);
+
+  const load = useCallback(async () => {
+    try {
+      const data = await api.fetchTenantBranding(tenant.id);
+      setPayload(data);
+      setForm(data.branding);
+    } catch (err) {
+      fail(err, 'Failed to load branding.');
+    }
+  }, [tenant.id, fail]);
+
+  useEffect(() => { load(); }, [load]);
+
+  if (!payload || !form) return <SectionSpinner label="Loading branding…" />;
+
+  const canManage = can(user, 'tenants.manage');
+  const canBrand = canManage && payload.entitlements.branding;
+  const canDomains = canManage && payload.entitlements.customDomains;
+
+  const saveBranding = async () => {
+    setBusy(true);
+    try {
+      const updated = await api.updateTenantBranding(tenant.id, {
+        appName: form.appName,
+        primaryColor: form.primaryColor,
+        accentColor: form.accentColor,
+        logoUrl: form.logoUrl || null,
+        faviconUrl: form.faviconUrl || null,
+        loginMessage: form.loginMessage || null,
+        reportHeader: form.reportHeader || null,
+        reportFooter: form.reportFooter || null,
+        emailFromName: form.emailFromName,
+        emailFromAddress: form.emailFromAddress || null,
+        supportEmail: form.supportEmail || null,
+        supportPhone: form.supportPhone || null,
+      });
+      setPayload(updated);
+      setForm(updated.branding);
+      notify('success', `Branding saved for ${tenant.name}.`);
+    } catch (err) {
+      fail(err, 'Failed to save branding.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const run = async (fn: () => Promise<TenantBrandingPayload>, ok: string) => {
+    setBusy(true);
+    try {
+      const updated = await fn();
+      setPayload(updated);
+      setForm(updated.branding);
+      notify('success', ok);
+    } catch (err) {
+      fail(err, 'Domain action failed.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const field = 'w-full rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs focus:border-cyan-500 focus:outline-none';
+  const label = 'text-[11px] font-semibold uppercase tracking-wide text-slate-500';
+
+  return (
+    <div className="space-y-4">
+      <div className="rounded-xl border border-slate-200 bg-white p-4 space-y-3">
+        <div className="flex items-center gap-2">
+          <p className="text-sm font-bold text-slate-800">White-label presentation</p>
+          {!payload.brandingOverridden && <span className="rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[11px] text-slate-600">using platform defaults</span>}
+        </div>
+        {!payload.entitlements.branding && (
+          <p className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+            The <code>branding</code> entitlement is disabled for this tenant — enable it in the Features tab first.
+          </p>
+        )}
+        <div className="grid md:grid-cols-2 gap-3">
+          <label className="space-y-1"><span className={label}>Application name</span>
+            <input disabled={!canBrand} className={field} value={form.appName} onChange={e => setForm({ ...form, appName: e.target.value })} />
+          </label>
+          <label className="space-y-1"><span className={label}>Primary colour</span>
+            <input disabled={!canBrand} className={field} value={form.primaryColor} onChange={e => setForm({ ...form, primaryColor: e.target.value })} placeholder="#0e7490" />
+          </label>
+          <label className="space-y-1"><span className={label}>Accent colour</span>
+            <input disabled={!canBrand} className={field} value={form.accentColor} onChange={e => setForm({ ...form, accentColor: e.target.value })} placeholder="#06b6d4" />
+          </label>
+          <label className="space-y-1"><span className={label}>Logo URL</span>
+            <input disabled={!canBrand} className={field} value={form.logoUrl ?? ''} onChange={e => setForm({ ...form, logoUrl: e.target.value })} placeholder="https://…" />
+          </label>
+          <label className="space-y-1"><span className={label}>Login message</span>
+            <input disabled={!canBrand} className={field} value={form.loginMessage ?? ''} onChange={e => setForm({ ...form, loginMessage: e.target.value })} />
+          </label>
+          <label className="space-y-1"><span className={label}>Email from name</span>
+            <input disabled={!canBrand} className={field} value={form.emailFromName} onChange={e => setForm({ ...form, emailFromName: e.target.value })} />
+          </label>
+          <label className="space-y-1"><span className={label}>Email from address</span>
+            <input disabled={!canBrand} className={field} value={form.emailFromAddress ?? ''} onChange={e => setForm({ ...form, emailFromAddress: e.target.value })} />
+          </label>
+          <label className="space-y-1"><span className={label}>Support email</span>
+            <input disabled={!canBrand} className={field} value={form.supportEmail ?? ''} onChange={e => setForm({ ...form, supportEmail: e.target.value })} />
+          </label>
+          <label className="space-y-1"><span className={label}>Support phone</span>
+            <input disabled={!canBrand} className={field} value={form.supportPhone ?? ''} onChange={e => setForm({ ...form, supportPhone: e.target.value })} />
+          </label>
+          <label className="space-y-1 md:col-span-2"><span className={label}>Report header</span>
+            <textarea disabled={!canBrand} rows={2} className={field} value={form.reportHeader ?? ''} onChange={e => setForm({ ...form, reportHeader: e.target.value })} />
+          </label>
+          <label className="space-y-1 md:col-span-2"><span className={label}>Report footer</span>
+            <textarea disabled={!canBrand} rows={2} className={field} value={form.reportFooter ?? ''} onChange={e => setForm({ ...form, reportFooter: e.target.value })} />
+          </label>
+        </div>
+        {canBrand ? (
+          <button onClick={saveBranding} disabled={busy} className={btnPrimarySm}><Pencil size={13} /> Save branding</button>
+        ) : (
+          <p className="text-[11px] text-slate-500">Read-only: you need <code>tenants.manage</code> and the tenant's <code>branding</code> entitlement.</p>
+        )}
+      </div>
+
+      <div className="rounded-xl border border-slate-200 bg-white p-4 space-y-3">
+        <p className="text-sm font-bold text-slate-800">Custom domains</p>
+        <p className="text-xs text-slate-500">
+          Publish a TXT record <code>{payload.verificationRecord.replace('<host>', 'your.host')}</code> containing{' '}
+          <code>polytronx-ris-verify=&lt;tenant code&gt;</code>, then verify. Only verified hosts serve this tenant's brand,
+          and a host is never an authorization input.
+        </p>
+        {!payload.entitlements.customDomains && (
+          <p className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+            The <code>custom_domains</code> entitlement is disabled for this tenant.
+          </p>
+        )}
+        {payload.domains.length === 0 ? (
+          <p className="text-xs text-slate-500">No custom domain registered.</p>
+        ) : (
+          <ul className="divide-y divide-slate-100 rounded-lg border border-slate-200">
+            {payload.domains.map(d => (
+              <li key={d.id} className="flex flex-wrap items-center gap-2 px-3 py-2 text-sm">
+                <span className="font-medium text-slate-800">{d.host}</span>
+                {d.isPrimary && <span className="rounded-full border border-cyan-200 bg-cyan-50 px-2 py-0.5 text-[11px] text-cyan-700">primary</span>}
+                <span className={`rounded-full border px-2 py-0.5 text-[11px] ${d.verifiedAt ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-amber-200 bg-amber-50 text-amber-700'}`}>
+                  {d.verifiedAt ? `verified ${fmtWhen(d.verifiedAt)}` : 'unverified'}
+                </span>
+                {canDomains && (
+                  <span className="ml-auto flex items-center gap-2">
+                    <button disabled={busy} onClick={() => run(() => api.verifyTenantDomain(tenant.id, d.id), `DNS verification ran for ${d.host}.`)} className={btnGhost}>Verify</button>
+                    {!d.isPrimary && <button disabled={busy} onClick={() => run(() => api.makeTenantDomainPrimary(tenant.id, d.id), `${d.host} is now primary.`)} className={btnGhost}>Make primary</button>}
+                    <button disabled={busy} onClick={() => run(() => api.deleteTenantDomain(tenant.id, d.id), `${d.host} removed.`)} className="inline-flex items-center gap-1 rounded-lg border border-rose-300 bg-rose-50 px-3 py-1.5 text-xs font-semibold text-rose-700 hover:bg-rose-100"><Trash2 size={13} /> Remove</button>
+                  </span>
+                )}
+              </li>
+            ))}
+          </ul>
+        )}
+        {canDomains && (
+          <div className="flex flex-wrap items-center gap-2">
+            <input className={`${field} max-w-xs`} value={newHost} onChange={e => setNewHost(e.target.value)} placeholder="ris.hospital.com" />
+            <button
+              disabled={busy || newHost.trim() === ''}
+              onClick={() => run(() => api.addTenantDomain(tenant.id, newHost.trim()), `${newHost.trim()} registered (unverified).`).then(() => setNewHost(''))}
+              className={btnPrimarySm}
+            >
+              <Plus size={13} /> Add domain
+            </button>
+          </div>
+        )}
+      </div>
     </div>
   );
 };
