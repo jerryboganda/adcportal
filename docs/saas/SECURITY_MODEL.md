@@ -6,6 +6,7 @@
 - **Authentication ≠ isolation.** Session auth (Sanctum SPA cookies) is step one; every request still passes the availability gate, tenant-scoped permission checks, ownership checks, and entitlement gates.
 - **Existence hiding.** Cross-tenant model binding resolves 404 — no existence oracle for the other tenant's resources.
 - **Safe denials.** Non-member tenant switch returns an identical 403 regardless of target existence.
+- **Unauthenticated is always a 401.** An unauthenticated request to any protected API route returns `401 {"message":"Unauthenticated."}` — regardless of the `Accept` header, and never a redirect. (This application has no named routes, so the framework's default guest redirect to `route('login')` had nowhere to go and answered 500 instead; `redirectGuestsTo(null)` plus JSON rendering for `api/*` fixed it. Pinned by `UnauthenticatedResponseTest`.)
 - **Presentation is never authorization.** A custom host, a tenant's brand, and a tenant's deployment placement are all presentation/operational metadata. The tenant is resolved from the session and nothing else; a request arriving on `clinic.example.com` gets no more access than the same request arriving on the platform host.
 - **Secrets are write-only.** Tenant integration credentials are encrypted at rest (`encrypted:array`) and never serialized to any response — the API reports which secret *keys* exist plus a fixed mask. There is no read-back path, by design.
 

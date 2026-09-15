@@ -1,5 +1,48 @@
 # COMPLETION_EVIDENCE — SaaS re-engineering program (2026-09-14, re-verified 2026-09-15)
 
+## 2026-09-15 — localhost deployment rehearsal (and the defect it exposed)
+
+Standing the app up locally for the first time since this work landed (SQLite, `php artisan
+serve` on 127.0.0.1:8000 + Vite on 3000, migrations applied, demo tenant seeded) surfaced a
+defect that CI could not have caught, because no test exercised it.
+
+**`500 Route [login] not defined.` for any unauthenticated API request without
+`Accept: application/json`.**
+
+- Laravel's default guest redirect is `fn () => route('login')`
+  (`ApplicationBuilder::withMiddleware`), and it is invoked from **inside** the `auth`
+  middleware (`Authenticate::redirectTo`) — so it throws `RouteNotFoundException` *before* the
+  exception handler can turn an `AuthenticationException` into a 401. This application is
+  API-only and has **no named routes at all** (135 routes, none named `login`/`home`), so the
+  redirect target never existed.
+- Impact: "you are not signed in" was reported as a **server fault**. Monitoring pages for a
+  real outage, clients retry the wrong way, and with `APP_DEBUG=true` the response leaked a
+  stack trace (a 451 KB HTML error page).
+- It survived because **every existing guest test used `getJson()`**, which sets the Accept
+  header and therefore never reached the broken branch. The SPA was unaffected only because it
+  always sends `Accept: application/json`.
+- Fix (`bootstrap/app.php`): `$middleware->redirectGuestsTo(fn () => null)` removes the
+  non-existent redirect target, and `$exceptions->shouldRenderJsonWhen(...)` renders JSON for
+  the whole `api/*` prefix so the answer is a 401 for *every* client. Verified locally: 401
+  with and without the Accept header, on both control-plane and tenant-plane routes, with
+  public routes (`/plans`, `/health`) still reachable.
+- Regression guard: `UnauthenticatedResponseTest` (8 protected routes × 3 assertions, plus a
+  public-route positive control).
+
+**Verified live on localhost** (super admin session via the real CSRF + cookie flow):
+`/api/v1/me`, `/platform/overview`, `/platform/tenants`, `/platform/infrastructure`,
+`/platform/operations`, `/platform/operations/jobs` → all **200** with real payloads. The §80
+dashboard reported `database=ok`, `queueConnection=database`, `failedJobDriver=database-uuids`,
+`pendingJobs=0`, `failedJobs=0`, `storageWritable=true`, `appVersion=v2-saas`, and tenant
+`DHQ Hospital Gujranwala` as `health=ok` on placement `default/stamp-a/pooled` — which also
+confirms the missing-`jobs`-table fix is live, since a `database` queue that cannot report
+depth would have been the tell.
+
+Known latent issue (pre-existing, **not** introduced here, and **not reachable**):
+`app/Http/Controllers/Auth/NewPasswordController.php:66` calls `redirect()->route('login')`.
+No route references that controller, so it is dead code today; if a password-reset flow is
+ever wired up, that line will 500 for the same reason this defect did.
+
 ## 2026-09-15 — deployment topology, white-labeling, integrations, observability
 
 Four further in-scope surfaces from the master prompt were implemented and verified
