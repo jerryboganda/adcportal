@@ -472,7 +472,7 @@ const TenantDetail: React.FC<{
   fail: (e: any, f: string) => void;
 }> = ({ tenantId, user, onBack, onEnterTenant, notify, fail }) => {
   const [tenant, setTenant] = useState<Tenant360 | null>(null);
-  const [tab, setTab] = useState<'overview' | 'users' | 'facilities' | 'deployment' | 'branding' | 'lifecycle' | 'audit' | 'features'>('overview');
+  const [tab, setTab] = useState<'overview' | 'users' | 'facilities' | 'deployment' | 'branding' | 'integrations' | 'lifecycle' | 'audit' | 'features'>('overview');
   const [confirmTerminate, setConfirmTerminate] = useState('');
   const [suspendReason, setSuspendReason] = useState('');
   const [busy, setBusy] = useState(false);

@@ -186,14 +186,21 @@ class TenantIntegrationTest extends ApiTestCase
             ->assertStatus(201)
             ->decodeResponseJson()['data']['integration']['id'];
 
-        Http::fake(['https://fhir.alpha.test/*' => Http::response(['resourceType' => 'CapabilityStatement'], 200)]);
+        // A single fake with a response SEQUENCE. Calling Http::fake() twice
+        // would merely *add* a second stub for the same URL, and the client
+        // resolves the first match — so the second stub would never be used.
+        Http::fake([
+            'https://fhir.alpha.test/*' => Http::sequence()
+                ->push(['resourceType' => 'CapabilityStatement'], 200)
+                ->push('boom', 503),
+        ]);
+
         $this->actingAs($super)
             ->postJson("/api/v1/platform/tenants/{$this->businessA->id}/integrations/{$id}/probe")
             ->assertOk()
             ->assertJsonPath('data.probe.status', 'active')
             ->assertJsonPath('data.probe.check', 'http');
 
-        Http::fake(['https://fhir.alpha.test/*' => Http::response('boom', 503)]);
         $this->actingAs($super)
             ->postJson("/api/v1/platform/tenants/{$this->businessA->id}/integrations/{$id}/probe")
             ->assertOk()

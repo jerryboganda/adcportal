@@ -70,6 +70,13 @@ jobs:
           # Line-numbered orientation: exactly where the failures sit.
           grep -anE "FAILED |ERRORS |Tests: |Failed asserting|Expected response|Exception|Error:|SQLSTATE" /tmp/phpunit.log | head -10 | cut -c1-400 | sed 's/^/::error::assert /' || true
 
+      - name: Failure detail — phpunit warnings
+        if: failure()
+        run: |
+          # PHPUnit reports unexpected output as a warning and only shows the
+          # first line, which is usually the only clue — print it in full.
+          grep -aE "! .*→" /tmp/phpunit.log | head -3 | cut -c1-900 | sed 's/^/::error::warn /' || true
+
       - name: Failure detail — tail 1/5
         if: failure()
         run: tail -n 50 /tmp/phpunit.log | sed -n '1,10p' | cut -c1-900 | sed 's/^/::error::t1 /' || true
