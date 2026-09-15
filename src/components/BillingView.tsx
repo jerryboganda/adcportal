@@ -1177,7 +1177,7 @@ export const BillingView: React.FC<BillingViewProps> = ({
               </button>
             </div>
 
-            {/* Thermal Slip Visual Simulation */}
+            {/* Thermal Slip Print View */}
             <div className="bg-slate-50 border border-dashed border-slate-300 p-4 rounded-xl font-mono text-[11px] text-slate-800 space-y-2 shadow-inner">
               {/* Slip Header */}
               <div className="text-center space-y-0.5 border-b border-dashed border-slate-300 pb-2">

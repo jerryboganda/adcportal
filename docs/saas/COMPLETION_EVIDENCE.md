@@ -1,5 +1,51 @@
 # COMPLETION_EVIDENCE — SaaS re-engineering program (2026-09-14, re-verified 2026-09-15)
 
+## 2026-09-15 — full frontend↔backend product-integrity audit (gap-matrix rows 22–31)
+
+A fresh, repository-wide audit pass (frontend action inventory → API client registry →
+route registry → controller/service/DB trace, both directions) found and repaired ten
+more integrity gaps. Details per row in `SAAS_GAP_MATRIX.md` (rows 22–31). Highlights:
+
+- **Money**: the cashier's cash discount never reached the API (dropped in the app
+  shell) — now persisted as `invoices.manual_discount` and folded into the unified
+  `Invoice::recalculateTotals()`; the balance check moved inside the payment
+  transaction with `lockForUpdate` (POS double-spend race).
+- **Reports**: drafts duplicated on every save (`PUT /reports/{id}` had no consumer);
+  addenda were spliced into signed findings; previews fabricated signatures; official
+  PDFs were client-rendered while the server PDF endpoints starved. All repaired.
+- **Pipeline**: `acquired → reading` was legal but unreachable from HTTP — "Verify QC
+  & Push" now performs the real audited `send_to_reading` transition and `reading_at`
+  is stamped honestly; queue-board calls persist (`called_at`) so all terminals agree.
+- **Clinical honesty**: dose capture no longer pre-fills invented measurements
+  (7.8 mGy / DLP 345 / kVp 120 …); screening answers with foreign question ids now 422
+  (they used to be skipped — silently CLEARING the safety gate); `modalityId`/
+  `appointmentId`/SKU-code validations are tenant-scoped; service deletion is
+  reference-guarded (the FK is `ON DELETE CASCADE`).
+- **Reminders**: the scheduled `app:appointment-reminder` could never work (d-m-Y
+  parsing of Y-m-d dates, exact-minute matching, missing settings key crash, missing
+  mail blade, queued mail on a workerless host). Rewritten: opt-in per clinic
+  (`sendAppointmentReminders` + `reminderHours` in Settings), idempotent via
+  `reminder_sent_at`, placeholder `@patients.local` addresses never mailed, send is
+  synchronous, audited.
+- **Honesty sweep**: customer accounts blocked from the staff portal at login;
+  notification writes roll back on failure; lock persists across reload; sound toggle
+  chimes on real notifications; presence picker removed; KPI slogans derived from
+  data; commission rate is a configurable clinic setting; booking defers
+  token/MRN/room to the server; real Code128 barcodes (jsbarcode) replace decorative
+  stripes; staff provisioning wrapped in transactions; latent `module` singleton
+  binding (nonexistent class) removed; dead schedules/limiters/middleware cleaned.
+
+**CI evidence**: runs **#120 → #123** (commits `c2dca6d` → `427ccb8` → `5accf8c` →
+`b7d4414`). #120 exposed five defects in the new `IntegrityRepairTest` itself (wrong
+status-code assertions, a test that booked without the pipeline, and — instructive —
+the seeded `ris_clinic_profile` row shadowing the test's settings insert; the
+Customer→User relation is named `customer()`), #121/#122 were frontend type/lockfile
+sync fixes (jsbarcode lock entry added by hand from registry metadata — no local npm
+execution). **Final: run #123 on `b7d4414`, all four jobs ✅ (backend feature suite
+incl. the 12 new `IntegrityRepairTest` suites, SPA typecheck+build, Playwright E2E,
+Deliver to Hostinger ✅ — production ran `git pull`, `composer install --no-dev`,
+`migrate --force` (the expand-only column migration), `config:cache`).**
+
 ## 2026-09-15 — localhost deployment rehearsal (and the defect it exposed)
 
 Standing the app up locally for the first time since this work landed (SQLite, `php artisan
