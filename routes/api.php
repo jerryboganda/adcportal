@@ -10,6 +10,7 @@ use App\Http\Controllers\Api\V1\Platform\PlatformAuditController;
 use App\Http\Controllers\Api\V1\Platform\PlatformBrandingController;
 use App\Http\Controllers\Api\V1\Platform\PlatformInfrastructureController;
 use App\Http\Controllers\Api\V1\Platform\PlatformIntegrationController;
+use App\Http\Controllers\Api\V1\Platform\PlatformOperationsController;
 use App\Http\Controllers\Api\V1\Platform\PlatformOverviewController;
 use App\Http\Controllers\Api\V1\Platform\PlatformPlanController;
 use App\Http\Controllers\Api\V1\Platform\PlatformSupportSessionController;
@@ -46,7 +47,7 @@ Route::prefix('v1')->group(function () {
             'ok' => $db === 'ok',
             'db' => $db,
             'time' => now()->toIso8601String(),
-            'version' => 'v2-saas',
+            'version' => config('ris.app_version'),
         ]);
     });
 
@@ -204,6 +205,14 @@ Route::middleware(['auth', 'platform'])->prefix('platform')->group(function () {
     Route::post('/tenants/{tenant}/integrations/{integration}/secrets', [PlatformIntegrationController::class, 'rotateSecrets'])->whereNumber('tenant')->whereNumber('integration');
     Route::post('/tenants/{tenant}/integrations/{integration}/probe', [PlatformIntegrationController::class, 'probe'])->whereNumber('tenant')->whereNumber('integration');
     Route::delete('/tenants/{tenant}/integrations/{integration}', [PlatformIntegrationController::class, 'destroy'])->whereNumber('tenant')->whereNumber('integration');
+
+    // Operations & observability: system + tenant health, failed-job
+    // inspection/retry, entitlement reconciliation (§80/§81)
+    Route::get('/operations', [PlatformOperationsController::class, 'index']);
+    Route::get('/operations/jobs', [PlatformOperationsController::class, 'jobs']);
+    Route::post('/operations/jobs/{uuid}/retry', [PlatformOperationsController::class, 'retryJob']);
+    Route::delete('/operations/jobs/{uuid}', [PlatformOperationsController::class, 'forgetJob']);
+    Route::post('/tenants/{tenant}/entitlements/reconcile', [PlatformOperationsController::class, 'reconcileEntitlements'])->whereNumber('tenant');
 
     // Plans
     Route::get('/plans', [PlatformPlanController::class, 'index']);

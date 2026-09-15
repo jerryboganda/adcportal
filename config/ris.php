@@ -4,6 +4,20 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Application version
+    |--------------------------------------------------------------------------
+    |
+    | The build identifier reported by /api/v1/health and by the platform
+    | observability dashboard (§80: "which deployment versions exist?"). One
+    | source of truth, so an operator reading the dashboard sees exactly the
+    | version the health endpoint reports.
+    |
+    */
+
+    'app_version' => env('RIS_APP_VERSION', 'v2-saas'),
+
+    /*
+    |--------------------------------------------------------------------------
     | Demo environment
     |--------------------------------------------------------------------------
     |

@@ -533,6 +533,139 @@ export interface InfrastructureSummary {
   unplacedTenants: number;
 }
 
+/** Per-tenant health verdict from the observability dashboard (§80). */
+export type TenantHealth = 'ok' | 'degraded' | 'critical';
+
+export interface QuotaPressure {
+  used: number | null;
+  limit: number | null;
+  percent: number | null;
+  nearLimit: boolean;
+  exceeded: boolean;
+}
+
+export interface TenantHealthRow {
+  tenantId: number;
+  name: string;
+  tenantCode: string | null;
+  subscriptionStatus: string;
+  trialEndsAt: string | null;
+  subscriptionEndsAt: string | null;
+  region: string | null;
+  deploymentStamp: string | null;
+  isolationProfile: string | null;
+  health: TenantHealth;
+  reasons: string[];
+  integrations: number;
+  failingIntegrations: number;
+  unconfiguredIntegrations: number;
+  usage: { users: number; facilities: number; studiesThisMonth: number };
+  limits: {
+    maxUsers: number | null;
+    maxStudiesPerMonth: number | null;
+    maxStorageMb: number | null;
+    maxLocations: number | null;
+  };
+  quotas: Record<'users' | 'studies' | 'locations' | 'storage', QuotaPressure>;
+  quotasBreached: string[];
+  quotasApproaching: string[];
+  storageBytes: number | null;
+}
+
+export interface DeploymentHealth {
+  region: string | null;
+  deploymentStamp: string | null;
+  isolationProfile: string | null;
+  tenants: number;
+  degraded: number;
+  critical: number;
+}
+
+export interface PlatformSystemHealth {
+  database: string;
+  cacheStore: string;
+  queueConnection: string;
+  failedJobDriver: string;
+  pendingJobs: number;
+  oldestPendingJobAt: string | null;
+  failedJobs: number;
+  storageWritable: boolean;
+  appEnv: string;
+  appVersion: string;
+  lastLifecycleEventAt: string | null;
+  lastLifecycleEvent: string | null;
+  checkedAt: string;
+}
+
+export interface PlatformOperationsPayload {
+  system: PlatformSystemHealth;
+  totalTenants: number;
+  returned: number;
+  storageBasis: string;
+  summary: {
+    total: number;
+    ok: number;
+    degraded: number;
+    critical: number;
+    failingIntegrations: number;
+    quotaBreaches: number;
+  };
+  tenants: TenantHealthRow[];
+  deployments: DeploymentHealth[];
+  provisioningStuck: TenantHealthRow[];
+}
+
+/** A failed background job. The payload itself is never sent (§81). */
+export interface FailedJobRecord {
+  id: string;
+  uuid: string;
+  queue: string | null;
+  connection: string | null;
+  jobClass: string | null;
+  attempts: number;
+  failedAt: string | null;
+  exceptionType: string | null;
+  exceptionSummary: string | null;
+  payloadBytes: number;
+  payloadPropertyNames: string[];
+}
+
+export interface FailedJobsPayload {
+  jobs: FailedJobRecord[];
+  limit: number;
+  system: PlatformSystemHealth;
+}
+
+export interface FailedJobRetryResult {
+  uuid: string;
+  requeued: boolean;
+  exitCode: number;
+  output: string;
+  job: FailedJobRecord | null;
+}
+
+export interface EntitlementReconciliationRow {
+  feature: string;
+  override: boolean;
+  plan: boolean | null;
+  platformDefault: boolean | null;
+  effective: boolean;
+  state: 'stale' | 'redundant' | 'overrides-plan' | 'override-without-plan';
+}
+
+export interface EntitlementReconciliation {
+  catalog: string[];
+  planFeatures: Record<string, boolean>;
+  overrides: EntitlementReconciliationRow[];
+  stale: string[];
+  redundant: string[];
+  contradicting: string[];
+  effective: Record<string, boolean>;
+  pruned: string[];
+  driftDetected: boolean;
+  applied: boolean;
+}
+
 /** Presentation-only white-label overrides (master-prompt §37). */
 export interface TenantBranding {
   appName: string;

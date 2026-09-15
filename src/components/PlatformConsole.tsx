@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Activity, Archive, ArrowLeft, BarChart3, Building2, CheckCircle2, ChevronRight, Copy, CreditCard,
-  Download, KeyRound, LifeBuoy, LogOut, Pause, Pencil, Play, Plus, RefreshCw, RotateCcw, ScrollText,
+  Download, HeartPulse, KeyRound, LifeBuoy, LogOut, Pause, Pencil, Play, Plus, RefreshCw, RotateCcw, ScrollText,
   Search, Server, ShieldCheck, Trash2, Users as UsersIcon, XCircle,
 } from 'lucide-react';
 import * as api from '../services/apiService';
@@ -9,9 +9,12 @@ import { SessionUser } from '../services/apiService';
 import {
   DeploymentCatalog,
   Entitlements,
+  EntitlementReconciliation,
+  FailedJobsPayload,
   InfrastructureSummary,
   Plan,
   PlatformAuditEntry,
+  PlatformOperationsPayload,
   PlatformOverviewStats,
   PlatformRole,
   PlatformSupportSessionRecord,
@@ -20,6 +23,7 @@ import {
   TenantBranding,
   TenantBrandingPayload,
   TenantFacilityRecord,
+  TenantHealth,
   TenantIntegrationRecord,
   TenantIntegrationsPayload,
   TenantLifecycleEntry,
@@ -36,7 +40,7 @@ import {
  * capabilities; this UI only mirrors what the role already holds.
  */
 
-type Section = 'overview' | 'tenants' | 'plans' | 'usage' | 'infrastructure' | 'support' | 'users' | 'audit';
+type Section = 'overview' | 'tenants' | 'plans' | 'usage' | 'infrastructure' | 'operations' | 'support' | 'users' | 'audit';
 
 const ROLE_CAPABILITIES: Record<string, string[]> = {
   super_admin: ['*'],
@@ -121,6 +125,7 @@ export const PlatformConsole: React.FC<{
     { key: 'plans', label: 'Plans', icon: <CreditCard size={15} /> },
     { key: 'usage', label: 'Usage', icon: <BarChart3 size={15} /> },
     { key: 'infrastructure', label: 'Infrastructure', icon: <Server size={15} /> },
+    { key: 'operations', label: 'Operations', icon: <HeartPulse size={15} /> },
     { key: 'support', label: 'Support Sessions', icon: <LifeBuoy size={15} /> },
     { key: 'users', label: 'Platform Users', icon: <ShieldCheck size={15} /> },
     { key: 'audit', label: 'Audit', icon: <ScrollText size={15} /> },
@@ -187,6 +192,7 @@ export const PlatformConsole: React.FC<{
             {section === 'plans' && <PlansSection notify={notify} fail={fail} />}
             {section === 'usage' && <UsageSection notify={notify} fail={fail} />}
             {section === 'infrastructure' && <InfrastructureSection user={user} notify={notify} fail={fail} />}
+            {section === 'operations' && <OperationsSection user={user} notify={notify} fail={fail} />}
             {section === 'support' && <SupportSection user={user} onEnterTenant={onEnterTenant} notify={notify} fail={fail} />}
             {section === 'users' && <PlatformUsersSection user={user} notify={notify} fail={fail} />}
             {section === 'audit' && <AuditSection notify={notify} fail={fail} />}
@@ -896,6 +902,366 @@ const TenantDetail: React.FC<{
  * must pass DNS verification before it serves that brand, and a host never
  * grants access to tenant data (the tenant is always resolved from the session).
  */
+// ==================== platform operations (master-prompt §80/§81) ====================
+
+/** Health verdict badge for the fleet rollup. */
+const HEALTH_STYLES: Record<TenantHealth, string> = {
+  ok: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+  degraded: 'bg-amber-50 text-amber-700 border-amber-200',
+  critical: 'bg-rose-50 text-rose-700 border-rose-200',
+};
+
+function HealthBadge({ health }: { health: TenantHealth }) {
+  return (
+    <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-semibold capitalize ${HEALTH_STYLES[health] ?? HEALTH_STYLES.ok}`}>
+      {health}
+    </span>
+  );
+}
+
+/** Quota read-out that distinguishes "unlimited" from "not measured here". */
+function fmtQuota(q: { used: number | null; limit: number | null; percent: number | null }): string {
+  if (q.limit === null) return 'unlimited';
+  if (q.used === null) return 'not measured';
+  return `${q.used} / ${q.limit}${q.percent !== null ? ` · ${q.percent}%` : ''}`;
+}
+
+/**
+ * Operations: what is actually happening across the fleet (§80) and the tools
+ * to act on it (§81). Every number comes from the server's own measurement —
+ * nothing here is inferred client-side.
+ */
+const OperationsSection: React.FC<{
+  user: SessionUser;
+  notify: (k: 'error' | 'success', m: string) => void;
+  fail: (e: any, f: string) => void;
+}> = ({ user, notify, fail }) => {
+  const [data, setData] = useState<PlatformOperationsPayload | null>(null);
+  const [jobs, setJobs] = useState<FailedJobsPayload | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [busyUuid, setBusyUuid] = useState<string | null>(null);
+  const [recon, setRecon] = useState<{ tenantId: number; report: EntitlementReconciliation } | null>(null);
+  const [reconBusy, setReconBusy] = useState(false);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const [operations, failed] = await Promise.all([api.fetchPlatformOperations(), api.fetchFailedJobs()]);
+      setData(operations);
+      setJobs(failed);
+    } catch (err) {
+      fail(err, 'Failed to load platform operations.');
+    } finally {
+      setLoading(false);
+    }
+  }, [fail]);
+
+  useEffect(() => { load(); }, [load]);
+
+  const canManage = can(user, 'operations.manage');
+
+  const retryJob = async (uuid: string) => {
+    setBusyUuid(uuid);
+    try {
+      const result = await api.retryFailedJob(uuid);
+      notify(
+        result.requeued ? 'success' : 'error',
+        result.requeued ? 'Job pushed back onto the queue.' : `Retry did not complete: ${result.output || 'no output'}`,
+      );
+      await load();
+    } catch (err) {
+      fail(err, 'Failed to retry the job.');
+    } finally {
+      setBusyUuid(null);
+    }
+  };
+
+  const forgetJob = async (uuid: string) => {
+    setBusyUuid(uuid);
+    try {
+      await api.forgetFailedJob(uuid);
+      notify('success', 'Failed job discarded.');
+      await load();
+    } catch (err) {
+      fail(err, 'Failed to discard the job.');
+    } finally {
+      setBusyUuid(null);
+    }
+  };
+
+  const reconcile = async (tenantId: number, apply: boolean) => {
+    setReconBusy(true);
+    try {
+      const report = await api.reconcileTenantEntitlements(String(tenantId), apply);
+      setRecon({ tenantId, report });
+      if (apply) notify('success', `Reconciled — ${report.pruned.length} stale override(s) pruned.`);
+    } catch (err) {
+      fail(err, 'Failed to reconcile entitlements.');
+    } finally {
+      setReconBusy(false);
+    }
+  };
+
+  if (loading && !data) return <SectionSpinner label="Loading platform operations…" />;
+  if (!data) return <EmptyState label="Operations unavailable." onRetry={load} />;
+
+  const system = data.system;
+
+  return (
+    <div className="space-y-5">
+      <div className="flex flex-wrap items-center gap-3">
+        <h2 className="text-lg font-bold">Operations</h2>
+        <button onClick={load} className={btnGhost}><RefreshCw size={13} className={loading ? 'animate-spin' : ''} /> Refresh</button>
+        <span className="ml-auto text-xs text-slate-500">
+          Measured {fmtWhen(system.checkedAt)} · {system.appEnv} · {system.appVersion}
+        </span>
+      </div>
+
+      {data.provisioningStuck.length > 0 && (
+        <div className="rounded-lg border border-indigo-300 bg-indigo-50 px-3 py-2 text-xs text-indigo-900">
+          {data.provisioningStuck.length} tenant(s) are still provisioning — retry the provisioning step from their tenant record.
+        </div>
+      )}
+
+      {data.summary.critical > 0 && (
+        <div className="rounded-lg border border-rose-300 bg-rose-50 px-3 py-2 text-xs text-rose-900">
+          {data.summary.critical} tenant(s) need attention now: {data.summary.failingIntegrations} failing integration(s),{' '}
+          {data.summary.quotaBreaches} quota breach(es).
+        </div>
+      )}
+
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <Card label="Database" value={system.database} sub={`cache: ${system.cacheStore}`} tone={system.database === 'ok' ? 'emerald' : 'rose'} />
+        <Card label="Queue" value={system.pendingJobs} sub={`${system.queueConnection} · oldest ${fmtWhen(system.oldestPendingJobAt)}`} tone={system.pendingJobs > 0 ? 'amber' : 'slate'} />
+        <Card label="Failed jobs" value={system.failedJobs} sub={`store: ${system.failedJobDriver}`} tone={system.failedJobs > 0 ? 'rose' : 'emerald'} />
+        <Card label="Storage" value={system.storageWritable ? 'writable' : 'read-only'} sub={system.lastLifecycleEvent ? `last lifecycle: ${system.lastLifecycleEvent}` : 'no lifecycle events'} tone={system.storageWritable ? 'emerald' : 'rose'} />
+        <Card label="Tenants healthy" value={`${data.summary.ok} / ${data.summary.total}`} tone="emerald" />
+        <Card label="Degraded" value={data.summary.degraded} tone={data.summary.degraded > 0 ? 'amber' : 'slate'} />
+        <Card label="Critical" value={data.summary.critical} tone={data.summary.critical > 0 ? 'rose' : 'slate'} />
+        <Card label="Failing integrations" value={data.summary.failingIntegrations} tone={data.summary.failingIntegrations > 0 ? 'rose' : 'slate'} />
+      </div>
+
+      <div className="rounded-xl border border-slate-200 bg-white">
+        <div className="flex items-center gap-3 border-b border-slate-200 px-4 py-3">
+          <h3 className="text-sm font-bold text-slate-800">Tenant health</h3>
+          <span className="text-xs text-slate-500">
+            Worst first · {data.returned} of {data.totalTenants} shown · storage {data.storageBasis}
+          </span>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-slate-200 bg-slate-50 text-left text-[11px] uppercase tracking-wide text-slate-500">
+                <th className="px-4 py-2.5 font-semibold">Tenant</th>
+                <th className="px-4 py-2.5 font-semibold">Health</th>
+                <th className="px-4 py-2.5 font-semibold">Placement</th>
+                <th className="px-4 py-2.5 font-semibold">Integrations</th>
+                <th className="px-4 py-2.5 font-semibold">Quotas</th>
+                <th className="px-4 py-2.5 font-semibold">Why</th>
+                {canManage && <th className="px-4 py-2.5 font-semibold">Entitlements</th>}
+              </tr>
+            </thead>
+            <tbody>
+              {data.tenants.map(row => (
+                <tr key={row.tenantId} className="border-b border-slate-100 last:border-0 align-top">
+                  <td className="px-4 py-3">
+                    <p className="font-semibold text-slate-800">{row.name}</p>
+                    <p className="text-[11px] text-slate-500">{row.tenantCode ?? '—'} · <StatusBadge status={row.subscriptionStatus} /></p>
+                  </td>
+                  <td className="px-4 py-3"><HealthBadge health={row.health} /></td>
+                  <td className="px-4 py-3 text-xs text-slate-600">
+                    {row.region ?? '—'} / {row.deploymentStamp ?? '—'}
+                    <p className="text-[11px] text-slate-400">{row.isolationProfile ?? 'unplaced'}</p>
+                  </td>
+                  <td className="px-4 py-3 text-xs text-slate-600">
+                    {row.integrations === 0 ? '—' : (
+                      <>
+                        <span className="tabular-nums">{row.integrations}</span> total
+                        {row.failingIntegrations > 0 && <p className="text-rose-600">{row.failingIntegrations} failing</p>}
+                        {row.unconfiguredIntegrations > 0 && <p className="text-amber-600">{row.unconfiguredIntegrations} unconfigured</p>}
+                      </>
+                    )}
+                  </td>
+                  <td className="px-4 py-3 text-xs text-slate-600">
+                    <p>users {fmtQuota(row.quotas.users)}</p>
+                    <p>studies {fmtQuota(row.quotas.studies)}</p>
+                    <p>
+                      storage {row.storageBytes === null ? 'not measured' : fmtBytes(row.storageBytes)}
+                      {row.quotas.storage.limit !== null && ` of ${fmtBytes(row.quotas.storage.limit)}`}
+                    </p>
+                  </td>
+                  <td className="px-4 py-3 text-xs text-slate-600">
+                    {row.reasons.length === 0 ? <span className="text-slate-400">healthy</span> : (
+                      <ul className="list-disc space-y-0.5 pl-4">
+                        {row.reasons.map((reason, index) => <li key={index}>{reason}</li>)}
+                      </ul>
+                    )}
+                  </td>
+                  {canManage && (
+                    <td className="px-4 py-3">
+                      <button disabled={reconBusy} onClick={() => reconcile(row.tenantId, false)} className={btnGhost}>
+                        Reconcile
+                      </button>
+                    </td>
+                  )}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {recon && (
+        <div className="rounded-xl border border-slate-200 bg-white p-4 space-y-3">
+          <div className="flex flex-wrap items-center gap-3">
+            <h3 className="text-sm font-bold text-slate-800">
+              Entitlement reconciliation — {data.tenants.find(t => t.tenantId === recon.tenantId)?.name ?? `tenant ${recon.tenantId}`}
+            </h3>
+            <button onClick={() => setRecon(null)} className={btnGhost}>Close</button>
+            {recon.report.stale.length > 0 && (
+              <button disabled={reconBusy} onClick={() => reconcile(recon.tenantId, true)} className={btnPrimary}>
+                Prune {recon.report.stale.length} stale override(s)
+              </button>
+            )}
+            {recon.report.applied && (
+              <span className="text-xs text-emerald-700">Applied — {recon.report.pruned.length} pruned.</span>
+            )}
+          </div>
+          <p className="text-xs text-slate-500">
+            Overrides that contradict the plan are reported, never removed: they are a commercial decision.
+          </p>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-slate-200 bg-slate-50 text-left text-[11px] uppercase tracking-wide text-slate-500">
+                  <th className="px-3 py-2 font-semibold">Feature</th>
+                  <th className="px-3 py-2 font-semibold">Override</th>
+                  <th className="px-3 py-2 font-semibold">Plan</th>
+                  <th className="px-3 py-2 font-semibold">Platform default</th>
+                  <th className="px-3 py-2 font-semibold">Effective</th>
+                  <th className="px-3 py-2 font-semibold">State</th>
+                </tr>
+              </thead>
+              <tbody>
+                {recon.report.overrides.map(row => (
+                  <tr key={row.feature} className="border-b border-slate-100 last:border-0">
+                    <td className="px-3 py-2 font-medium text-slate-700">{row.feature}</td>
+                    <td className="px-3 py-2">{row.override ? 'on' : 'off'}</td>
+                    <td className="px-3 py-2">{row.plan === null ? '—' : row.plan ? 'on' : 'off'}</td>
+                    <td className="px-3 py-2">{row.platformDefault === null ? '—' : row.platformDefault ? 'on' : 'off'}</td>
+                    <td className="px-3 py-2">{row.effective ? 'on' : 'off'}</td>
+                    <td className={`px-3 py-2 text-xs ${row.state === 'stale' ? 'text-rose-600' : row.state === 'redundant' ? 'text-amber-600' : 'text-slate-600'}`}>
+                      {row.state}
+                    </td>
+                  </tr>
+                ))}
+                {recon.report.overrides.length === 0 && (
+                  <tr><td colSpan={6} className="px-3 py-4 text-center text-xs text-slate-500">No overrides stored for this tenant.</td></tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      <div className="grid gap-3 lg:grid-cols-2">
+        <div className="rounded-xl border border-slate-200 bg-white">
+          <div className="border-b border-slate-200 px-4 py-3">
+            <h3 className="text-sm font-bold text-slate-800">Deployment health</h3>
+            <p className="text-xs text-slate-500">Which region or stamp is affected.</p>
+          </div>
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-slate-200 bg-slate-50 text-left text-[11px] uppercase tracking-wide text-slate-500">
+                <th className="px-4 py-2 font-semibold">Region / stamp</th>
+                <th className="px-4 py-2 font-semibold">Tenants</th>
+                <th className="px-4 py-2 font-semibold">Degraded</th>
+                <th className="px-4 py-2 font-semibold">Critical</th>
+              </tr>
+            </thead>
+            <tbody>
+              {data.deployments.map(d => (
+                <tr key={`${d.region}/${d.deploymentStamp}`} className="border-b border-slate-100 last:border-0">
+                  <td className="px-4 py-2 text-slate-700">
+                    {d.region ?? '—'} / {d.deploymentStamp ?? '—'}
+                    <p className="text-[11px] text-slate-400">{d.isolationProfile ?? 'unplaced'}</p>
+                  </td>
+                  <td className="px-4 py-2 tabular-nums">{d.tenants}</td>
+                  <td className={`px-4 py-2 tabular-nums ${d.degraded ? 'text-amber-600' : 'text-slate-400'}`}>{d.degraded}</td>
+                  <td className={`px-4 py-2 tabular-nums ${d.critical ? 'text-rose-600' : 'text-slate-400'}`}>{d.critical}</td>
+                </tr>
+              ))}
+              {data.deployments.length === 0 && (
+                <tr><td colSpan={4} className="px-4 py-6 text-center text-xs text-slate-500">No tenants placed yet.</td></tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+
+        <div className="rounded-xl border border-slate-200 bg-white">
+          <div className="border-b border-slate-200 px-4 py-3">
+            <h3 className="text-sm font-bold text-slate-800">Failed background jobs</h3>
+            <p className="text-xs text-slate-500">
+              Payloads are never shown — only the job class, the exception and the property names it carries.
+            </p>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-slate-200 bg-slate-50 text-left text-[11px] uppercase tracking-wide text-slate-500">
+                  <th className="px-4 py-2 font-semibold">Job</th>
+                  <th className="px-4 py-2 font-semibold">Failure</th>
+                  {canManage && <th className="px-4 py-2 font-semibold">Actions</th>}
+                </tr>
+              </thead>
+              <tbody>
+                {(jobs?.jobs ?? []).map(job => (
+                  <tr key={job.uuid} className="border-b border-slate-100 last:border-0 align-top">
+                    <td className="px-4 py-3">
+                      <p className="font-medium text-slate-800 break-all">{job.jobClass ?? 'unknown job'}</p>
+                      <p className="text-[11px] text-slate-500">
+                        queue {job.queue ?? '—'} · {job.attempts} attempt(s) · {fmtWhen(job.failedAt)}
+                      </p>
+                      {job.payloadPropertyNames.length > 0 && (
+                        <p className="mt-1 text-[11px] text-slate-400 break-all">
+                          payload properties: {job.payloadPropertyNames.join(', ')}
+                        </p>
+                      )}
+                    </td>
+                    <td className="px-4 py-3">
+                      <p className="text-xs font-semibold text-rose-600">{job.exceptionType ?? 'Exception'}</p>
+                      <p className="text-[11px] text-slate-600 break-all">{job.exceptionSummary ?? '—'}</p>
+                    </td>
+                    {canManage && (
+                      <td className="px-4 py-3">
+                        <div className="flex flex-col gap-1.5">
+                          <button disabled={busyUuid === job.uuid} onClick={() => retryJob(job.uuid)} className={btnPrimary}>
+                            <RotateCcw size={12} /> Retry
+                          </button>
+                          <button disabled={busyUuid === job.uuid} onClick={() => forgetJob(job.uuid)} className={btnGhost}>
+                            <Trash2 size={12} /> Discard
+                          </button>
+                        </div>
+                      </td>
+                    )}
+                  </tr>
+                ))}
+                {(jobs?.jobs ?? []).length === 0 && (
+                  <tr>
+                    <td colSpan={canManage ? 3 : 2} className="px-4 py-6 text-center text-xs text-slate-500">
+                      No failed jobs. Nothing is stuck.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 // ==================== deployment topology ====================
 
 /**

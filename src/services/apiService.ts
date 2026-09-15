@@ -10,6 +10,9 @@ import {
   DoctorDispatchLog,
   DoseLog,
   Entitlements,
+  EntitlementReconciliation,
+  FailedJobRetryResult,
+  FailedJobsPayload,
   InfrastructureSummary,
   InventoryItem,
   InventoryTransaction,
@@ -43,6 +46,7 @@ import {
   TenantRecord,
   TenantUserRecord,
   PublicTenantContext,
+  PlatformOperationsPayload,
   UsageSummary,
 } from '../types';
 
@@ -709,6 +713,33 @@ export async function updateTenantSubscription(id: string, updates: { name?: str
 
 export async function fetchInfrastructure(): Promise<InfrastructureSummary> {
   const { data } = await http.get('/platform/infrastructure');
+  return data.data;
+}
+
+// ==================== platform: operations & observability (§80/§81) ====================
+
+export async function fetchPlatformOperations(): Promise<PlatformOperationsPayload> {
+  const { data } = await http.get('/platform/operations');
+  return data.data;
+}
+
+export async function fetchFailedJobs(limit = 25): Promise<FailedJobsPayload> {
+  const { data } = await http.get('/platform/operations/jobs', { params: { limit } });
+  return data.data;
+}
+
+export async function retryFailedJob(uuid: string): Promise<FailedJobRetryResult> {
+  const { data } = await http.post(`/platform/operations/jobs/${uuid}/retry`);
+  return data.data;
+}
+
+export async function forgetFailedJob(uuid: string): Promise<{ uuid: string; removed: boolean }> {
+  const { data } = await http.delete(`/platform/operations/jobs/${uuid}`);
+  return data.data;
+}
+
+export async function reconcileTenantEntitlements(tenantId: string, apply = false): Promise<EntitlementReconciliation> {
+  const { data } = await http.post(`/platform/tenants/${tenantId}/entitlements/reconcile`, { apply });
   return data.data;
 }
 
