@@ -37,6 +37,7 @@ import {
   TenantBranding,
   TenantBrandingPayload,
   TenantDomainRecord,
+  TenantIntegrationsPayload,
   TenantFacilityRecord,
   TenantMembership,
   TenantRecord,
@@ -762,6 +763,55 @@ export async function deleteTenantDomain(id: string, domainId: string): Promise<
 export async function fetchPublicTenantContext(host?: string): Promise<PublicTenantContext> {
   const { data } = await http.get('/tenant-context', { params: host ? { host } : undefined });
   return data.data.branding;
+}
+
+// ==================== platform: tenant integration registry ====================
+
+export async function fetchTenantIntegrations(tenantId: string): Promise<TenantIntegrationsPayload> {
+  const { data } = await http.get(`/platform/tenants/${tenantId}/integrations`);
+  return data.data;
+}
+
+export async function createTenantIntegration(tenantId: string, input: {
+  type: string;
+  name: string;
+  facilityId?: string | null;
+  config?: Record<string, string>;
+  secrets?: Record<string, string>;
+}): Promise<TenantIntegrationsPayload> {
+  const { data } = await http.post(`/platform/tenants/${tenantId}/integrations`, {
+    ...input,
+    facilityId: input.facilityId ? Number(input.facilityId) : undefined,
+  });
+  return data.data;
+}
+
+export async function updateTenantIntegration(tenantId: string, integrationId: string, input: {
+  name?: string;
+  facilityId?: string | null;
+  config?: Record<string, string>;
+  secrets?: Record<string, string>;
+}): Promise<TenantIntegrationsPayload> {
+  const { data } = await http.patch(`/platform/tenants/${tenantId}/integrations/${integrationId}`, {
+    ...input,
+    facilityId: input.facilityId === undefined ? undefined : (input.facilityId ? Number(input.facilityId) : null),
+  });
+  return data.data;
+}
+
+export async function rotateTenantIntegrationSecrets(tenantId: string, integrationId: string, secrets: Record<string, string>): Promise<TenantIntegrationsPayload> {
+  const { data } = await http.post(`/platform/tenants/${tenantId}/integrations/${integrationId}/secrets`, { secrets });
+  return data.data;
+}
+
+export async function probeTenantIntegration(tenantId: string, integrationId: string): Promise<TenantIntegrationsPayload> {
+  const { data } = await http.post(`/platform/tenants/${tenantId}/integrations/${integrationId}/probe`);
+  return data.data;
+}
+
+export async function deleteTenantIntegration(tenantId: string, integrationId: string): Promise<TenantIntegrationsPayload> {
+  const { data } = await http.delete(`/platform/tenants/${tenantId}/integrations/${integrationId}`);
+  return data.data;
 }
 
 // ==================== platform: tenant user administration ====================

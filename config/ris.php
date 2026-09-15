@@ -107,6 +107,79 @@ return [
         // override can withhold them from lower tiers.
         'branding' => true,
         'custom_domains' => true,
+        // Healthcare interoperability + tenant messaging integrations (§33).
+        'interop' => true,
+        'notifications' => true,
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Tenant integration registry (§33/§44)
+    |--------------------------------------------------------------------------
+    |
+    | The integration types this product actually implements, each mapped to the
+    | entitlement that unlocks it, the keys it must be configured with, and how
+    | its health is checked:
+    |
+    |   tcp    — real socket reachability probe to host:port
+    |   http   — real HTTP request to the configured URL
+    |   config — configuration completeness check only (no live send is faked)
+    |
+    | `secrets` are stored encrypted at rest (Laravel `encrypted:array`) and are
+    | never returned by the API — only their presence and a mask.
+    |
+    */
+
+    'integrations' => [
+        'dicom' => [
+            'label' => 'PACS / DICOM node',
+            'feature' => 'dicom',
+            'probe' => 'tcp',
+            'required' => ['host', 'port', 'aeTitle'],
+            'secrets' => [],
+        ],
+        'hl7' => [
+            'label' => 'HL7 v2 / MLLP endpoint',
+            'feature' => 'interop',
+            'probe' => 'tcp',
+            'required' => ['host', 'port'],
+            'secrets' => [],
+        ],
+        'fhir' => [
+            'label' => 'FHIR server',
+            'feature' => 'interop',
+            'probe' => 'http',
+            'required' => ['baseUrl'],
+            'secrets' => ['clientId', 'clientSecret'],
+        ],
+        'webhook' => [
+            'label' => 'Outbound webhook',
+            'feature' => 'interop',
+            'probe' => 'http',
+            'required' => ['url'],
+            'secrets' => ['signingSecret'],
+        ],
+        'sms' => [
+            'label' => 'SMS gateway',
+            'feature' => 'notifications',
+            'probe' => 'config',
+            'required' => ['provider'],
+            'secrets' => ['apiKey', 'senderId'],
+        ],
+        'email' => [
+            'label' => 'Outbound email (SMTP)',
+            'feature' => 'notifications',
+            'probe' => 'config',
+            'required' => ['host', 'port', 'fromAddress'],
+            'secrets' => ['username', 'password'],
+        ],
+        'whatsapp' => [
+            'label' => 'WhatsApp Business',
+            'feature' => 'notifications',
+            'probe' => 'config',
+            'required' => ['phoneNumberId'],
+            'secrets' => ['accessToken'],
+        ],
     ],
 
     /*

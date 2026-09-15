@@ -20,6 +20,8 @@ import {
   TenantBranding,
   TenantBrandingPayload,
   TenantFacilityRecord,
+  TenantIntegrationRecord,
+  TenantIntegrationsPayload,
   TenantLifecycleEntry,
   TenantRecord,
   TenantUserRecord,
@@ -569,7 +571,7 @@ const TenantDetail: React.FC<{
       )}
 
       <div className="flex gap-1 overflow-x-auto border-b border-slate-200">
-        {(['overview', 'users', 'facilities', 'deployment', 'branding', 'lifecycle', 'audit', 'features'] as const).map(t => (
+        {(['overview', 'users', 'facilities', 'deployment', 'branding', 'integrations', 'lifecycle', 'audit', 'features'] as const).map(t => (
           <button
             key={t}
             onClick={() => setTab(t)}
@@ -833,6 +835,8 @@ const TenantDetail: React.FC<{
       {tab === 'deployment' && <DeploymentTab tenant={tenant} user={user} onChanged={load} notify={notify} fail={fail} />}
 
       {tab === 'branding' && <BrandingTab tenant={tenant} user={user} notify={notify} fail={fail} />}
+
+      {tab === 'integrations' && <IntegrationsTab tenant={tenant} user={user} notify={notify} fail={fail} />}
 
       {tab === 'features' && <FeatureOverridesTab tenant={tenant} onChanged={load} notify={notify} fail={fail} />}
 
@@ -1258,6 +1262,228 @@ const BrandingTab: React.FC<{
           </div>
         )}
       </div>
+    </div>
+  );
+};
+
+// ==================== tenant integrations ====================
+
+const INTEGRATION_STATUS_STYLES: Record<string, string> = {
+  active: 'border-emerald-200 bg-emerald-50 text-emerald-700',
+  error: 'border-rose-200 bg-rose-50 text-rose-700',
+  unconfigured: 'border-amber-200 bg-amber-50 text-amber-700',
+  disabled: 'border-slate-200 bg-slate-50 text-slate-600',
+};
+
+/**
+ * Tenant integration registry. Credentials are write-only: the API returns a
+ * mask, never a value, so rotating a secret means typing a new one.
+ * Health checks are real — the button reports exactly what the probe did.
+ */
+const IntegrationsTab: React.FC<{
+  tenant: Tenant360;
+  user: SessionUser;
+  notify: (k: 'error' | 'success', m: string) => void;
+  fail: (e: any, f: string) => void;
+}> = ({ tenant, user, notify, fail }) => {
+  const [payload, setPayload] = useState<TenantIntegrationsPayload | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [creating, setCreating] = useState(false);
+  const [type, setType] = useState('');
+  const [name, setName] = useState('');
+  const [facilityId, setFacilityId] = useState('');
+  const [config, setConfig] = useState<Record<string, string>>({});
+  const [secrets, setSecrets] = useState<Record<string, string>>({});
+  const [rotateFor, setRotateFor] = useState<TenantIntegrationRecord | null>(null);
+  const [rotateValues, setRotateValues] = useState<Record<string, string>>({});
+
+  const load = useCallback(async () => {
+    try {
+      setPayload(await api.fetchTenantIntegrations(tenant.id));
+    } catch (err) {
+      fail(err, 'Failed to load integrations.');
+    }
+  }, [tenant.id, fail]);
+
+  useEffect(() => { load(); }, [load]);
+
+  if (!payload) return <SectionSpinner label="Loading integrations…" />;
+
+  const canManage = can(user, 'tenants.manage');
+  const def = payload.catalog.find(c => c.type === type) ?? null;
+  const field = 'w-full rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs focus:border-cyan-500 focus:outline-none';
+  const label = 'text-[11px] font-semibold uppercase tracking-wide text-slate-500';
+
+  const run = async (fn: () => Promise<TenantIntegrationsPayload>, ok: string) => {
+    setBusy(true);
+    try {
+      const updated = await fn();
+      setPayload(updated);
+      notify('success', ok);
+    } catch (err) {
+      fail(err, 'Integration action failed.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const create = async () => {
+    setBusy(true);
+    try {
+      const updated = await api.createTenantIntegration(tenant.id, {
+        type,
+        name: name.trim(),
+        facilityId: facilityId || null,
+        config,
+        secrets,
+      });
+      setPayload(updated);
+      notify('success', `${name.trim()} registered.`);
+      setCreating(false);
+      setName('');
+      setType('');
+      setFacilityId('');
+      setConfig({});
+      setSecrets({});
+    } catch (err) {
+      fail(err, 'Failed to create the integration.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="space-y-4">
+      <div className="flex flex-wrap items-center gap-2">
+        <p className="text-xs text-slate-500">
+          Each integration belongs to this tenant only; credentials are encrypted at rest and never returned by the API.
+        </p>
+        {canManage && (
+          <button onClick={() => setCreating(v => !v)} className={`${btnPrimarySm} ml-auto`}>
+            <Plus size={13} /> {creating ? 'Cancel' : 'Register integration'}
+          </button>
+        )}
+      </div>
+
+      {creating && (
+        <div className="rounded-xl border border-slate-200 bg-white p-4 space-y-3">
+          <div className="grid md:grid-cols-3 gap-3">
+            <label className="space-y-1"><span className={label}>Type</span>
+              <select className={field} value={type} onChange={e => { setType(e.target.value); setConfig({}); setSecrets({}); }}>
+                <option value="">— select —</option>
+                {payload.catalog.map(c => (
+                  <option key={c.type} value={c.type} disabled={c.feature ? payload.entitlements[c.feature] === false : false}>
+                    {c.label}{c.feature && payload.entitlements[c.feature] === false ? ' (entitlement off)' : ''}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="space-y-1"><span className={label}>Name</span>
+              <input className={field} value={name} onChange={e => setName(e.target.value)} placeholder="e.g. Main PACS" />
+            </label>
+            <label className="space-y-1"><span className={label}>Facility (optional)</span>
+              <select className={field} value={facilityId} onChange={e => setFacilityId(e.target.value)}>
+                <option value="">All facilities</option>
+                {tenant.facilities.map(f => <option key={f.id} value={f.id}>{f.name}</option>)}
+              </select>
+            </label>
+          </div>
+
+          {def && (
+            <>
+              <div className="grid md:grid-cols-3 gap-3">
+                {def.requiredKeys.map(key => (
+                  <label key={key} className="space-y-1"><span className={label}>{key} <span className="text-rose-500">*</span></span>
+                    <input className={field} value={config[key] ?? ''} onChange={e => setConfig({ ...config, [key]: e.target.value })} />
+                  </label>
+                ))}
+                {def.secretKeys.map(key => (
+                  <label key={key} className="space-y-1"><span className={label}>{key} (credential)</span>
+                    <input type="password" className={field} value={secrets[key] ?? ''} onChange={e => setSecrets({ ...secrets, [key]: e.target.value })} placeholder="stored encrypted" />
+                  </label>
+                ))}
+              </div>
+              <p className="text-[11px] text-slate-500">
+                Health check: <span className="font-semibold">{def.probe === 'tcp' ? 'TCP socket reachability' : def.probe === 'http' ? 'live HTTP request' : 'configuration completeness only (no delivery is asserted)'}</span>
+                {' '}· entitlement <code>{def.feature}</code>
+              </p>
+              <button onClick={create} disabled={busy || !name.trim() || !type} className={btnPrimarySm}>Register integration</button>
+            </>
+          )}
+        </div>
+      )}
+
+      {payload.integrations.length === 0 ? (
+        <p className="rounded-xl border border-slate-200 bg-white px-4 py-6 text-sm text-slate-500">No integrations registered for this tenant.</p>
+      ) : (
+        <ul className="space-y-2">
+          {payload.integrations.map(i => (
+            <li key={i.id} className="rounded-xl border border-slate-200 bg-white p-4">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="font-semibold text-sm text-slate-800">{i.name}</span>
+                <span className="text-xs text-slate-500">{i.typeLabel}</span>
+                <span className={`rounded-full border px-2 py-0.5 text-[11px] font-semibold ${INTEGRATION_STATUS_STYLES[i.status] ?? ''}`}>{i.status}</span>
+                {i.facilityId && <span className="text-[11px] text-slate-400">facility {tenant.facilities.find(f => f.id === i.facilityId)?.name ?? i.facilityId}</span>}
+                <span className="ml-auto text-[11px] text-slate-400">last check {fmtWhen(i.lastCheckedAt)}</span>
+              </div>
+
+              <div className="mt-2 grid md:grid-cols-2 gap-2 text-xs">
+                <div className="space-y-0.5">
+                  {Object.entries(i.config).length === 0
+                    ? <p className="text-slate-400">No configuration stored.</p>
+                    : Object.entries(i.config).map(([k, v]) => <p key={k} className="text-slate-600"><span className="font-medium">{k}</span>: {v}</p>)}
+                </div>
+                <div className="space-y-0.5">
+                  {Object.keys(i.secrets).length === 0
+                    ? <p className="text-slate-400">No credentials required for this type.</p>
+                    : Object.entries(i.secrets).map(([k, s]) => (
+                      <p key={k} className="text-slate-600"><span className="font-medium">{k}</span>: {s.present ? s.mask : <span className="text-amber-600">not set</span>}</p>
+                    ))}
+                </div>
+              </div>
+
+              {i.lastError && <p className="mt-2 rounded-lg border border-rose-200 bg-rose-50 px-2.5 py-1.5 text-[11px] text-rose-700">{i.lastError}</p>}
+
+              {canManage && (
+                <div className="mt-3 flex flex-wrap items-center gap-2">
+                  <button disabled={busy} onClick={() => run(() => api.probeTenantIntegration(tenant.id, i.id), `Health check ran for ${i.name}.`)} className={btnGhost}>
+                    <Activity size={13} /> Run health check
+                  </button>
+                  {Object.keys(i.secrets).length > 0 && (
+                    <button disabled={busy} onClick={() => { setRotateFor(i); setRotateValues({}); }} className={btnGhost}>
+                      <KeyRound size={13} /> Rotate credentials
+                    </button>
+                  )}
+                  <button disabled={busy} onClick={() => run(() => api.deleteTenantIntegration(tenant.id, i.id), `${i.name} deleted.`)} className="inline-flex items-center gap-1 rounded-lg border border-rose-300 bg-rose-50 px-3 py-1.5 text-xs font-semibold text-rose-700 hover:bg-rose-100">
+                    <Trash2 size={13} /> Delete
+                  </button>
+                </div>
+              )}
+
+              {rotateFor?.id === i.id && (
+                <div className="mt-3 space-y-2 rounded-lg border border-slate-200 bg-slate-50 p-3">
+                  <p className="text-[11px] text-slate-500">New values replace the stored credentials. They are never displayed again.</p>
+                  <div className="grid md:grid-cols-2 gap-2">
+                    {Object.keys(i.secrets).map(k => (
+                      <input key={k} type="password" className={field} placeholder={k} value={rotateValues[k] ?? ''} onChange={e => setRotateValues({ ...rotateValues, [k]: e.target.value })} />
+                    ))}
+                  </div>
+                  <div className="flex gap-2">
+                    <button
+                      disabled={busy || Object.values(rotateValues).every(v => !v)}
+                      onClick={() => run(() => api.rotateTenantIntegrationSecrets(tenant.id, i.id, rotateValues), `Credentials rotated for ${i.name}.`).then(() => setRotateFor(null))}
+                      className={btnPrimarySm}
+                    >
+                      Save new credentials
+                    </button>
+                    <button onClick={() => setRotateFor(null)} className={btnGhost}>Cancel</button>
+                  </div>
+                </div>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   );
 };

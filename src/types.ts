@@ -575,6 +575,47 @@ export interface PublicTenantContext extends TenantBranding {
   verified: boolean;
 }
 
+/** Tenant-owned integration registry entry (master-prompt §33/§44). */
+export interface IntegrationSecretState {
+  present: boolean;
+  mask: string;
+}
+
+export type IntegrationProbe = 'tcp' | 'http' | 'config';
+export type IntegrationStatus = 'active' | 'error' | 'unconfigured' | 'disabled';
+
+export interface IntegrationCatalogEntry {
+  type: string;
+  label: string;
+  feature: string | null;
+  probe: IntegrationProbe;
+  requiredKeys: string[];
+  secretKeys: string[];
+}
+
+export interface TenantIntegrationRecord {
+  id: string;
+  type: string;
+  typeLabel: string;
+  name: string;
+  facilityId: string | null;
+  config: Record<string, string>;
+  /** Presence + mask only — secret values never leave the server. */
+  secrets: Record<string, IntegrationSecretState>;
+  status: IntegrationStatus;
+  lastCheckedAt: string | null;
+  lastError: string | null;
+  createdAt?: string | null;
+}
+
+export interface TenantIntegrationsPayload {
+  catalog: IntegrationCatalogEntry[];
+  entitlements: Record<string, boolean>;
+  integrations: TenantIntegrationRecord[];
+  integration?: TenantIntegrationRecord;
+  probe?: { status: IntegrationStatus; detail: string; check: string };
+}
+
 export interface TenantRecord {
   id: string;
   name: string;
