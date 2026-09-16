@@ -837,26 +837,10 @@ class AppointmentController extends Controller
         // Get business info
         $business = Business::find($appointment->business_id);
         
-        // Assign token number if not already assigned
+        // Assign token number if not already assigned — delegates to the
+        // single domain allocator (same rule as the API booking adapter).
         if (empty($appointment->token_number)) {
-            // Use database transaction with lock to prevent duplicate tokens
-            DB::transaction(function () use ($appointment) {
-                // Get today's date
-                $today = Carbon::today()->toDateString();
-                
-                // Get the max token number for today (using date field or created_at)
-                $maxToken = Appointment::where('business_id', $appointment->business_id)
-                    ->whereDate('date', $today)
-                    ->whereNotNull('token_number')
-                    ->lockForUpdate()
-                    ->max('token_number');
-                
-                // Assign next token number
-                $appointment->token_number = ($maxToken ?? 0) + 1;
-                $appointment->save();
-            });
-            
-            // Refresh to get the updated token
+            \App\Services\StudyTokenAllocator::assignTo($appointment, \Carbon\Carbon::today()->toDateString());
             $appointment->refresh();
         }
 

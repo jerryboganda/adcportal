@@ -84,6 +84,15 @@ class TenantContextController extends BaseApiController
         $user = auth()->user();
         abort_unless($user->isPlatformAdmin(), 403, 'Support sessions are restricted to platform staff.');
 
+        // Break-glass is the most sensitive action in the product: an enrolled
+        // platform identity must have completed its 2FA challenge this session.
+        if (\App\Services\TwoFactorService::hasEnabledTwoFactor($user) && ! \App\Services\TwoFactorService::isUnlocked($request)) {
+            abort(response()->json([
+                'message' => 'Two-factor authentication is required before entering a clinic.',
+                'error' => 'two_factor_required',
+            ], 403));
+        }
+
         $validated = $request->validate(['businessId' => ['required', 'integer']]);
 
         SupportSessionService::enter($user, (int) $validated['businessId']);

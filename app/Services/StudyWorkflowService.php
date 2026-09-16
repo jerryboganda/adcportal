@@ -3,10 +3,15 @@
 namespace App\Services;
 
 use App\Enums\StudyState;
+use App\Events\Study\StudyAcquisitionCompleted;
+use App\Events\Study\StudyCheckedIn;
+use App\Events\Study\StudyRejectedToTechnologist;
+use App\Events\Study\StudySentToReading;
 use App\Models\Appointment;
 use App\Models\AuditLog;
 use App\Models\DoseLog;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Validation\ValidationException;
 
 /**
@@ -16,6 +21,13 @@ use Illuminate\Validation\ValidationException;
  *          → reading/reported → delivered      (+ cancelled / no_show)
  *
  * Every transition is guarded, timestamped, and audit-logged.
+ *
+ * Unit of work: the state change, its audit row, and the domain FACT (e.g.
+ * "patient checked in") commit atomically — the fact is dispatched inside
+ * the transaction and its projector writes the notification row in the same
+ * transaction. A crash can never leave a transition without its fact, and a
+ * failed fact insert rolls the transition back (fail-safe). The projector
+ * must therefore never perform broker/HTTP I/O.
  */
 class StudyWorkflowService
 {
@@ -75,6 +87,9 @@ class StudyWorkflowService
                 'to' => $target->value,
                 'reason' => $payload['cancel_reason'] ?? $payload['reject_reason'] ?? null,
             ]);
+
+            // Domain fact — same unit of work as the state change above.
+            $this->emitFact($appointment, $target, $payload);
 
             return $appointment;
         });
@@ -158,6 +173,30 @@ class StudyWorkflowService
     }
 
     // ==================== Internals ====================
+
+    /**
+     * Map a successful transition to its past-tense domain fact. Dispatched
+     * inside the transaction; the projector (ProjectStudyNotification)
+     * persists the notification row in this same unit of work.
+     *
+     * Note: StudyState::Acquired is the target of BOTH completion and
+     * rejection — distinguished by the payload (reject_reason present).
+     */
+    private function emitFact(Appointment $appointment, StudyState $target, array $payload): void
+    {
+        $fact = match (true) {
+            $target === StudyState::CheckedIn => new StudyCheckedIn($appointment),
+            $target === StudyState::Reading => new StudySentToReading($appointment),
+            $target === StudyState::Acquired && array_key_exists('reject_reason', $payload)
+                => new StudyRejectedToTechnologist($appointment, (string) ($payload['reject_reason'] ?? '')),
+            $target === StudyState::Acquired => new StudyAcquisitionCompleted($appointment),
+            default => null,
+        };
+
+        if ($fact !== null) {
+            Event::dispatch($fact);
+        }
+    }
 
     private function guard(Appointment $appointment, StudyState $current, StudyState $target): void
     {

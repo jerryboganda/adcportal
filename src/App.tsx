@@ -43,6 +43,7 @@ import { MasterDataView } from './components/MasterDataView';
 import { DoctorNetworkView } from './components/DoctorNetworkView';
 import { SettingsView } from './components/SettingsView';
 import { LoginView } from './components/LoginView';
+import { TwoFactorChallengeView } from './components/TwoFactorChallengeView';
 
 import { ScreeningModal } from './components/ScreeningModal';
 import { DoseCaptureModal } from './components/DoseCaptureModal';
@@ -67,6 +68,7 @@ export const App: React.FC = () => {
   const [user, setUser] = useState<SessionUser | null>(null);
   const [gateInfo, setGateInfo] = useState<{ status: string; message: string } | null>(null);
   const [flash, setFlash] = useState<{ kind: 'error' | 'success'; message: string } | null>(null);
+  const [challengeEmail, setChallengeEmail] = useState<string | null>(null);
 
   // ==================== domain state (hydrated from the API) ====================
   const [appointments, setAppointments] = useState<Appointment[]>([]);
@@ -195,8 +197,19 @@ export const App: React.FC = () => {
   }, [showFlash]);
 
   const handleAuthenticated = useCallback((_user: SessionUser) => {
+    setChallengeEmail(null);
     runBootstrap();
   }, [runBootstrap]);
+
+  const handleTwoFactorVerified = useCallback(() => {
+    setChallengeEmail(null);
+    runBootstrap();
+  }, [runBootstrap]);
+
+  const handleTwoFactorCancel = useCallback(() => {
+    setChallengeEmail(null);
+    setBootStatus('unauthenticated');
+  }, []);
 
   const handleLogout = useCallback(async () => {
     try {
@@ -867,9 +880,20 @@ export const App: React.FC = () => {
 
   if (bootStatus !== 'ready' || !user || !clinicSettings) {
     if (bootStatus === 'unauthenticated') {
+      if (challengeEmail) {
+        return (
+          <TwoFactorChallengeView
+            email={challengeEmail}
+            onVerified={handleTwoFactorVerified}
+            onCancel={handleTwoFactorCancel}
+          />
+        );
+      }
+
       return (
         <LoginView
           onAuthenticated={handleAuthenticated}
+          onTwoFactorRequired={(email) => { setChallengeEmail(email); }}
         />
       );
     }

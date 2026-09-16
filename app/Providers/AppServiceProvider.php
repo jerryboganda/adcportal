@@ -24,6 +24,14 @@ class AppServiceProvider extends ServiceProvider
         if ($this->app->environment('production')) {
             \Illuminate\Support\Facades\URL::forceScheme('https');
         }
+
+        // Study domain facts → clinical notification center: NO manual
+        // registration here. Laravel 11 event discovery binds
+        // ProjectStudyNotification (union type-hint) to all five study
+        // events automatically — `php artisan event:list` is the proof.
+        // Registering manually as well would fire every fact TWICE.
+        // The listener runs synchronously inside the workflow unit of
+        // work — see ProjectStudyNotification for the atomicity contract.
     }
 
 }

@@ -46,8 +46,9 @@ test('reception desk lists today\u2019s seeded studies', async ({ page }) => {
     await expect(page.getByText('Reception & Patient Check-In Desk')).toBeVisible({ timeout: 15000 });
 
     // Seeded studies appear in the server-backed worklist.
-    await expect(page.locator('body')).toContainText('DX-01');
-    await expect(page.locator('body')).toContainText('CT-01');
+    // (Tokens are integer sequences now; anchor on seeded patients.)
+    await expect(page.locator('body')).toContainText('Bilal Ahmed Sheikh');
+    await expect(page.locator('body')).toContainText('Capt. (R) Asadullah Khan');
 });
 
 test('technologist worklist and billing render live data', async ({ page }) => {

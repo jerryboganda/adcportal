@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import * as api from '../services/apiService';
 import { SessionUser } from '../services/apiService';
+import { TwoFactorSettingsCard } from './TwoFactorSettingsCard';
 import {
   DeploymentCatalog,
   Entitlements,
@@ -131,6 +132,8 @@ export const PlatformConsole: React.FC<{
     { key: 'audit', label: 'Audit', icon: <ScrollText size={15} /> },
   ], []);
 
+  const [securityOpen, setSecurityOpen] = useState(false);
+
   return (
     <div className="min-h-screen bg-slate-100 text-slate-900 flex flex-col antialiased">
       {/* Console header — dark, deliberately distinct from the clinic shell */}
@@ -148,6 +151,12 @@ export const PlatformConsole: React.FC<{
               <p className="text-xs font-semibold">{user.name}</p>
               <p className="text-[11px] text-cyan-300 capitalize">{user.platformRole ?? 'ops'}</p>
             </div>
+            <button
+              onClick={() => setSecurityOpen(o => !o)}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-slate-700 px-3 py-1.5 text-xs font-semibold text-slate-200 hover:bg-slate-800"
+            >
+              <KeyRound size={13} /> Security
+            </button>
             <button
               onClick={onSignOut}
               className="inline-flex items-center gap-1.5 rounded-lg border border-slate-700 px-3 py-1.5 text-xs font-semibold text-slate-200 hover:bg-slate-800"
@@ -174,6 +183,20 @@ export const PlatformConsole: React.FC<{
           ))}
         </nav>
       </header>
+
+      {securityOpen && (
+        <div className="fixed inset-0 z-[70] bg-slate-900/50 flex items-start justify-center p-4 sm:p-8" onClick={() => setSecurityOpen(false)}>
+          <div className="w-full max-w-lg" onClick={e => e.stopPropagation()}>
+            <TwoFactorSettingsCard notify={notify} />
+            <button
+              onClick={() => setSecurityOpen(false)}
+              className="mt-3 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50"
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      )}
 
       <main className="flex-1 w-full max-w-[1680px] mx-auto px-4 lg:px-6 py-5">
         {selectedTenantId ? (

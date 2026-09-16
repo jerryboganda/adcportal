@@ -22,6 +22,7 @@ use App\Http\Controllers\Api\V1\SettingsController;
 use App\Http\Controllers\Api\V1\StaffUserController;
 use App\Http\Controllers\Api\V1\StudyController;
 use App\Http\Controllers\Api\V1\TenantContextController;
+use App\Http\Controllers\Api\V1\TwoFactorController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -59,6 +60,13 @@ Route::post('/register', [AuthController::class, 'register'])->middleware('throt
 // Public plan catalog (signup + subscription gate views).
 Route::get('/plans', [PlatformPlanController::class, 'publicIndex']);
 
+// Two-factor: the login challenge endpoint is intentionally public — the
+// "identity" it acts on is a server-side pending flag stashed during login,
+// never a client-supplied user id. Management routes live in the auth group.
+Route::get('/two-factor/status', [TwoFactorController::class, 'status']);
+Route::post('/two-factor/challenge', [TwoFactorController::class, 'challenge'])->middleware('throttle:login');
+Route::post('/two-factor/challenge/cancel', [TwoFactorController::class, 'cancelChallenge']);
+
 // Public presentation lookup for the login screen: resolves the brand of a
 // DNS-verified custom domain. Cosmetic only — never an authorization input.
 Route::get('/tenant-context', [PublicTenantContextController::class, 'show'])->middleware('throttle:60,1');
@@ -81,6 +89,11 @@ Route::middleware(['auth', 'tenant.active', 'throttle:tenant'])->group(function 
     Route::post('/logout', [AuthController::class, 'logout']);
     Route::post('/verify-password', [AuthController::class, 'verifyPassword']);
     Route::get('/bootstrap', [BootstrapController::class, 'index']);
+
+    // Two-factor enrollment / management (authenticated platform staff).
+    Route::post('/two-factor/setup', [TwoFactorController::class, 'setup']);
+    Route::post('/two-factor/confirm', [TwoFactorController::class, 'confirm']);
+    Route::post('/two-factor/disable', [TwoFactorController::class, 'disable']);
 
     // Studies (booking + pipeline + screening)
     Route::get('/studies', [StudyController::class, 'index']);

@@ -162,7 +162,7 @@ class RisDemoData extends Seeder
             'screening_required' => false, 'screening_cleared' => true,
             'room_number' => 'Room 1 (X-Ray Suite A)',
             'checked_in_at' => $stamp('08:15'), 'preparing_at' => $stamp('08:25'), 'in_progress_at' => $stamp('08:32'),
-            'token_number' => 'DX-01',
+            'token_number' => 1,
             'notes' => 'STAT Trauma protocol. Patient arrived from ER with right chest pain following motor vehicle collision.',
         ]);
 
@@ -177,7 +177,7 @@ class RisDemoData extends Seeder
             'room_number' => 'Room 4 (MRI 1.5T Suite)',
             'assigned_radiologist_id' => $staffUsers['radiologist']->id,
             'checked_in_at' => $stamp('08:40'), 'preparing_at' => $stamp('08:50'), 'in_progress_at' => $stamp('09:05'), 'acquired_at' => $stamp('09:42'),
-            'token_number' => 'MR-01',
+            'token_number' => 2,
             'notes' => 'Severe L5/S1 radicular symptoms x 3 weeks. MRI acquisition completed without artifacts.',
         ]);
 
@@ -205,7 +205,7 @@ class RisDemoData extends Seeder
             'room_number' => 'Room 3 (CT 128-Slice)',
             'assigned_radiologist_id' => $staffUsers['radiologist']->id,
             'checked_in_at' => $stamp('09:10'), 'preparing_at' => $stamp('09:20'), 'in_progress_at' => $stamp('09:35'), 'acquired_at' => $stamp('09:55'),
-            'token_number' => 'CT-01',
+            'token_number' => 3,
             'notes' => 'Interstitial lung evaluation with contrast. Prior mild allergy pre-treated successfully.',
         ]);
 
@@ -254,7 +254,7 @@ class RisDemoData extends Seeder
             'room_number' => 'Room 2 (Ultrasound Suite)',
             'assigned_radiologist_id' => $staffUsers['radiologist']->id,
             'checked_in_at' => $stamp('09:45'), 'preparing_at' => $stamp('09:55'), 'in_progress_at' => $stamp('10:05'), 'acquired_at' => $stamp('10:28'), 'reported_at' => $stamp('10:45'),
-            'token_number' => 'US-01',
+            'token_number' => 4,
             'notes' => 'Report finalized; ready for collection or portal.',
         ]);
 
@@ -287,7 +287,7 @@ class RisDemoData extends Seeder
             'screening_required' => false, 'screening_cleared' => true,
             'room_number' => 'Room 5 (Mammography Suite)',
             'checked_in_at' => $stamp('10:18'),
-            'token_number' => 'MG-01',
+            'token_number' => 5,
             'notes' => 'Annual screening exam. Patient in sub-waiting area.',
         ]);
 
@@ -300,7 +300,7 @@ class RisDemoData extends Seeder
             'date' => $today, 'time' => '11:15:00', 'priority' => 'urgent', 'workflow_state' => 'booked',
             'screening_required' => true, 'screening_cleared' => false,
             'room_number' => 'Room 4 (MRI 1.5T Suite)',
-            'token_number' => 'MR-02',
+            'token_number' => 6,
             'notes' => 'Patient scheduled for 11:15 AM. Requires MRI safety checklist completion upon arrival.',
         ]);
 

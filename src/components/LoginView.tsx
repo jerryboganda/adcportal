@@ -5,6 +5,7 @@ import { PublicTenantContext } from '../types';
 
 interface LoginViewProps {
   onAuthenticated: (user: SessionUser) => void;
+  onTwoFactorRequired?: (email: string) => void;
 }
 
 /**
@@ -16,7 +17,7 @@ interface LoginViewProps {
  * access to anything — the tenant for a session is always derived from the
  * authenticated principal.
  */
-export const LoginView: React.FC<LoginViewProps> = ({ onAuthenticated }) => {
+export const LoginView: React.FC<LoginViewProps> = ({ onAuthenticated, onTwoFactorRequired }) => {
   const [mode, setMode] = useState<'login' | 'register'>('login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -54,7 +55,12 @@ export const LoginView: React.FC<LoginViewProps> = ({ onAuthenticated }) => {
     try {
       let user: SessionUser;
       if (mode === 'login') {
-        user = await login(email.trim(), password);
+        const result = await login(email.trim(), password);
+        if (result.kind === 'two_factor_required') {
+          onTwoFactorRequired?.(result.email);
+          return;
+        }
+        user = result.user;
       } else {
         user = await registerTenant({
           clinicName: clinicName.trim(),

@@ -85,7 +85,7 @@ class StudyController extends BaseApiController
         $service = Service::forClinic($this->tenantId())->with('modality')->findOrFail($validated['serviceId']);
         $modality = $service->modality;
 
-        [$appointment, $invoice] = DB::transaction(function () use ($validated, $service) {
+        [$appointment, $invoice] = DB::transaction(function () use ($validated, $service, $modality) {
             // Resolve or create the patient (tenant-scoped).
             if (! empty($validated['patientId'])) {
                 $customer = Customer::where('business_id', $this->tenantId())->findOrFail($validated['patientId']);
@@ -133,39 +133,20 @@ class StudyController extends BaseApiController
                 'created_by' => Auth::id(),
             ]);
 
-            $appointment->forceFill(['token_number' => $this->nextToken($service->modality?->code ?? 'ST', $validated['date'])])->save();
+            // Token allocation is a domain rule: one allocator, race-free,
+            // integer tokens (delegates to StudyTokenAllocator).
+            \App\Services\StudyTokenAllocator::assignTo($appointment, $validated['date']);
 
             // Usage metering rides inside the same transaction as the study.
             UsageCounter::add($this->tenantId(), 'studies');
 
+            // Domain fact: dispatched INSIDE the unit of work so its
+            // notification row commits atomically with the booking (a crash
+            // can no longer lose the clinical fact).
+            event(new \App\Events\Study\StudyBooked($appointment, $service->name, $modality?->name));
+
             return [$appointment, $this->issueBookingInvoice($appointment, $service)];
         });
-
-        if ($appointment->priority === 'stat') {
-            $this->notify([
-                'title' => "🚨 STAT Booking Created (#{$appointment->token_number})",
-                'message' => "Emergency priority study scheduled for {$appointment->patientDisplayName()} ({$service->name}). Modality: {$modality?->name}.",
-                'category' => 'stat',
-                'priority' => 'critical',
-                'appointment_id' => $appointment->id,
-                'token_number' => $appointment->token_number,
-                'patient_name' => $appointment->patientDisplayName(),
-                'target_tab' => 'technologist',
-                'action_label' => 'Open Tech Worklist',
-            ]);
-        } else {
-            $this->notify([
-                'title' => "New Appointment Booked (#{$appointment->token_number})",
-                'message' => $appointment->patientDisplayName().' registered for '.$service->name.' at '.$this->displayTime($appointment->time).'.',
-                'category' => 'workflow',
-                'priority' => 'low',
-                'appointment_id' => $appointment->id,
-                'token_number' => $appointment->token_number,
-                'patient_name' => $appointment->patientDisplayName(),
-                'target_tab' => 'checkin',
-                'action_label' => 'View Reception Desk',
-            ]);
-        }
 
         $this->audit('appointment_created', $appointment, [
             'summary' => "Booked {$service->name} for {$appointment->patientDisplayName()} (token {$appointment->token_number}).",
@@ -249,8 +230,9 @@ class StudyController extends BaseApiController
 
         switch ($action) {
             case 'checkin':
+                // Notification is projected atomically inside the workflow
+                // service (domain fact), not written here after commit.
                 $this->workflow->checkIn($appointment);
-                $this->notifyCheckIn($appointment);
                 break;
 
             case 'no_show':
@@ -297,23 +279,12 @@ class StudyController extends BaseApiController
                     ->all();
 
                 $this->workflow->completeAcquisition($appointment, $dose, Auth::id());
-                $this->notifyAcquisition($appointment);
                 break;
 
             case 'send_to_reading':
                 // PACS QC verified: hand the study to the reading radiologist.
+                // (Notification projected atomically by the workflow service.)
                 $this->workflow->sendToReading($appointment);
-                $this->notify([
-                    'title' => "Study Sent to Reading (#{$appointment->token_number})",
-                    'message' => ($appointment->ServiceData?->modality?->code ?? 'Imaging')." study for {$appointment->patientDisplayName()} passed technologist QC and is ready for interpretation.",
-                    'category' => 'workflow',
-                    'priority' => $appointment->priority === 'stat' ? 'high' : 'medium',
-                    'appointment_id' => $appointment->id,
-                    'token_number' => $appointment->token_number,
-                    'patient_name' => $appointment->patientDisplayName(),
-                    'target_tab' => 'reporting',
-                    'action_label' => 'Open Report Worklist',
-                ]);
                 break;
 
             case 'cancel':
@@ -326,7 +297,6 @@ class StudyController extends BaseApiController
                     $this->workflow->cancel($appointment, $reason);
                 } else {
                     $this->workflow->rejectToTechnologist($appointment, $reason);
-                    $this->notifyRejection($appointment, $reason);
                 }
                 break;
         }
@@ -379,12 +349,19 @@ class StudyController extends BaseApiController
         DB::transaction(function () use ($validated, $appointment) {
             $hasRisk = false;
 
+            // Batch-load every requested question in ONE tenant-scoped query
+            // (the per-answer ->find() was an N+1 on a safety-critical path).
+            $questionIds = collect($validated['answers'])->pluck('questionId')->unique()->all();
+            $questions = ScreeningQuestion::whereHas('form', fn ($q) => $q->where('business_id', $this->tenantId()))
+                ->whereIn('id', $questionIds)
+                ->get()
+                ->keyBy('id');
+
             foreach ($validated['answers'] as $entry) {
                 // Tenant-scoped and strict: an unknown question — or one from
                 // ANOTHER clinic's form — fails the submission instead of being
                 // silently skipped (skipping would clear the safety gate).
-                $question = ScreeningQuestion::whereHas('form', fn ($q) => $q->where('business_id', $this->tenantId()))
-                    ->find($entry['questionId']);
+                $question = $questions->get($entry['questionId']);
                 if (! $question) {
                     throw ValidationException::withMessages([
                         'answers' => 'Screening contains a question that does not belong to this clinic. Reload the form and try again.',
@@ -456,22 +433,6 @@ class StudyController extends BaseApiController
         throw ValidationException::withMessages(['time' => 'Invalid time format.']);
     }
 
-    private function nextToken(string $modalityCode, string $date): string
-    {
-        $prefix = $modalityCode.'-';
-        $existing = Appointment::forClinic($this->tenantId())
-            ->whereDate('date_sort', $date)
-            ->where('token_number', 'like', $prefix.'%')
-            ->pluck('token_number');
-
-        $max = $existing
-            ->map(fn ($t) => (int) substr((string) $t, strlen($prefix)))
-            ->filter(fn ($n) => $n > 0)
-            ->max() ?? 0;
-
-        return $prefix.str_pad((string) ($max + 1), 2, '0', STR_PAD_LEFT);
-    }
-
     /** Walk-in patients get a login-less user row (customers.user_id is required). */
     private function walkInUserId(array $np): int
     {
@@ -524,48 +485,4 @@ class StudyController extends BaseApiController
         return $invoice;
     }
 
-    private function notifyCheckIn(Appointment $appointment): void
-    {
-        $this->notify([
-            'title' => "Patient Checked In (#{$appointment->token_number})",
-            'message' => "{$appointment->patientDisplayName()} has arrived at the reception desk. Token {$appointment->token_number} is now ready for preparation in {$appointment->ServiceData?->modality?->name}.",
-            'category' => 'workflow',
-            'priority' => $appointment->priority === 'stat' ? 'critical' : 'medium',
-            'appointment_id' => $appointment->id,
-            'token_number' => $appointment->token_number,
-            'patient_name' => $appointment->patientDisplayName(),
-            'target_tab' => 'technologist',
-            'action_label' => 'View Worklist',
-        ]);
-    }
-
-    private function notifyAcquisition(Appointment $appointment): void
-    {
-        $this->notify([
-            'title' => "Acquisition Complete (#{$appointment->token_number})",
-            'message' => ($appointment->ServiceData?->modality?->code ?? 'Imaging')." imaging completed for {$appointment->patientDisplayName()}. Study ready for reporting.",
-            'category' => 'workflow',
-            'priority' => $appointment->priority === 'stat' ? 'high' : 'medium',
-            'appointment_id' => $appointment->id,
-            'token_number' => $appointment->token_number,
-            'patient_name' => $appointment->patientDisplayName(),
-            'target_tab' => 'reporting',
-            'action_label' => 'Open Diagnostic Report',
-        ]);
-    }
-
-    private function notifyRejection(Appointment $appointment, string $reason): void
-    {
-        $this->notify([
-            'title' => "Quality Rejection Alert (#{$appointment->token_number})",
-            'message' => Auth::user()->name." rejected study #{$appointment->token_number} back for repeat scan/technologist review: \"{$reason}\"",
-            'category' => 'stat',
-            'priority' => 'high',
-            'appointment_id' => $appointment->id,
-            'token_number' => $appointment->token_number,
-            'patient_name' => $appointment->patientDisplayName(),
-            'target_tab' => 'technologist',
-            'action_label' => 'View Study in Worklist',
-        ]);
-    }
 }

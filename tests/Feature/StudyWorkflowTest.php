@@ -46,7 +46,9 @@ class StudyWorkflowTest extends ApiTestCase
     {
         $study = $this->book();
 
-        $this->assertSame('DX-01', $study['tokenNumber']);
+        // Token is an integer sequence per modality/day (serialized as a string).
+        // ('DX-01'-style strings are the legacy format that broke strict-mode MySQL.)
+        $this->assertSame('1', $study['tokenNumber']);
         $this->assertSame('booked', $study['workflowState']);
         $this->assertStringContainsString('MRN-', $study['patient']['mrn']);
 
@@ -67,7 +69,7 @@ class StudyWorkflowTest extends ApiTestCase
         $this->book();
         $second = $this->book();
 
-        $this->assertSame('DX-02', $second['tokenNumber']);
+        $this->assertSame('2', $second['tokenNumber']);
     }
 
     public function test_full_pipeline_booking_to_delivery(): void

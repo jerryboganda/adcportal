@@ -9,6 +9,7 @@ dist/
 *.sqlite
 *.sqlite-journal
 /.agent/
+.freebuff/
 
 # Environment & Secrets
 .env

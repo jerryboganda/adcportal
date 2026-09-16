@@ -34,7 +34,7 @@ class PlatformUserController extends PlatformController
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'email', 'max:255', 'unique:users,email'],
-            'password' => ['required', 'string', 'min:8'],
+            'password' => \App\Services\PasswordPolicy::rules(),
             'role' => ['required', Rule::in(['super_admin', ...array_keys(config('ris.platform_roles', []))])],
         ]);
 

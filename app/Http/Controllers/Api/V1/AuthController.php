@@ -66,7 +66,28 @@ class AuthController extends BaseApiController
             return response()->json(['message' => 'This account cannot sign in to the staff portal.'], 403);
         }
 
+        // Session fixation defense: mint a fresh session ID now that the
+        // identity is authenticated (mirrors the Breeze web login). Guarded
+        // because non-stateful API clients may not have a session at all.
+        if ($request->hasSession()) {
+            $request->session()->regenerate();
+        }
+
+        // Platform 2FA: enrolled identities enter a TOTP challenge instead of
+        // receiving a usable session (no-op for everyone else).
+        \App\Services\TwoFactorService::onLogin($request, $user);
+
         $user->forceFill(['last_login_at' => now()])->save();
+
+        // Enrolled platform identity: hold the session at the second factor.
+        // The response has no user payload — possession of the password alone
+        // must never yield a usable SPA session.
+        if (\App\Services\TwoFactorService::pendingUser($request)) {
+            return response()->json(['data' => [
+                'two_factor_required' => true,
+                'email' => $user->email,
+            ]]);
+        }
 
         $this->audit('login', $user, ['summary' => "Signed in from {$request->ip()}"]);
 
@@ -117,7 +138,7 @@ class AuthController extends BaseApiController
             'name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'email', 'max:255', 'unique:users,email'],
             'phone' => ['nullable', 'string', 'max:40'],
-            'password' => ['required', Password::min(8)],
+            'password' => \App\Services\PasswordPolicy::rules(),
             'plan' => ['nullable', 'string', 'exists:plans,slug'],
         ]);
 
@@ -144,6 +165,11 @@ class AuthController extends BaseApiController
         $this->audit('tenant_registered', $tenant, ['summary' => "New clinic registered: {$tenant->name}"]);
 
         Auth::attempt($request->only('email', 'password'), remember: true);
+
+        // Session fixation defense on signup-login, same as login().
+        if ($request->hasSession()) {
+            $request->session()->regenerate();
+        }
 
         return response()->json([
             'data' => ['user' => ApiShape::currentUser(auth()->user())],

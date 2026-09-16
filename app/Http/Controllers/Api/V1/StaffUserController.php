@@ -150,7 +150,7 @@ class StaffUserController extends BaseApiController
         return $request->validate([
             'name' => [$required ? 'required' : 'sometimes', 'string', 'max:255'],
             'email' => [$required ? 'required' : 'sometimes', 'email', 'max:255', 'unique:users,email'.($required ? '' : ','.(int) $request->route('staff').',id')],
-            'password' => [$required ? 'required' : 'sometimes', Password::min(8)],
+            'password' => [$required ? 'required' : 'sometimes', ...array_slice(\App\Services\PasswordPolicy::rules(), 1)],
             'role' => [$required ? 'required' : 'sometimes', 'in:admin,radiologist,technologist,receptionist,billing'],
             'department' => ['nullable', 'string', 'max:255'],
             'phone' => ['nullable', 'string', 'max:50'],

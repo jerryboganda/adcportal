@@ -137,9 +137,50 @@ function normalizeInvoice(raw: any): Invoice {
 
 // ==================== auth ====================
 
-export async function login(email: string, password: string): Promise<SessionUser> {
+export type LoginResult =
+  | { kind: 'authenticated'; user: SessionUser }
+  | { kind: 'two_factor_required'; email: string };
+
+export async function login(email: string, password: string): Promise<LoginResult> {
   const { data } = await http.post('/login', { email, password });
-  return data.data.user;
+  if (data?.data?.two_factor_required) {
+    return { kind: 'two_factor_required', email: data.data.email ?? email };
+  }
+  return { kind: 'authenticated', user: data.data.user };
+}
+
+// ==================== two-factor (platform) ====================
+
+export interface TwoFactorStatus {
+  enabled: boolean;
+  pending: boolean;
+  email?: string;
+}
+
+export async function twoFactorStatus(): Promise<TwoFactorStatus> {
+  const { data } = await http.get('/two-factor/status');
+  return data.data;
+}
+
+export async function twoFactorSetup(): Promise<{ secret: string; otpauthUrl: string }> {
+  const { data } = await http.post('/two-factor/setup');
+  return data.data;
+}
+
+export async function twoFactorConfirm(code: string): Promise<void> {
+  await http.post('/two-factor/confirm', { code });
+}
+
+export async function twoFactorChallenge(code: string): Promise<void> {
+  await http.post('/two-factor/challenge', { code });
+}
+
+export async function twoFactorCancelChallenge(): Promise<void> {
+  await http.post('/two-factor/challenge/cancel');
+}
+
+export async function twoFactorDisable(password: string, code: string): Promise<void> {
+  await http.post('/two-factor/disable', { password, code });
 }
 
 export async function me(): Promise<SessionUser> {

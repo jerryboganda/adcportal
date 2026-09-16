@@ -390,7 +390,7 @@ class PlatformTenantController extends PlatformController
             'email' => ['required', 'email', 'max:255', 'unique:users,email'],
             'role' => ['required', 'in:admin,radiologist,technologist,receptionist,billing'],
             'phone' => ['nullable', 'string', 'max:50'],
-            'password' => ['nullable', 'string', 'min:8'],
+            'password' => ['nullable', ...array_slice(\App\Services\PasswordPolicy::rules(), 1)],
             'isActive' => ['nullable', 'boolean'],
         ]);
 

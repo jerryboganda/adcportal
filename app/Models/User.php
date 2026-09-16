@@ -62,6 +62,8 @@ class User extends Authenticatable implements LaratrustUser,MustVerifyEmail
         'initials',
         'capabilities',
         'last_login_at',
+        'two_factor_secret',
+        'two_factor_enabled_at',
     ];
 
     /**
@@ -72,6 +74,7 @@ class User extends Authenticatable implements LaratrustUser,MustVerifyEmail
     protected $hidden = [
         'password',
         'remember_token',
+        'two_factor_secret',
     ];
 
     /**
@@ -84,6 +87,8 @@ class User extends Authenticatable implements LaratrustUser,MustVerifyEmail
         'password' => 'hashed',
         'capabilities' => 'array',
         'last_login_at' => 'datetime',
+        'two_factor_secret' => 'encrypted',
+        'two_factor_enabled_at' => 'datetime',
     ];
 
     /** Portal capability flags consumed by the React RBAC matrix. */
