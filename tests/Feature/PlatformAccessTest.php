@@ -18,7 +18,7 @@ class PlatformAccessTest extends ApiTestCase
         $user = User::create([
             'name' => "Platform {$role}",
             'email' => "platform.{$role}.".md5(uniqid('', true)).'@test.local',
-            'password' => 'Secret#12345',
+            'password' => 'R1s!T3st#2026x',
             'email_verified_at' => now(),
             'type' => $role === 'super_admin' ? 'super_admin' : 'platform_admin',
             'platform_role' => $role === 'super_admin' ? null : $role,
@@ -114,11 +114,11 @@ class PlatformAccessTest extends ApiTestCase
         $super = $this->makePlatformUser('super_admin');
 
         $this->actingAs($ops)->postJson('/api/v1/platform/users', [
-            'name' => 'New', 'email' => 'new.ops@test.local', 'password' => 'Secret#12345', 'role' => 'ops',
+            'name' => 'New', 'email' => 'new.ops@test.local', 'password' => 'R1s!T3st#2026x', 'role' => 'ops',
         ])->assertStatus(403);
 
         $this->actingAs($super)->postJson('/api/v1/platform/users', [
-            'name' => 'New Ops', 'email' => 'new.ops.'.md5(uniqid('', true)).'@test.local', 'password' => 'Secret#12345', 'role' => 'ops',
+            'name' => 'New Ops', 'email' => 'new.ops.'.md5(uniqid('', true)).'@test.local', 'password' => 'R1s!T3st#2026x', 'role' => 'ops',
         ])->assertStatus(201);
     }
 
@@ -142,12 +142,12 @@ class PlatformAccessTest extends ApiTestCase
         $super = $this->makePlatformUser('super_admin');
 
         $this->actingAs($super)->postJson('/api/v1/platform/users', [
-            'name' => 'Creds', 'email' => 'creds.'.md5(uniqid('', true)).'@test.local', 'password' => 'Secret#12345', 'role' => 'billing',
+            'name' => 'Creds', 'email' => 'creds.'.md5(uniqid('', true)).'@test.local', 'password' => 'R1s!T3st#2026x', 'role' => 'billing',
         ])->assertStatus(201);
 
         $created = User::where('email', 'like', 'creds.%@test.local')->first();
         $this->assertNotNull($created);
-        $this->assertTrue(Hash::check('Secret#12345', $created->password));
+        $this->assertTrue(Hash::check('R1s!T3st#2026x', $created->password));
         $this->assertSame('platform_admin', $created->type);
     }
 }

@@ -81,7 +81,7 @@ class InventoryAndAuthTest extends ApiTestCase
 
         $this->postJson('/api/v1/login', [
             'email' => $this->adminA->email,
-            'password' => 'Secret#12345',
+            'password' => 'R1s!T3st#2026x',
         ])->assertOk()->assertJsonPath('data.user.email', $this->adminA->email);
 
         $this->postJson('/api/v1/logout')->assertOk();

@@ -25,7 +25,7 @@ class PlatformOperationsTest extends ApiTestCase
         return User::create([
             'name' => "Platform {$role}",
             'email' => "platform.{$role}.".md5(uniqid('', true)).'@test.local',
-            'password' => 'Secret#12345',
+            'password' => 'R1s!T3st#2026x',
             'email_verified_at' => now(),
             'type' => $role === 'super_admin' ? 'super_admin' : 'platform_admin',
             'platform_role' => $role === 'super_admin' ? null : $role,

@@ -17,7 +17,7 @@ class SupportSessionTest extends ApiTestCase
         return User::create([
             'name' => 'Support Engineer',
             'email' => 'support.'.md5(uniqid('', true)).'@test.local',
-            'password' => 'Secret#12345',
+            'password' => 'R1s!T3st#2026x',
             'email_verified_at' => now(),
             'type' => 'platform_admin',
             'platform_role' => 'support',

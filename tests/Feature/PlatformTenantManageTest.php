@@ -19,7 +19,7 @@ class PlatformTenantManageTest extends ApiTestCase
         return User::create([
             'name' => "Platform {$role}",
             'email' => "platform.{$role}.".md5(uniqid('', true)).'@test.local',
-            'password' => 'Secret#12345',
+            'password' => 'R1s!T3st#2026x',
             'email_verified_at' => now(),
             'type' => $role === 'super_admin' ? 'super_admin' : 'platform_admin',
             'platform_role' => $role === 'super_admin' ? null : $role,
@@ -140,7 +140,7 @@ class PlatformTenantManageTest extends ApiTestCase
         $this->assertEquals(0, DB::table('sessions')->where('user_id', $staff->id)->count());
 
         // Old password no longer authenticates; new one does.
-        $this->postJson('/api/v1/login', ['email' => $staff->email, 'password' => 'Secret#12345'])->assertStatus(401);
+        $this->postJson('/api/v1/login', ['email' => $staff->email, 'password' => 'R1s!T3st#2026x'])->assertStatus(401);
         $this->postJson('/api/v1/login', ['email' => $staff->email, 'password' => $newPassword])->assertOk();
     }
 

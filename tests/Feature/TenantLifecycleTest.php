@@ -21,7 +21,7 @@ class TenantLifecycleTest extends ApiTestCase
         return User::create([
             'name' => 'Platform Owner',
             'email' => 'super.'.md5(uniqid('', true)).'@test.local',
-            'password' => 'Secret#12345',
+            'password' => 'R1s!T3st#2026x',
             'email_verified_at' => now(),
             'type' => 'super_admin',
             'active_status' => 1,
@@ -139,7 +139,7 @@ class TenantLifecycleTest extends ApiTestCase
             ->assertJsonPath('data.tenant.subscriptionStatus', 'terminated');
 
         // Terminated tenants cannot even sign in.
-        $this->postJson('/api/v1/login', ['email' => $this->adminA->email, 'password' => 'Secret#12345'])
+        $this->postJson('/api/v1/login', ['email' => $this->adminA->email, 'password' => 'R1s!T3st#2026x'])
             ->assertStatus(403)
             ->assertJsonPath('subscriptionStatus', 'terminated');
 
@@ -154,7 +154,7 @@ class TenantLifecycleTest extends ApiTestCase
         // Simulate a tenant stuck in provisioning (bootstrap never finished).
         $admin = User::create([
             'name' => 'Stuck Owner', 'email' => 'stuck.'.md5(uniqid('', true)).'@test.local',
-            'password' => 'Secret#12345', 'email_verified_at' => now(), 'type' => 'admin', 'active_status' => 1, 'lang' => 'en',
+            'password' => 'R1s!T3st#2026x', 'email_verified_at' => now(), 'type' => 'admin', 'active_status' => 1, 'lang' => 'en',
         ]);
         $tenant = Business::create([
             'name' => 'Stuck Imaging', 'form_type' => 'form-layout', 'layouts' => 'Formlayout11',
@@ -201,7 +201,7 @@ class TenantLifecycleTest extends ApiTestCase
             app(TenantLifecycleService::class)->provision('Should Roll Back', [
                 'name' => 'Doomed Owner',
                 'email' => 'boom.mid-provision@test.local',
-                'password' => 'Secret#12345',
+                'password' => 'R1s!T3st#2026x',
             ]);
             $this->fail('Provisioning should have thrown.');
         } catch (\RuntimeException $e) {

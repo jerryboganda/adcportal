@@ -64,12 +64,12 @@ class EntitlementAndUsageTest extends ApiTestCase
 
         // businessA already has 1 staff (owner). Two more fill the 2-seat plan…
         $this->actingAs($this->adminA)->postJson('/api/v1/staff', [
-            'name' => 'Seat Two', 'email' => 'seat2.'.uniqid().'@test.local', 'password' => 'Secret#12345', 'role' => 'receptionist',
+            'name' => 'Seat Two', 'email' => 'seat2.'.uniqid().'@test.local', 'password' => 'R1s!T3st#2026x', 'role' => 'receptionist',
         ])->assertStatus(201);
 
         // …the third is refused.
         $this->actingAs($this->adminA)->postJson('/api/v1/staff', [
-            'name' => 'Seat Three', 'email' => 'seat3.'.uniqid().'@test.local', 'password' => 'Secret#12345', 'role' => 'receptionist',
+            'name' => 'Seat Three', 'email' => 'seat3.'.uniqid().'@test.local', 'password' => 'R1s!T3st#2026x', 'role' => 'receptionist',
         ])->assertStatus(403)
             ->assertJsonPath('error', 'quota_exceeded')
             ->assertJsonPath('quota', 'users');

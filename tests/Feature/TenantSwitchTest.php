@@ -170,7 +170,7 @@ class TenantSwitchTest extends ApiTestCase
     {
         $super = User::create([
             'name' => 'Platform', 'email' => 'pswitch.'.md5(uniqid('', true)).'@test.local',
-            'password' => 'Secret#12345', 'email_verified_at' => now(),
+            'password' => 'R1s!T3st#2026x', 'email_verified_at' => now(),
             'type' => 'super_admin', 'active_status' => 1, 'lang' => 'en',
         ]);
 

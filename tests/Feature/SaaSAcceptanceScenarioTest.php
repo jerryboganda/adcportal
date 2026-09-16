@@ -31,7 +31,7 @@ class SaaSAcceptanceScenarioTest extends ApiTestCase
         $this->superAdmin = User::create([
             'name' => 'SaaS Platform Owner',
             'email' => 'owner.'.md5(uniqid('', true)).'@platform.test',
-            'password' => 'Secret#12345',
+            'password' => 'R1s!T3st#2026x',
             'email_verified_at' => now(),
             'type' => 'super_admin',
             'active_status' => 1,

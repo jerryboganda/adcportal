@@ -40,7 +40,7 @@ abstract class ApiTestCase extends TestCase
         $admin = User::create([
             'name' => "Owner of {$name}",
             'email' => 'owner.'.md5($name.uniqid('', true)).'@test.local',
-            'password' => 'Secret#12345',
+            'password' => 'R1s!T3st#2026x',
             'email_verified_at' => now(),
             'type' => 'admin',
             'active_status' => 1,
@@ -113,7 +113,7 @@ abstract class ApiTestCase extends TestCase
         $user = User::create([
             'name' => ucfirst($portalRole).' of '.$business->name.' '.uniqid(),
             'email' => $portalRole.'.'.md5($business->name.uniqid('', true)).'@test.local',
-            'password' => 'Secret#12345',
+            'password' => 'R1s!T3st#2026x',
             'email_verified_at' => now(),
             'type' => 'staff',
             'active_status' => 1,

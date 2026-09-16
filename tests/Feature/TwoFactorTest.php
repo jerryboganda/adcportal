@@ -18,7 +18,7 @@ class TwoFactorTest extends ApiTestCase
         return User::create([
             'name' => 'Platform '.$type.' '.uniqid(),
             'email' => 'p2fa.'.md5(uniqid('', true)).'@test.local',
-            'password' => 'Secret#12345',
+            'password' => 'R1s!T3st#2026x',
             'email_verified_at' => now(),
             'type' => $type,
             'active_status' => 1,
@@ -74,7 +74,7 @@ class TwoFactorTest extends ApiTestCase
 
         $response = $this->postJson('/api/v1/login', [
             'email' => $super->email,
-            'password' => 'Secret#12345',
+            'password' => 'R1s!T3st#2026x',
         ]);
 
         $response->assertOk()->assertJsonPath('data.two_factor_required', true);
@@ -92,7 +92,7 @@ class TwoFactorTest extends ApiTestCase
         // Step 1: password → challenge pending.
         $this->postJson('/api/v1/login', [
             'email' => $super->email,
-            'password' => 'Secret#12345',
+            'password' => 'R1s!T3st#2026x',
         ])->assertOk()->assertJsonPath('data.two_factor_required', true);
 
         // Step 2: wrong code rejected.
@@ -166,14 +166,14 @@ class TwoFactorTest extends ApiTestCase
         // Wrong code refused.
         $this->actingAs($super)
             ->postJson('/api/v1/two-factor/disable', [
-                'password' => 'Secret#12345',
+                'password' => 'R1s!T3st#2026x',
                 'code' => '000000',
             ])->assertStatus(422);
 
         // Correct pair disables.
         $this->actingAs($super)
             ->postJson('/api/v1/two-factor/disable', [
-                'password' => 'Secret#12345',
+                'password' => 'R1s!T3st#2026x',
                 'code' => Totp::currentCode($super->fresh()->two_factor_secret),
             ])->assertOk();
 

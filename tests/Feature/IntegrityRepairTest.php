@@ -211,7 +211,7 @@ class IntegrityRepairTest extends ApiTestCase
         User::create([
             'name' => 'Legacy Patient',
             'email' => $email,
-            'password' => 'Secret#12345',
+            'password' => 'R1s!T3st#2026x',
             'type' => 'customer',
             'active_status' => 1,
             'is_enable_login' => 1,
@@ -219,7 +219,7 @@ class IntegrityRepairTest extends ApiTestCase
             'created_by' => $this->businessA->id,
         ]);
 
-        $this->postJson('/api/v1/login', ['email' => $email, 'password' => 'Secret#12345'])
+        $this->postJson('/api/v1/login', ['email' => $email, 'password' => 'R1s!T3st#2026x'])
             ->assertStatus(403);
     }
 
