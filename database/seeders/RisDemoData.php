@@ -155,7 +155,7 @@ class RisDemoData extends Seeder
         // 1) STAT in-progress X-ray
         $svc = $lookup('DX-CHEST-PA');
         $apt = $makeStudy([
-            'customer_id' => $patientsByName['Bilal Ahmed Sheikh']->id,
+            'customer_id' => $patientsByName['Bilal Ahmed Sheikh']->user_id,
             'name' => 'Bilal Ahmed Sheikh', 'email' => $patientsByName['Bilal Ahmed Sheikh']->email, 'contact' => $patientsByName['Bilal Ahmed Sheikh']->phone,
             'service_id' => $svc->id, 'referrer_id' => $this->referrerId($business, 'Dr. Rabia Khalid, MBBS'),
             'date' => $today, 'time' => '08:30:00', 'priority' => 'stat', 'workflow_state' => 'in_progress',
@@ -169,7 +169,7 @@ class RisDemoData extends Seeder
         // 2) Acquired MRI lumbar (cleared screening)
         $svc = $lookup('MR-LUMBAR');
         $aptMri = $makeStudy([
-            'customer_id' => $patientsByName['Muhammad Haroon']->id,
+            'customer_id' => $patientsByName['Muhammad Haroon']->user_id,
             'name' => 'Muhammad Haroon', 'email' => $patientsByName['Muhammad Haroon']->email, 'contact' => $patientsByName['Muhammad Haroon']->phone,
             'service_id' => $svc->id, 'referrer_id' => $this->referrerId($business, 'Dr. Usman Farooq, MD'),
             'date' => $today, 'time' => '09:00:00', 'priority' => 'routine', 'workflow_state' => 'acquired',
@@ -197,7 +197,7 @@ class RisDemoData extends Seeder
         // 3) Urgent HRCT reading, dose + contrast, risk answer overridden
         $svc = $lookup('CT-CHEST-HR');
         $aptCt = $makeStudy([
-            'customer_id' => $patientsByName['Capt. (R) Asadullah Khan']->id,
+            'customer_id' => $patientsByName['Capt. (R) Asadullah Khan']->user_id,
             'name' => 'Capt. (R) Asadullah Khan', 'email' => $patientsByName['Capt. (R) Asadullah Khan']->email, 'contact' => $patientsByName['Capt. (R) Asadullah Khan']->phone,
             'service_id' => $svc->id, 'referrer_id' => $this->referrerId($business, 'Dr. Tariq Mahmood, FRCP'),
             'date' => $today, 'time' => '09:30:00', 'priority' => 'urgent', 'workflow_state' => 'reading',
@@ -246,7 +246,7 @@ class RisDemoData extends Seeder
         // 4) Reported + released ultrasound
         $svc = $lookup('US-ABD-PEL');
         $aptUs = $makeStudy([
-            'customer_id' => $patientsByName['Zainab Bibi']->id,
+            'customer_id' => $patientsByName['Zainab Bibi']->user_id,
             'name' => 'Zainab Bibi', 'email' => $patientsByName['Zainab Bibi']->email, 'contact' => $patientsByName['Zainab Bibi']->phone,
             'service_id' => $svc->id, 'referrer_id' => $this->referrerId($business, 'Dr. Rabia Khalid, MBBS'),
             'date' => $today, 'time' => '10:00:00', 'priority' => 'routine', 'workflow_state' => 'reported',
@@ -280,7 +280,7 @@ class RisDemoData extends Seeder
         // 5) Checked-in mammography
         $svc = $lookup('MG-BILATERAL');
         $makeStudy([
-            'customer_id' => $patientsByName['Nusrat Parveen']->id,
+            'customer_id' => $patientsByName['Nusrat Parveen']->user_id,
             'name' => 'Nusrat Parveen', 'email' => $patientsByName['Nusrat Parveen']->email, 'contact' => $patientsByName['Nusrat Parveen']->phone,
             'service_id' => $svc->id, 'referrer_id' => $this->referrerId($business, 'Dr. Rabia Khalid, MBBS'),
             'date' => $today, 'time' => '10:30:00', 'priority' => 'routine', 'workflow_state' => 'checked_in',
@@ -294,7 +294,7 @@ class RisDemoData extends Seeder
         // 6) Booked MRI brain (screening pending)
         $svc = $lookup('MR-BRAIN-SPEC');
         $makeStudy([
-            'customer_id' => $patientsByName['Fatima Noor']->id,
+            'customer_id' => $patientsByName['Fatima Noor']->user_id,
             'name' => 'Fatima Noor', 'email' => $patientsByName['Fatima Noor']->email, 'contact' => $patientsByName['Fatima Noor']->phone,
             'service_id' => $svc->id, 'referrer_id' => $this->referrerId($business, 'Dr. Ayesha Siddiqui, FCPS'),
             'date' => $today, 'time' => '11:15:00', 'priority' => 'urgent', 'workflow_state' => 'booked',
