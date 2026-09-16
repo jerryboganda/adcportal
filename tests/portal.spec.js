@@ -36,7 +36,7 @@ test('staff sign-in lands on the live dashboard', async ({ page }) => {
     await expect(page.getByText('Reception Desk')).toBeVisible();
 
     // A seeded demo study is present (server-persisted, not mock data).
-    await expect(page.locator('body')).toContainText('MR-01');
+    await expect(page.locator('body')).toContainText('Bilal Ahmed Sheikh');
 });
 
 test('reception desk lists today\u2019s seeded studies', async ({ page }) => {
