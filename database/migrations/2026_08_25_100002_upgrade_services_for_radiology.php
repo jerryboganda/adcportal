@@ -16,7 +16,12 @@ return new class extends Migration
             $table->string('contrast_type', 20)->default('none');   // none|oral|intravenous|both
             $table->boolean('requires_screening')->default(false);
             $table->unsignedInteger('duration_minutes')->nullable(); // normalized slot length
-            $table->decimal('price', 12, 2)->nullable()->change();
+            if (DB::connection()->getDriverName() === 'pgsql') {
+                // PG cannot implicitly cast varchar -> numeric; do it explicitly.
+                DB::statement('ALTER TABLE services ALTER COLUMN price TYPE numeric(12, 2) USING NULLIF(price, \'\')::numeric');
+            } else {
+                $table->decimal('price', 12, 2)->nullable()->change();
+            }
             $table->unsignedInteger('tat_target_hours')->default(24); // reporting turnaround target
             $table->boolean('is_bookable_online')->default(true);
         });
