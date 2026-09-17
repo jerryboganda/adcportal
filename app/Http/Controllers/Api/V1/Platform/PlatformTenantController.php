@@ -33,7 +33,7 @@ class PlatformTenantController extends PlatformController
     {
         $this->denyUnlessCapability('tenants.view');
 
-        $query = Business::query()->with('plan')->withCount(['users', 'appointments']);
+        $query = Business::query()->with(['plan', 'branding'])->withCount(['users', 'appointments']);
 
         if ($q = trim((string) $request->query('q'))) {
             $query->where(function ($w) use ($q) {
@@ -104,7 +104,7 @@ class PlatformTenantController extends PlatformController
     {
         $this->denyUnlessCapability('tenants.view');
 
-        $tenant->load('plan');
+        $tenant->load(['plan', 'branding']);
 
         $lifecycle = $tenant->lifecycleEvents()->limit(50)->get()->map(fn ($e) => [
             'id' => (string) $e->id,
@@ -207,7 +207,15 @@ class PlatformTenantController extends PlatformController
             $updates['trial_ends_at'] = $validated['trialEndsAt'] ? now()->parse($validated['trialEndsAt']) : null;
         }
 
+        $oldName = $tenant->name;
         $tenant->update($updates);
+
+        if (isset($updates['name']) && $updates['name'] !== $oldName) {
+            AuditLog::record('tenant_renamed', $tenant, [
+                'summary' => "Tenant account renamed from \"{$oldName}\" to \"{$tenant->name}\"."
+                    .' Acting platform user: '.$this->actor()->email.'.',
+            ], $tenant->id);
+        }
 
         \App\Models\TenantLifecycleEvent::record($tenant, 'subscription_updated', $tenant->subscription_status, $tenant->subscription_status, [
             'summary' => 'Tenant profile/subscription updated: '.implode(', ', array_keys($updates)).'.',

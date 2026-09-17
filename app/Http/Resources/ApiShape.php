@@ -370,12 +370,12 @@ class ApiShape
 
     public static function currentUser(User $u): array
     {
-        $business = $u->business_id ? Business::find($u->business_id) : null;
+        $business = $u->business_id ? Business::with('branding')->find($u->business_id) : null;
 
         $memberships = $u->isPlatformAdmin() ? [] : TenantMembership::query()
             ->where('user_id', $u->id)
             ->where('status', 'active')
-            ->with('business:id,name,subscription_status')
+            ->with(['business:id,name,subscription_status', 'business.branding:business_id,app_name'])
             ->orderByDesc('is_default')
             ->get()
             ->map(fn ($m) => self::membership($m))
@@ -393,6 +393,8 @@ class ApiShape
             ...self::staffUser($u),
             'businessId' => (int) getActiveBusiness($u->id),
             'businessName' => $business?->name ?? $u->name,
+            // White-label brand of the active tenant (null = account name is the brand).
+            'businessBrandName' => $business?->branding?->app_name,
             'subscriptionStatus' => $business?->subscription_status ?? 'active',
             'isPlatformAdmin' => $u->isPlatformAdmin(),
             'platformRole' => $u->type === 'super_admin' ? 'super_admin' : $u->platform_role,
@@ -406,6 +408,7 @@ class ApiShape
         return [
             'businessId' => (int) $m->business_id,
             'businessName' => $m->business?->name ?? '',
+            'businessBrandName' => $m->business?->branding?->app_name,
             'role' => $m->role,
             'isDefault' => (bool) $m->is_default,
             'subscriptionStatus' => $m->business?->subscription_status ?? 'unknown',
@@ -647,6 +650,7 @@ class ApiShape
         'plan_updated' => ['Platform', 'Plan Updated', 'success'],
         'platform_user_created' => ['Platform Access', 'Platform User Created', 'success'],
         'platform_user_updated' => ['Platform Access', 'Platform User Updated', 'success'],
+        'tenant_renamed' => ['Platform', 'Tenant Account Renamed', 'success'],
         'tenant_updated' => ['Platform', 'Tenant Updated', 'success'],
         'tenant_deployment_updated' => ['Platform Infrastructure', 'Tenant Deployment Placement Changed', 'warning'],
         'tenant_branding_updated' => ['Platform', 'Tenant Branding Updated', 'success'],
@@ -744,7 +748,10 @@ class ApiShape
     {
         return [
             'id' => self::id($b->id),
+            // Account name = platform identity. brandName = the tenant's white-label
+            // presentation name; it MAY differ (login screen, emails, navbar brand).
             'name' => $b->name,
+            'brandName' => $b->branding?->app_name,
             'slug' => $b->slug,
             'orgType' => $b->org_type ?? 'clinic',
             'tenantCode' => $b->tenant_code,

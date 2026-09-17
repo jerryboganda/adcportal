@@ -442,6 +442,9 @@ const TenantsSection: React.FC<{
                     <p className="font-semibold text-slate-800">
                       {t.name} <OrgTypeBadge orgType={t.orgType} />
                     </p>
+                    {t.brandName && t.brandName !== t.name && (
+                      <p className="text-[11px] text-cyan-700">brand: {t.brandName}</p>
+                    )}
                     <p className="text-[11px] text-slate-400">{t.tenantCode}</p>
                   </td>
                   <td className="px-4 py-2.5"><StatusBadge status={t.subscriptionStatus} /></td>
@@ -620,6 +623,9 @@ const TenantDetail: React.FC<{
           <ArrowLeft size={14} /> All tenants
         </button>
         <h2 className="text-lg font-bold">{tenant.name}</h2>
+        {tenant.brandName && tenant.brandName !== tenant.name && (
+          <span className="rounded-full border border-cyan-200 bg-cyan-50 px-2 py-0.5 text-[11px] font-semibold text-cyan-800">brand: {tenant.brandName}</span>
+        )}
         <StatusBadge status={tenant.subscriptionStatus} />
         <OrgTypeBadge orgType={tenant.orgType} />
         <span className="text-xs text-slate-400">{tenant.tenantCode}</span>
@@ -1652,6 +1658,9 @@ const BrandingTab: React.FC<{
           Platform-managed presentation for this tenant only. These values change what
           <strong> {tenant.name}'s users</strong> see — they never alter the PolytronX platform brand,
           and the tenant's own admins cannot edit them here (this console is platform staff only).
+          {' '}The white-label <strong>application name</strong> below is the brand users see on the
+          login screen and navbar — the tenant's <strong>account name</strong> ("{tenant.name}")
+          stays the platform identifier; rename it from <em>Edit tenant</em> if you want both to match.
         </p>
         {!payload.entitlements.branding && (
           <p className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-800">
@@ -1659,7 +1668,7 @@ const BrandingTab: React.FC<{
           </p>
         )}
         <div className="grid md:grid-cols-2 gap-3">
-          <label className="space-y-1"><span className={label}>Application name</span>
+          <label className="space-y-1"><span className={label}>Brand / application name <span className="font-normal text-slate-400">(login screen, navbar, browser tab — not the account name)</span></span>
             <input disabled={!canBrand} className={field} value={form.appName} onChange={e => setForm({ ...form, appName: e.target.value })} />
           </label>
           <label className="space-y-1"><span className={label}>Primary colour</span>

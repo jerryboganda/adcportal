@@ -93,6 +93,13 @@ export const App: React.FC = () => {
   // White-label presentation for the active tenant (server-resolved from the
   // session, never from a client-supplied host).
   const [branding, setBranding] = useState<TenantBranding | null>(null);
+
+  // Browser-tab title follows the tenant's white-label brand. Priority:
+  // white-label appName → tenant account name → platform default.
+  useEffect(() => {
+    const brand = branding?.appName?.trim() || user?.businessBrandName?.trim() || user?.businessName?.trim() || '';
+    document.title = brand ? `${brand} — PolytronX RIS` : 'PolytronX - RIS';
+  }, [branding?.appName, user?.businessBrandName, user?.businessName]);
   const [dicomNodes, setDicomNodes] = useState<DicomNodeConfig[]>([]);
   const [notificationTemplates, setNotificationTemplates] = useState<api.NotificationTemplateT[]>([]);
   const [auditLogs, setAuditLogs] = useState<AuditLogEntry[]>([]);

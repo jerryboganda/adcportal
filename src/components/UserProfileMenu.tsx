@@ -151,6 +151,9 @@ export const UserProfileMenu: React.FC<UserProfileMenuProps> = ({
                   <span className="font-mono bg-white/10 px-1.5 py-0.5 rounded text-white/90 truncate max-w-[160px]">
                     {currentUser.businessName}
                   </span>
+                  {currentUser.businessBrandName && currentUser.businessBrandName !== currentUser.businessName && (
+                    <span className="text-[11px] text-cyan-300 truncate max-w-[160px]">{currentUser.businessBrandName}</span>
+                  )}
                 </div>
                 <p className="text-[11px] text-slate-400 truncate mt-1">
                   {currentUser.email}
@@ -185,7 +188,7 @@ export const UserProfileMenu: React.FC<UserProfileMenuProps> = ({
                   >
                     <span className="flex items-center space-x-2 truncate">
                       <SwitchCamera className="w-4 h-4 text-slate-500 shrink-0" />
-                      <span className="truncate">{m.businessName}</span>
+                      <span className="truncate">{m.businessName}{m.businessBrandName && m.businessBrandName !== m.businessName ? ` — ${m.businessBrandName}` : ''}</span>
                     </span>
                     <span className="text-[10px] uppercase text-slate-400">{isCurrent ? 'current' : m.role}</span>
                   </button>

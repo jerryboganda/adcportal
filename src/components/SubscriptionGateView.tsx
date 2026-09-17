@@ -43,6 +43,9 @@ export const SubscriptionGateView: React.FC<{
           <div>
             <p className="text-sm font-bold text-slate-900">PolytronX — RIS</p>
             <p className="text-xs text-slate-500">{user.businessName}</p>
+            {user.businessBrandName && user.businessBrandName !== user.businessName && (
+              <p className="text-[11px] text-cyan-700">{user.businessBrandName}</p>
+            )}
           </div>
           <span className="ml-auto inline-flex items-center gap-1.5 rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-xs font-semibold capitalize text-amber-800">
             <ShieldAlert size={13} /> {status}

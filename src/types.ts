@@ -473,6 +473,8 @@ export interface Plan {
 export interface TenantMembership {
   businessId: number;
   businessName: string;
+  /** White-label brand of that tenant (null = account name is the brand). */
+  businessBrandName?: string | null;
   role: string;
   isDefault: boolean;
   subscriptionStatus: SubscriptionStatus;
@@ -776,6 +778,8 @@ export interface TenantIntegrationsPayload {
 export interface TenantRecord {
   id: string;
   name: string;
+  /** White-label presentation name (tenant_brandings.app_name); null = account name is the brand. */
+  brandName?: string | null;
   slug: string;
   /** Organization flavor: clinic and hospital share the portal today. */
   orgType: 'clinic' | 'hospital';

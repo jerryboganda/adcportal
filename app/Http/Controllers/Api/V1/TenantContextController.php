@@ -28,12 +28,13 @@ class TenantContextController extends BaseApiController
         $memberships = TenantMembership::query()
             ->where('user_id', $user->id)
             ->where('status', 'active')
-            ->with('business:id,name,subscription_status')
+            ->with(['business:id,name,subscription_status', 'business.branding:business_id,app_name'])
             ->orderByDesc('is_default')
             ->get()
             ->map(fn ($m) => [
                 'businessId' => (int) $m->business_id,
                 'businessName' => $m->business?->name ?? '',
+                'businessBrandName' => $m->business?->branding?->app_name,
                 'role' => $m->role,
                 'isDefault' => (bool) $m->is_default,
                 'subscriptionStatus' => $m->business?->subscription_status ?? 'unknown',

@@ -63,6 +63,8 @@ type Nullable<T> = T | null;
 export interface SessionUser extends StaffUser {
   businessId: number;
   businessName: string;
+  /** White-label brand of the active tenant (null = account name is the brand). */
+  businessBrandName?: string | null;
   subscriptionStatus: string;
   isPlatformAdmin: boolean;
   platformRole?: PlatformRole | null;
