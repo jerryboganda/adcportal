@@ -19,5 +19,13 @@ if [ "${APP_OPTIMIZE_ON_BOOT:-true}" = "true" ]; then
     php artisan route:cache || true
 fi
 
+# In-container scheduler (queue drain each minute, subscription sweep,
+# expiry checks). `schedule:work` is the official container-mode scheduler:
+# it ticks every minute internally — no host cron required.
+if [ "${APP_SCHEDULE_ON_BOOT:-true}" = "true" ]; then
+    echo "[entrypoint] starting schedule:work in background"
+    php artisan schedule:work >> storage/logs/schedule.log 2>&1 &
+fi
+
 echo "[entrypoint] handing off to: $*"
 exec "$@"
