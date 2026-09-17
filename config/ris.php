@@ -162,7 +162,7 @@ return [
         'fhir' => [
             'label' => 'FHIR server',
             'feature' => 'interop',
-            'probe' => 'http',
+            'probe' => 'fhir',
             'required' => ['baseUrl'],
             'secrets' => ['clientId', 'clientSecret'],
         ],
@@ -177,20 +177,20 @@ return [
             'label' => 'SMS gateway',
             'feature' => 'notifications',
             'probe' => 'config',
-            'required' => ['provider'],
+            'required' => ['provider', 'endpoint'],
             'secrets' => ['apiKey', 'senderId'],
         ],
         'email' => [
             'label' => 'Outbound email (SMTP)',
             'feature' => 'notifications',
-            'probe' => 'config',
+            'probe' => 'smtp',
             'required' => ['host', 'port', 'fromAddress'],
             'secrets' => ['username', 'password'],
         ],
         'whatsapp' => [
             'label' => 'WhatsApp Business',
             'feature' => 'notifications',
-            'probe' => 'config',
+            'probe' => 'whatsapp',
             'required' => ['phoneNumberId'],
             'secrets' => ['accessToken'],
         ],
@@ -243,5 +243,23 @@ return [
     */
 
     'tenant_api_rate_limit_per_minute' => env('RIS_TENANT_API_RATE_LIMIT_PER_MINUTE', 2400),
+
+    /*
+    |--------------------------------------------------------------------------
+    | Control-plane step-up re-authentication
+    |--------------------------------------------------------------------------
+    |
+    | Mutating platform actions (suspend, terminate, branding, deployment...)
+    | require a fresh password confirmation, standard for SaaS control
+    | planes: a borrowed/attended-but-unlocked session must not be able to
+    | take a clinic offline. `window` is how long one confirmation stays
+    | valid. 428 responses carry `error: step_up_required`.
+    |
+    */
+
+    'platform_step_up' => [
+        'enabled' => env('RIS_PLATFORM_STEP_UP_ENABLED', true),
+        'window_minutes' => env('RIS_PLATFORM_STEP_UP_WINDOW', 15),
+    ],
 
 ];

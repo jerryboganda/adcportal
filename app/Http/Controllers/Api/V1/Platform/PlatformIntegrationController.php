@@ -172,6 +172,22 @@ class PlatformIntegrationController extends PlatformController
     }
 
     /** Run the type's real health check and persist the outcome. */
+    /** Real end-to-end test: send a synthetic event through the channel. */
+    public function testDelivery(Business $tenant, TenantIntegration $integration): JsonResponse
+    {
+        $this->denyUnlessCapability('tenants.manage');
+        abort_unless($integration->business_id === $tenant->id, 404);
+
+        $result = TenantIntegrationService::testDelivery($integration);
+
+        AuditLog::record('tenant_integration_tested', $tenant, [
+            'summary' => "Test delivery through {$integration->name} ({$integration->type}) on {$tenant->name}: {$result['status']}."
+                .' Acting platform user: '.$this->actor()->email.'.',
+        ], $tenant->id);
+
+        return $this->ok($this->payload($tenant) + ['test' => $result]);
+    }
+
     public function probe(Business $tenant, TenantIntegration $integration): JsonResponse
     {
         $this->denyUnlessCapability('tenants.manage');

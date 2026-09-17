@@ -11,6 +11,7 @@ use App\Http\Controllers\Api\V1\Platform\PlatformBrandingController;
 use App\Http\Controllers\Api\V1\Platform\PlatformInfrastructureController;
 use App\Http\Controllers\Api\V1\Platform\PlatformIntegrationController;
 use App\Http\Controllers\Api\V1\Platform\PlatformOperationsController;
+use App\Http\Controllers\Api\V1\Platform\PlatformStepUpController;
 use App\Http\Controllers\Api\V1\Platform\PlatformOverviewController;
 use App\Http\Controllers\Api\V1\Platform\PlatformPlanController;
 use App\Http\Controllers\Api\V1\Platform\PlatformSupportSessionController;
@@ -161,6 +162,10 @@ Route::middleware(['auth', 'tenant.active', 'throttle:tenant'])->group(function 
     Route::post('/backup/reset-demo', [SettingsController::class, 'resetDemo']);
     Route::post('/dispatches', [SettingsController::class, 'storeDispatch']);
 
+    // Tenant-side white-label view (READ-ONLY): branding is platform-managed,
+    // clinic admins may see their presentation settings but never edit them.
+    Route::get('/settings/branding', [SettingsController::class, 'showBranding']);
+
     // Notification center
     Route::get('/notifications', [AppNotificationController::class, 'index']);
     Route::post('/notifications/mark-read', [AppNotificationController::class, 'markRead']);
@@ -172,75 +177,81 @@ Route::middleware(['auth', 'tenant.active', 'throttle:tenant'])->group(function 
 // ---------- platform control plane (SaaS vendor) ----------
 
 Route::middleware(['auth', 'platform'])->prefix('platform')->group(function () {
+    // Step-up re-authentication: mutating platform actions below require a
+    // fresh password confirmation; EnsureStepUpAuth answers 428 until then.
+    Route::get('/step-up', [PlatformStepUpController::class, 'status']);
+    Route::post('/step-up', [PlatformStepUpController::class, 'confirm'])->middleware('throttle:5,1');
+
     // Overview / stats
     Route::get('/overview', [PlatformOverviewController::class, 'index']);
 
     // Tenants: directory, provisioning, 360 view, lifecycle
     Route::get('/tenants', [PlatformTenantController::class, 'index']);
-    Route::post('/tenants', [PlatformTenantController::class, 'store']);
+    Route::post('/tenants', [PlatformTenantController::class, 'store'])->middleware('platform.step-up');
     Route::get('/tenants/{tenant}', [PlatformTenantController::class, 'show'])->whereNumber('tenant');
-    Route::patch('/tenants/{tenant}', [PlatformTenantController::class, 'updateSubscription'])->whereNumber('tenant');
-    Route::put('/tenants/{tenant}/features', [PlatformTenantController::class, 'updateFeatures'])->whereNumber('tenant');
+    Route::patch('/tenants/{tenant}', [PlatformTenantController::class, 'updateSubscription'])->middleware('platform.step-up')->whereNumber('tenant');
+    Route::put('/tenants/{tenant}/features', [PlatformTenantController::class, 'updateFeatures'])->middleware('platform.step-up')->whereNumber('tenant');
     Route::get('/tenants/{tenant}/usage', [PlatformTenantController::class, 'usage'])->whereNumber('tenant');
     Route::get('/tenants/{tenant}/audit', [PlatformTenantController::class, 'tenantAudit'])->whereNumber('tenant');
-    Route::get('/tenants/{tenant}/export', [PlatformTenantController::class, 'export'])->whereNumber('tenant');
-    Route::post('/tenants/{tenant}/activate', [PlatformTenantController::class, 'activate'])->whereNumber('tenant');
-    Route::post('/tenants/{tenant}/suspend', [PlatformTenantController::class, 'suspend'])->whereNumber('tenant');
-    Route::post('/tenants/{tenant}/reactivate', [PlatformTenantController::class, 'reactivate'])->whereNumber('tenant');
-    Route::post('/tenants/{tenant}/offboard', [PlatformTenantController::class, 'offboard'])->whereNumber('tenant');
-    Route::post('/tenants/{tenant}/terminate', [PlatformTenantController::class, 'terminate'])->whereNumber('tenant');
-    Route::post('/tenants/{tenant}/provision-retry', [PlatformTenantController::class, 'retryProvisioning'])->whereNumber('tenant');
+    Route::get('/tenants/{tenant}/export', [PlatformTenantController::class, 'export'])->middleware('platform.step-up')->whereNumber('tenant');
+    Route::post('/tenants/{tenant}/activate', [PlatformTenantController::class, 'activate'])->middleware('platform.step-up')->whereNumber('tenant');
+    Route::post('/tenants/{tenant}/suspend', [PlatformTenantController::class, 'suspend'])->middleware('platform.step-up')->whereNumber('tenant');
+    Route::post('/tenants/{tenant}/reactivate', [PlatformTenantController::class, 'reactivate'])->middleware('platform.step-up')->whereNumber('tenant');
+    Route::post('/tenants/{tenant}/offboard', [PlatformTenantController::class, 'offboard'])->middleware('platform.step-up')->whereNumber('tenant');
+    Route::post('/tenants/{tenant}/terminate', [PlatformTenantController::class, 'terminate'])->middleware('platform.step-up')->whereNumber('tenant');
+    Route::post('/tenants/{tenant}/provision-retry', [PlatformTenantController::class, 'retryProvisioning'])->middleware('platform.step-up')->whereNumber('tenant');
 
     // Tenant administration: user accounts + facilities inside one tenant
-    Route::post('/tenants/{tenant}/users', [PlatformTenantController::class, 'storeUser'])->whereNumber('tenant');
-    Route::patch('/tenants/{tenant}/users/{user}', [PlatformTenantController::class, 'updateUser'])->whereNumber('tenant')->whereNumber('user');
-    Route::post('/tenants/{tenant}/users/{user}/reset-password', [PlatformTenantController::class, 'resetUserPassword'])->whereNumber('tenant')->whereNumber('user');
-    Route::post('/tenants/{tenant}/facilities', [PlatformTenantController::class, 'storeFacility'])->whereNumber('tenant');
-    Route::patch('/tenants/{tenant}/facilities/{location}', [PlatformTenantController::class, 'updateFacility'])->whereNumber('tenant')->whereNumber('location');
-    Route::delete('/tenants/{tenant}/facilities/{location}', [PlatformTenantController::class, 'destroyFacility'])->whereNumber('tenant')->whereNumber('location');
+    Route::post('/tenants/{tenant}/users', [PlatformTenantController::class, 'storeUser'])->middleware('platform.step-up')->whereNumber('tenant');
+    Route::patch('/tenants/{tenant}/users/{user}', [PlatformTenantController::class, 'updateUser'])->middleware('platform.step-up')->whereNumber('tenant')->whereNumber('user');
+    Route::post('/tenants/{tenant}/users/{user}/reset-password', [PlatformTenantController::class, 'resetUserPassword'])->middleware('platform.step-up')->whereNumber('tenant')->whereNumber('user');
+    Route::post('/tenants/{tenant}/facilities', [PlatformTenantController::class, 'storeFacility'])->middleware('platform.step-up')->whereNumber('tenant');
+    Route::patch('/tenants/{tenant}/facilities/{location}', [PlatformTenantController::class, 'updateFacility'])->middleware('platform.step-up')->whereNumber('tenant')->whereNumber('location');
+    Route::delete('/tenants/{tenant}/facilities/{location}', [PlatformTenantController::class, 'destroyFacility'])->middleware('platform.step-up')->whereNumber('tenant')->whereNumber('location');
 
     // Deployment topology: placement catalog + per-tenant re-placement
     Route::get('/infrastructure', [PlatformInfrastructureController::class, 'index']);
-    Route::patch('/tenants/{tenant}/deployment', [PlatformInfrastructureController::class, 'updateDeployment'])->whereNumber('tenant');
+    Route::patch('/tenants/{tenant}/deployment', [PlatformInfrastructureController::class, 'updateDeployment'])->middleware('platform.step-up')->whereNumber('tenant');
 
     // White-label branding + custom domain registry
     Route::get('/tenants/{tenant}/branding', [PlatformBrandingController::class, 'index'])->whereNumber('tenant');
-    Route::put('/tenants/{tenant}/branding', [PlatformBrandingController::class, 'update'])->whereNumber('tenant');
-    Route::post('/tenants/{tenant}/domains', [PlatformBrandingController::class, 'storeDomain'])->whereNumber('tenant');
-    Route::post('/tenants/{tenant}/domains/{domain}/verify', [PlatformBrandingController::class, 'verifyDomain'])->whereNumber('tenant')->whereNumber('domain');
-    Route::post('/tenants/{tenant}/domains/{domain}/primary', [PlatformBrandingController::class, 'makePrimary'])->whereNumber('tenant')->whereNumber('domain');
-    Route::delete('/tenants/{tenant}/domains/{domain}', [PlatformBrandingController::class, 'destroyDomain'])->whereNumber('tenant')->whereNumber('domain');
+    Route::put('/tenants/{tenant}/branding', [PlatformBrandingController::class, 'update'])->middleware('platform.step-up')->whereNumber('tenant');
+    Route::post('/tenants/{tenant}/domains', [PlatformBrandingController::class, 'storeDomain'])->middleware('platform.step-up')->whereNumber('tenant');
+    Route::post('/tenants/{tenant}/domains/{domain}/verify', [PlatformBrandingController::class, 'verifyDomain'])->middleware('platform.step-up')->whereNumber('tenant')->whereNumber('domain');
+    Route::post('/tenants/{tenant}/domains/{domain}/primary', [PlatformBrandingController::class, 'makePrimary'])->middleware('platform.step-up')->whereNumber('tenant')->whereNumber('domain');
+    Route::delete('/tenants/{tenant}/domains/{domain}', [PlatformBrandingController::class, 'destroyDomain'])->middleware('platform.step-up')->whereNumber('tenant')->whereNumber('domain');
 
     // Tenant integration registry (encrypted secrets, tenant/facility scoped)
     Route::get('/tenants/{tenant}/integrations', [PlatformIntegrationController::class, 'index'])->whereNumber('tenant');
-    Route::post('/tenants/{tenant}/integrations', [PlatformIntegrationController::class, 'store'])->whereNumber('tenant');
-    Route::patch('/tenants/{tenant}/integrations/{integration}', [PlatformIntegrationController::class, 'update'])->whereNumber('tenant')->whereNumber('integration');
-    Route::post('/tenants/{tenant}/integrations/{integration}/secrets', [PlatformIntegrationController::class, 'rotateSecrets'])->whereNumber('tenant')->whereNumber('integration');
-    Route::post('/tenants/{tenant}/integrations/{integration}/probe', [PlatformIntegrationController::class, 'probe'])->whereNumber('tenant')->whereNumber('integration');
-    Route::delete('/tenants/{tenant}/integrations/{integration}', [PlatformIntegrationController::class, 'destroy'])->whereNumber('tenant')->whereNumber('integration');
+    Route::post('/tenants/{tenant}/integrations', [PlatformIntegrationController::class, 'store'])->middleware('platform.step-up')->whereNumber('tenant');
+    Route::patch('/tenants/{tenant}/integrations/{integration}', [PlatformIntegrationController::class, 'update'])->middleware('platform.step-up')->whereNumber('tenant')->whereNumber('integration');
+    Route::post('/tenants/{tenant}/integrations/{integration}/secrets', [PlatformIntegrationController::class, 'rotateSecrets'])->middleware('platform.step-up')->whereNumber('tenant')->whereNumber('integration');
+    Route::post('/tenants/{tenant}/integrations/{integration}/probe', [PlatformIntegrationController::class, 'probe'])->middleware('platform.step-up')->whereNumber('tenant')->whereNumber('integration');
+    Route::post('/tenants/{tenant}/integrations/{integration}/test', [PlatformIntegrationController::class, 'testDelivery'])->middleware('platform.step-up')->whereNumber('tenant')->whereNumber('integration');
+    Route::delete('/tenants/{tenant}/integrations/{integration}', [PlatformIntegrationController::class, 'destroy'])->middleware('platform.step-up')->whereNumber('tenant')->whereNumber('integration');
 
     // Operations & observability: system + tenant health, failed-job
     // inspection/retry, entitlement reconciliation (§80/§81)
     Route::get('/operations', [PlatformOperationsController::class, 'index']);
     Route::get('/operations/jobs', [PlatformOperationsController::class, 'jobs']);
-    Route::post('/operations/jobs/{uuid}/retry', [PlatformOperationsController::class, 'retryJob']);
-    Route::delete('/operations/jobs/{uuid}', [PlatformOperationsController::class, 'forgetJob']);
-    Route::post('/tenants/{tenant}/entitlements/reconcile', [PlatformOperationsController::class, 'reconcileEntitlements'])->whereNumber('tenant');
+    Route::post('/operations/jobs/{uuid}/retry', [PlatformOperationsController::class, 'retryJob'])->middleware('platform.step-up');
+    Route::delete('/operations/jobs/{uuid}', [PlatformOperationsController::class, 'forgetJob'])->middleware('platform.step-up');
+    Route::post('/tenants/{tenant}/entitlements/reconcile', [PlatformOperationsController::class, 'reconcileEntitlements'])->middleware('platform.step-up')->whereNumber('tenant');
 
     // Plans
     Route::get('/plans', [PlatformPlanController::class, 'index']);
-    Route::post('/plans', [PlatformPlanController::class, 'store']);
-    Route::patch('/plans/{plan}', [PlatformPlanController::class, 'update'])->whereNumber('plan');
+    Route::post('/plans', [PlatformPlanController::class, 'store'])->middleware('platform.step-up');
+    Route::patch('/plans/{plan}', [PlatformPlanController::class, 'update'])->middleware('platform.step-up')->whereNumber('plan');
 
     // Platform staff
     Route::get('/users', [PlatformUserController::class, 'index']);
-    Route::post('/users', [PlatformUserController::class, 'store']);
-    Route::patch('/users/{user}', [PlatformUserController::class, 'update'])->whereNumber('user');
+    Route::post('/users', [PlatformUserController::class, 'store'])->middleware('platform.step-up');
+    Route::patch('/users/{user}', [PlatformUserController::class, 'update'])->middleware('platform.step-up')->whereNumber('user');
 
     // Break-glass support sessions
     Route::get('/support-sessions', [PlatformSupportSessionController::class, 'index']);
-    Route::post('/support-sessions', [PlatformSupportSessionController::class, 'store']);
-    Route::post('/support-sessions/{session}/end', [PlatformSupportSessionController::class, 'end'])->whereNumber('session');
+    Route::post('/support-sessions', [PlatformSupportSessionController::class, 'store'])->middleware('platform.step-up');
+    Route::post('/support-sessions/{session}/end', [PlatformSupportSessionController::class, 'end'])->middleware('platform.step-up')->whereNumber('session');
 
     // Platform audit stream
     Route::get('/audit', [PlatformAuditController::class, 'index']);

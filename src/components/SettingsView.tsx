@@ -26,7 +26,8 @@ import {
   Radio,
   Clock,
   Sparkles,
-  Info
+  Info,
+  Paintbrush
 } from 'lucide-react';
 import {
   StaffUser,
@@ -34,7 +35,8 @@ import {
   ClinicProfileSettings,
   DicomNodeConfig,
   NotificationTemplate,
-  AuditLogEntry
+  AuditLogEntry,
+  TenantBrandingView
 } from '../types';
 
 interface SettingsViewProps {
@@ -59,9 +61,101 @@ interface SettingsViewProps {
   onRefreshAuditLogs?: () => Promise<void>;
 
   onExportBackup: () => void;
+
+  brandingView: TenantBrandingView | null;
+  onLoadBrandingView: () => void;
 }
 
-type SettingsSection = 'users' | 'clinic' | 'dicom' | 'notifications' | 'audit' | 'database';
+type SettingsSection = 'users' | 'clinic' | 'branding' | 'dicom' | 'notifications' | 'audit' | 'database';
+
+
+/**
+ * Tenant-side white-label view  strictly READ-ONLY. Branding is authored by
+ * the platform team (control plane); this panel closes the visibility
+ * asymmetry by letting clinic admins SEE the presentation settings that
+ * govern their portal, with a change-request hint instead of an edit form.
+ */
+const BrandingPanel: React.FC<{ view: TenantBrandingView | null }> = ({ view }) => {
+  const customisedLabel = 'Customised by the platform team';
+  const defaultsLabel = 'Using platform defaults';
+  if (!view) {
+    return (
+      <div className="rounded-xl border border-slate-200 bg-white p-6 text-xs text-slate-500">
+        Loading branding…
+      </div>
+    );
+  }
+  const bf = view.branding;
+  const Field: React.FC<{ label: string; children: React.ReactNode }> = ({ label, children }) => (
+    <div>
+      <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">{label}</p>
+      <div className="mt-1 flex items-center gap-2 text-xs font-semibold text-slate-700">
+        {children}
+      </div>
+    </div>
+  );
+  const Swatch: React.FC<{ color: string }> = ({ color }) => (
+    <>
+      <span className="inline-block h-4 w-4 rounded border border-slate-300" style={{ backgroundColor: color }} />
+      <span className="font-mono">{color}</span>
+    </>
+  );
+  function dash(v: string | null) {
+    return v && v.trim() !== '' ? v : '—';
+  }
+  return (
+    <div className="space-y-4">
+      <div className="rounded-xl border border-sky-200 bg-sky-50 p-4 flex items-start gap-3">
+        <Info size={16} className="text-sky-600 mt-0.5 shrink-0" />
+        <div>
+          <p className="text-xs font-bold text-sky-900">White-label branding is managed by the platform team</p>
+          <p className="text-[11px] text-sky-800 mt-0.5 leading-relaxed">{view.changeHint}</p>
+        </div>
+      </div>
+
+      <div className="rounded-xl border border-slate-200 bg-white p-5">
+        <div className="flex items-center gap-3 flex-wrap">
+          <h3 className="text-sm font-bold text-slate-800">Your portal's presentation</h3>
+          {view.overridden ? (
+            <span className="rounded-full border border-violet-200 bg-violet-50 px-2 py-0.5 text-[11px] font-semibold text-violet-700">{customisedLabel}</span>
+          ) : (
+            <span className="rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[11px] text-slate-600">{defaultsLabel}</span>
+          )}
+        </div>
+
+        <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          <Field label="Application name">{dash(bf.appName)}</Field>
+          <Field label="Primary colour"><Swatch color={bf.primaryColor} /></Field>
+          <Field label="Accent colour"><Swatch color={bf.accentColor} /></Field>
+          <Field label="Logo URL">{dash(bf.logoUrl)}</Field>
+          <Field label="Login message">{dash(bf.loginMessage)}</Field>
+          <Field label="Email from name">{dash(bf.emailFromName)}</Field>
+          <Field label="Email from address">{dash(bf.emailFromAddress)}</Field>
+          <Field label="Support email">{dash(bf.supportEmail)}</Field>
+          <Field label="Support phone">{dash(bf.supportPhone)}</Field>
+          <Field label="Report header / footer">{(bf.reportHeader || bf.reportFooter) ? 'Configured' : '—'}</Field>
+        </div>
+
+        {view.domains.length > 0 && (
+          <div className="mt-5 border-t border-slate-100 pt-4">
+            <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">Custom domains</p>
+            <div className="mt-2 space-y-1.5">
+              {view.domains.map(d => (
+                <div key={d.host} className="flex items-center gap-2 text-xs">
+                  <span className="font-mono font-semibold text-slate-700">{d.host}</span>
+                  {d.isPrimary && <span className="rounded bg-cyan-50 border border-cyan-200 px-1.5 py-0.5 text-[10px] font-bold text-cyan-700">primary</span>}
+                  <span className={`rounded px-1.5 py-0.5 text-[10px] font-bold border ${d.verified ? 'bg-emerald-50 border-emerald-200 text-emerald-700' : 'bg-amber-50 border-amber-200 text-amber-700'}`}>
+                    {d.verified ? 'verified' : 'pending verification'}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
 
 export const SettingsView: React.FC<SettingsViewProps> = ({
   staffUsers,
@@ -80,8 +174,11 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   auditLogs,
   onRefreshAuditLogs,
   onExportBackup,
+  brandingView,
+  onLoadBrandingView,
 }) => {
   const [activeSection, setActiveSection] = useState<SettingsSection>('users');
+  const [brandingLoaded, setBrandingLoaded] = useState(false);
 
   // User form modal state
   const [userModalOpen, setUserModalOpen] = useState(false);
@@ -341,6 +438,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
           {[
             { id: 'users', label: 'Users & RBAC Access', icon: Shield, count: staffUsers.length },
             { id: 'clinic', label: 'Clinic & Branch Setup', icon: Building2 },
+            { id: 'branding', label: 'Branding (view only)', icon: Paintbrush },
             { id: 'dicom', label: 'PACS & DICOM Nodes', icon: Server, count: dicomNodes.length },
             { id: 'notifications', label: 'SMS & WhatsApp Gateway', icon: Bell, count: notificationTemplates.length },
             { id: 'audit', label: 'System Audit Logs', icon: History, count: auditLogs.length },
@@ -351,7 +449,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
             return (
               <button
                 key={tab.id}
-                onClick={() => setActiveSection(tab.id as SettingsSection)}
+                onClick={() => { setActiveSection(tab.id as SettingsSection); if (tab.id === 'branding' && !brandingLoaded) { setBrandingLoaded(true); onLoadBrandingView(); } }}
                 className={`flex items-center space-x-2 px-4 py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap cursor-pointer ${
                   isActive
                     ? 'bg-cyan-500 text-white shadow-md shadow-cyan-500/25'
@@ -837,6 +935,8 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
       )}
 
       {/* SECTION 3: PACS & DICOM NODES */}
+      {activeSection === 'branding' && <BrandingPanel view={brandingView} />}
+
       {activeSection === 'dicom' && (
         <div className="space-y-6">
           <div className="flex items-center justify-between bg-white p-4 rounded-xl border border-slate-200 shadow-xs">

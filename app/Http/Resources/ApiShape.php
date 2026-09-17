@@ -746,6 +746,7 @@ class ApiShape
             'id' => self::id($b->id),
             'name' => $b->name,
             'slug' => $b->slug,
+            'orgType' => $b->org_type ?? 'clinic',
             'tenantCode' => $b->tenant_code,
             'subscriptionStatus' => $b->subscription_status,
             'plan' => $b->plan ? self::plan($b->plan) : null,

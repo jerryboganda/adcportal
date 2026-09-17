@@ -40,7 +40,7 @@ class PlatformTenantManageTest extends ApiTestCase
         $super = $this->superAdmin();
 
         $this->actingAs($super)
-            ->patchJson("/api/v1/platform/tenants/{$this->businessA->id}", [
+            ->confirmStepUp()->patchJson("/api/v1/platform/tenants/{$this->businessA->id}", [
                 'name' => 'Alpha Health Group',
                 'subscriptionEndsAt' => now()->addMonths(6)->toDateString(),
             ])
@@ -60,12 +60,12 @@ class PlatformTenantManageTest extends ApiTestCase
 
         // billing holds subscriptions.manage.
         $this->actingAs($billing)
-            ->patchJson("/api/v1/platform/tenants/{$this->businessA->id}", ['trialEndsAt' => now()->addDays(10)->toDateString()])
+            ->confirmStepUp()->patchJson("/api/v1/platform/tenants/{$this->businessA->id}", ['trialEndsAt' => now()->addDays(10)->toDateString()])
             ->assertOk();
 
         // billing does NOT hold tenants.manage.
         $this->actingAs($billing)
-            ->postJson("/api/v1/platform/tenants/{$this->businessA->id}/users", [
+            ->confirmStepUp()->postJson("/api/v1/platform/tenants/{$this->businessA->id}/users", [
                 'name' => 'X', 'email' => 'x.'.uniqid().'@test.local', 'role' => 'receptionist',
             ])
             ->assertStatus(403);
@@ -82,7 +82,7 @@ class PlatformTenantManageTest extends ApiTestCase
         $email = 'tech.'.uniqid().'@test.local';
 
         $res = $this->actingAs($super)
-            ->postJson("/api/v1/platform/tenants/{$this->businessA->id}/users", [
+            ->confirmStepUp()->postJson("/api/v1/platform/tenants/{$this->businessA->id}/users", [
                 'name' => 'New Technologist', 'email' => $email, 'role' => 'technologist',
             ])
             ->assertStatus(201);
@@ -107,7 +107,7 @@ class PlatformTenantManageTest extends ApiTestCase
         $staff = $this->makeStaff($this->businessA, $this->adminA, 'receptionist');
 
         $this->actingAs($super)
-            ->patchJson("/api/v1/platform/tenants/{$this->businessA->id}/users/{$staff->id}", [
+            ->confirmStepUp()->patchJson("/api/v1/platform/tenants/{$this->businessA->id}/users/{$staff->id}", [
                 'name' => 'Renamed Staff', 'role' => 'billing',
             ])
             ->assertOk()
@@ -132,7 +132,7 @@ class PlatformTenantManageTest extends ApiTestCase
         }
 
         $res = $this->actingAs($super)
-            ->postJson("/api/v1/platform/tenants/{$this->businessA->id}/users/{$staff->id}/reset-password")
+            ->confirmStepUp()->postJson("/api/v1/platform/tenants/{$this->businessA->id}/users/{$staff->id}/reset-password")
             ->assertOk();
 
         $newPassword = $res->decodeResponseJson()['data']['newPassword'];
@@ -151,17 +151,17 @@ class PlatformTenantManageTest extends ApiTestCase
 
         // With two active admins, revoking one is fine.
         $this->actingAs($super)
-            ->patchJson("/api/v1/platform/tenants/{$this->businessA->id}/users/{$extraAdmin->id}", ['loginEnabled' => false])
+            ->confirmStepUp()->patchJson("/api/v1/platform/tenants/{$this->businessA->id}/users/{$extraAdmin->id}", ['loginEnabled' => false])
             ->assertOk();
 
         // Revoking the owner too must be refused — no active admin would remain.
         $this->actingAs($super)
-            ->patchJson("/api/v1/platform/tenants/{$this->businessA->id}/users/{$this->adminA->id}", ['loginEnabled' => false])
+            ->confirmStepUp()->patchJson("/api/v1/platform/tenants/{$this->businessA->id}/users/{$this->adminA->id}", ['loginEnabled' => false])
             ->assertStatus(422);
 
         // Demoting the last admin's role is equally refused.
         $this->actingAs($super)
-            ->patchJson("/api/v1/platform/tenants/{$this->businessA->id}/users/{$this->adminA->id}", ['role' => 'receptionist'])
+            ->confirmStepUp()->patchJson("/api/v1/platform/tenants/{$this->businessA->id}/users/{$this->adminA->id}", ['role' => 'receptionist'])
             ->assertStatus(422);
     }
 
@@ -170,11 +170,11 @@ class PlatformTenantManageTest extends ApiTestCase
         $super = $this->superAdmin();
 
         $this->actingAs($super)
-            ->patchJson("/api/v1/platform/tenants/{$this->businessA->id}/users/{$super->id}", ['name' => 'Hacked'])
+            ->confirmStepUp()->patchJson("/api/v1/platform/tenants/{$this->businessA->id}/users/{$super->id}", ['name' => 'Hacked'])
             ->assertStatus(404);
 
         $this->actingAs($super)
-            ->postJson("/api/v1/platform/tenants/{$this->businessA->id}/users/{$super->id}/reset-password")
+            ->confirmStepUp()->postJson("/api/v1/platform/tenants/{$this->businessA->id}/users/{$super->id}/reset-password")
             ->assertStatus(404);
     }
 
@@ -185,7 +185,7 @@ class PlatformTenantManageTest extends ApiTestCase
         $super = $this->superAdmin();
 
         $created = $this->actingAs($super)
-            ->postJson("/api/v1/platform/tenants/{$this->businessA->id}/facilities", [
+            ->confirmStepUp()->postJson("/api/v1/platform/tenants/{$this->businessA->id}/facilities", [
                 'name' => 'Alpha Satellite Clinic', 'address' => '12.example Street', 'phone' => '+61 3 5555 0100',
             ])
             ->assertStatus(201);
@@ -193,7 +193,7 @@ class PlatformTenantManageTest extends ApiTestCase
         $facilityId = (int) $created->decodeResponseJson()['data']['facility']['id'];
 
         $this->actingAs($super)
-            ->patchJson("/api/v1/platform/tenants/{$this->businessA->id}/facilities/{$facilityId}", ['name' => 'Alpha Satellite (renamed)'])
+            ->confirmStepUp()->patchJson("/api/v1/platform/tenants/{$this->businessA->id}/facilities/{$facilityId}", ['name' => 'Alpha Satellite (renamed)'])
             ->assertOk()
             ->assertJsonPath('data.facility.name', 'Alpha Satellite (renamed)');
 
@@ -212,19 +212,19 @@ class PlatformTenantManageTest extends ApiTestCase
         \App\Models\Appointment::where('id', $studyId)->update(['location_id' => $facilityId]);
 
         $this->actingAs($super)
-            ->deleteJson("/api/v1/platform/tenants/{$this->businessA->id}/facilities/{$facilityId}")
+            ->confirmStepUp()->deleteJson("/api/v1/platform/tenants/{$this->businessA->id}/facilities/{$facilityId}")
             ->assertStatus(422);
 
         // A facility with no references deletes fine.
         $spare = Location::create(['name' => 'Unused', 'address' => '', 'business_id' => $this->businessA->id, 'created_by' => $this->adminA->id]);
         $this->actingAs($super)
-            ->deleteJson("/api/v1/platform/tenants/{$this->businessA->id}/facilities/{$spare->id}")
+            ->confirmStepUp()->deleteJson("/api/v1/platform/tenants/{$this->businessA->id}/facilities/{$spare->id}")
             ->assertOk();
 
         // Cross-tenant facility access is a 404.
         $foreign = Location::create(['name' => 'Foreign', 'address' => '', 'business_id' => $this->businessB->id, 'created_by' => $this->adminB->id]);
         $this->actingAs($super)
-            ->patchJson("/api/v1/platform/tenants/{$this->businessA->id}/facilities/{$foreign->id}", ['name' => 'Nope'])
+            ->confirmStepUp()->patchJson("/api/v1/platform/tenants/{$this->businessA->id}/facilities/{$foreign->id}", ['name' => 'Nope'])
             ->assertStatus(404);
     }
 }

@@ -150,14 +150,14 @@ class SaaSAcceptanceScenarioTest extends ApiTestCase
 
         // ============ 7. Suspension, gate behavior, reactivation ============
         $this->actingAs($this->superAdmin)
-            ->postJson("/api/v1/platform/tenants/{$this->businessB->id}/suspend", ['reason' => 'Acceptance: suspension check'])
+            ->confirmStepUp()->postJson("/api/v1/platform/tenants/{$this->businessB->id}/suspend", ['reason' => 'Acceptance: suspension check'])
             ->assertOk();
 
         $this->actingAs($betaOwner)->getJson('/api/v1/bootstrap')->assertStatus(402);
         $this->actingAs($betaRadiologist)->getJson('/api/v1/studies')->assertStatus(402);
 
         $this->actingAs($this->superAdmin)
-            ->postJson("/api/v1/platform/tenants/{$this->businessB->id}/reactivate", ['reason' => 'Acceptance: restore'])
+            ->confirmStepUp()->postJson("/api/v1/platform/tenants/{$this->businessB->id}/reactivate", ['reason' => 'Acceptance: restore'])
             ->assertOk();
         $this->actingAs($betaOwner)->getJson('/api/v1/bootstrap')->assertOk();
 
@@ -168,7 +168,7 @@ class SaaSAcceptanceScenarioTest extends ApiTestCase
             'max_studies_per_month' => 1, 'is_active' => true,
         ]);
         $this->actingAs($this->superAdmin)
-            ->patchJson("/api/v1/platform/tenants/{$this->businessB->id}", ['planId' => $quotaPlan->id])
+            ->confirmStepUp()->patchJson("/api/v1/platform/tenants/{$this->businessB->id}", ['planId' => $quotaPlan->id])
             ->assertOk();
 
         // Usage counters already hold Beta's booked studies this month → quota hit.
@@ -182,11 +182,11 @@ class SaaSAcceptanceScenarioTest extends ApiTestCase
 
         // Restore an unlimited plan for the remainder of the scenario.
         $this->actingAs($this->superAdmin)
-            ->patchJson("/api/v1/platform/tenants/{$this->businessB->id}", ['planId' => null])
+            ->confirmStepUp()->patchJson("/api/v1/platform/tenants/{$this->businessB->id}", ['planId' => null])
             ->assertOk();
 
         // ============ 9. Break-glass support session, audited ============
-        $opened = $this->actingAs($this->superAdmin)->postJson('/api/v1/platform/support-sessions', [
+        $opened = $this->actingAs($this->superAdmin)->confirmStepUp()->postJson('/api/v1/platform/support-sessions', [
             'businessId' => $this->businessB->id,
             'reason' => 'Acceptance: verifying controlled support access',
         ])->assertStatus(201)->decodeResponseJson();
@@ -197,7 +197,7 @@ class SaaSAcceptanceScenarioTest extends ApiTestCase
         $this->actingAs($this->superAdmin)->postJson('/api/v1/tenant/leave')->assertOk();
 
         // Closing the grant entirely is a separate, audited edge.
-        $this->actingAs($this->superAdmin)->postJson("/api/v1/platform/support-sessions/{$supportSessionId}/end", ['note' => 'Acceptance complete.'])
+        $this->actingAs($this->superAdmin)->confirmStepUp()->postJson("/api/v1/platform/support-sessions/{$supportSessionId}/end", ['note' => 'Acceptance complete.'])
             ->assertOk();
 
         $this->assertDatabaseHas('audit_logs', ['business_id' => $this->businessB->id, 'action' => 'support_session_started']);

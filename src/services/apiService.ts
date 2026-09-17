@@ -38,6 +38,7 @@ import {
   SupportSessionInfo,
   Tenant360,
   TenantBranding,
+  TenantBrandingView,
   TenantBrandingPayload,
   TenantDomainRecord,
   TenantIntegrationsPayload,
@@ -189,6 +190,7 @@ export async function me(): Promise<SessionUser> {
 }
 
 export async function registerTenant(input: {
+  orgType: 'clinic' | 'hospital';
   clinicName: string;
   name: string;
   email: string;
@@ -196,6 +198,7 @@ export async function registerTenant(input: {
   password: string;
 }): Promise<SessionUser> {
   const { data } = await http.post('/register', {
+    org_type: input.orgType,
     clinic_name: input.clinicName,
     name: input.name,
     email: input.email,
@@ -886,6 +889,12 @@ export async function probeTenantIntegration(tenantId: string, integrationId: st
   return data.data;
 }
 
+/** Real end-to-end test: sends a synthetic event through the channel. */
+export async function testTenantIntegration(tenantId: string, integrationId: string): Promise<TenantIntegrationsPayload> {
+  const { data } = await http.post(`/platform/tenants/${tenantId}/integrations/${integrationId}/test`);
+  return data.data;
+}
+
 export async function deleteTenantIntegration(tenantId: string, integrationId: string): Promise<TenantIntegrationsPayload> {
   const { data } = await http.delete(`/platform/tenants/${tenantId}/integrations/${integrationId}`);
   return data.data;
@@ -1012,4 +1021,22 @@ export async function endSupportSession(id: string, note?: string): Promise<Plat
 export async function fetchPlatformAudit(params?: { action?: string; tenantId?: string }): Promise<PlatformAuditEntry[]> {
   const { data } = await http.get('/platform/audit', { params });
   return data.data.audit ?? [];
+}
+
+// ==================== control-plane step-up + tenant branding view ====================
+
+/** Fresh password confirmation for mutating platform actions (428 gate). */
+export async function confirmPlatformStepUp(password: string): Promise<void> {
+  await http.post('/platform/step-up', { password });
+}
+
+export async function fetchPlatformStepUpStatus(): Promise<{ required: boolean; confirmedAt: string | null; windowMinutes: number }> {
+  const { data } = await http.get('/platform/step-up');
+  return data.data;
+}
+
+/** Tenant-side READ-ONLY white-label view (branding is platform-managed). */
+export async function fetchTenantBrandingView(): Promise<TenantBrandingView> {
+  const { data } = await http.get('/settings/branding');
+  return data.data;
 }

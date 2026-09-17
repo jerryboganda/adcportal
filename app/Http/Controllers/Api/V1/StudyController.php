@@ -152,6 +152,23 @@ class StudyController extends BaseApiController
             'summary' => "Booked {$service->name} for {$appointment->patientDisplayName()} (token {$appointment->token_number}).",
         ]);
 
+        // Fan the booking out to the tenant's interoperability integrations
+        // (queued — HIS/RIS consumers hear about the study without adding
+        // latency to the booking response).
+        \App\Services\Delivery\IntegrationEventFanout::dispatch(
+            $this->tenantId(),
+            ['webhook', 'hl7', 'fhir'],
+            'study.booked',
+            [
+                'studyId' => $appointment->id,
+                'token' => $appointment->token_number,
+                'patientName' => $appointment->patientDisplayName(),
+                'study' => $service->name,
+                'scheduledFor' => $validated['date'].' '.$this->normalizeTime($validated['time']),
+                'bookedAt' => now()->toIso8601String(),
+            ],
+        );
+
         return response()->json([
             'data' => [
                 'study' => ApiShape::appointment($appointment->fresh(self::eager())),

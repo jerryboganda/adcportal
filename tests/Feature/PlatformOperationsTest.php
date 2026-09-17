@@ -168,7 +168,7 @@ class PlatformOperationsTest extends ApiTestCase
         // Tenant staff never reach the control plane at all.
         $this->actingAs($this->adminA)->getJson('/api/v1/platform/operations')->assertStatus(403);
         $this->actingAs($this->adminA)
-            ->postJson("/api/v1/platform/tenants/{$this->businessA->id}/entitlements/reconcile")
+            ->confirmStepUp()->postJson("/api/v1/platform/tenants/{$this->businessA->id}/entitlements/reconcile")
             ->assertStatus(403);
     }
 
@@ -215,7 +215,7 @@ class PlatformOperationsTest extends ApiTestCase
         $job = $this->failedJob([], ['connection' => 'database']);
 
         $this->actingAs($this->platformUser('ops'))
-            ->postJson("/api/v1/platform/operations/jobs/{$job->uuid}/retry")
+            ->confirmStepUp()->postJson("/api/v1/platform/operations/jobs/{$job->uuid}/retry")
             ->assertOk()
             ->assertJsonPath('data.requeued', true);
 
@@ -230,7 +230,7 @@ class PlatformOperationsTest extends ApiTestCase
         $job = $this->failedJob();
 
         $this->actingAs($this->platformUser('ops'))
-            ->deleteJson("/api/v1/platform/operations/jobs/{$job->uuid}")
+            ->confirmStepUp()->deleteJson("/api/v1/platform/operations/jobs/{$job->uuid}")
             ->assertOk()
             ->assertJsonPath('data.removed', true);
 
@@ -243,13 +243,13 @@ class PlatformOperationsTest extends ApiTestCase
         $missing = (string) Str::uuid();
 
         $this->actingAs($this->platformUser('ops'))
-            ->postJson("/api/v1/platform/operations/jobs/{$missing}/retry")->assertStatus(404);
+            ->confirmStepUp()->postJson("/api/v1/platform/operations/jobs/{$missing}/retry")->assertStatus(404);
         $this->actingAs($this->platformUser('ops'))
-            ->deleteJson("/api/v1/platform/operations/jobs/{$missing}")->assertStatus(404);
+            ->confirmStepUp()->deleteJson("/api/v1/platform/operations/jobs/{$missing}")->assertStatus(404);
 
         $job = $this->failedJob();
         $this->actingAs($this->platformUser('billing'))
-            ->postJson("/api/v1/platform/operations/jobs/{$job->uuid}/retry")->assertStatus(403);
+            ->confirmStepUp()->postJson("/api/v1/platform/operations/jobs/{$job->uuid}/retry")->assertStatus(403);
         $this->assertDatabaseHas('failed_jobs', ['uuid' => $job->uuid]);
     }
 
@@ -267,7 +267,7 @@ class PlatformOperationsTest extends ApiTestCase
         $ops = $this->platformUser('ops');
 
         $report = $this->actingAs($ops)
-            ->postJson("/api/v1/platform/tenants/{$this->businessA->id}/entitlements/reconcile")
+            ->confirmStepUp()->postJson("/api/v1/platform/tenants/{$this->businessA->id}/entitlements/reconcile")
             ->assertOk()
             ->decodeResponseJson()['data'];
 
@@ -282,7 +282,7 @@ class PlatformOperationsTest extends ApiTestCase
         $this->assertDatabaseMissing('audit_logs', ['action' => 'entitlements_reconciled']);
 
         $applied = $this->actingAs($ops)
-            ->postJson("/api/v1/platform/tenants/{$this->businessA->id}/entitlements/reconcile", ['apply' => true])
+            ->confirmStepUp()->postJson("/api/v1/platform/tenants/{$this->businessA->id}/entitlements/reconcile", ['apply' => true])
             ->assertOk()
             ->decodeResponseJson()['data'];
 
@@ -301,7 +301,7 @@ class PlatformOperationsTest extends ApiTestCase
         TenantFeatureOverride::create(['business_id' => $this->businessA->id, 'feature' => 'dicom', 'enabled' => false]);
 
         $applied = $this->actingAs($this->platformUser('ops'))
-            ->postJson("/api/v1/platform/tenants/{$this->businessA->id}/entitlements/reconcile", ['apply' => true])
+            ->confirmStepUp()->postJson("/api/v1/platform/tenants/{$this->businessA->id}/entitlements/reconcile", ['apply' => true])
             ->assertOk()
             ->decodeResponseJson()['data'];
 
@@ -318,7 +318,7 @@ class PlatformOperationsTest extends ApiTestCase
         TenantFeatureOverride::create(['business_id' => $this->businessB->id, 'feature' => 'telepathy', 'enabled' => true]);
 
         $this->actingAs($this->platformUser('ops'))
-            ->postJson("/api/v1/platform/tenants/{$this->businessA->id}/entitlements/reconcile", ['apply' => true])
+            ->confirmStepUp()->postJson("/api/v1/platform/tenants/{$this->businessA->id}/entitlements/reconcile", ['apply' => true])
             ->assertOk();
 
         // Beta's override is untouched by a reconciliation of Alpha.

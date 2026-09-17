@@ -18,6 +18,7 @@ class DoctorDispatchLog extends Model
         'channel',
         'recipient_contact',
         'status',
+        'failure_detail',
         'sent_by',
         'business_id',
     ];

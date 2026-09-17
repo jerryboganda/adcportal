@@ -244,14 +244,14 @@ class TwoFactorTest extends ApiTestCase
     {
         $super = $this->platformUser();
 
-        $this->actingAs($super)->postJson('/api/v1/platform/users', [
+        $this->actingAs($super)->confirmStepUp()->postJson('/api/v1/platform/users', [
             'name' => 'Weak Platform User',
             'email' => 'weak.plat.'.md5(uniqid('', true)).'@test.local',
             'password' => 'Password1!',
             'role' => 'ops',
         ])->assertStatus(422);
 
-        $this->actingAs($super)->postJson('/api/v1/platform/users', [
+        $this->actingAs($super)->confirmStepUp()->postJson('/api/v1/platform/users', [
             'name' => 'Strong Platform User',
             'email' => 'strong.plat.'.md5(uniqid('', true)).'@test.local',
             'password' => 'Str0ng!Passphrase',

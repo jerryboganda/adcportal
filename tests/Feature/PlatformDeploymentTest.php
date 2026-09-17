@@ -50,7 +50,7 @@ class PlatformDeploymentTest extends ApiTestCase
         $stamp = array_key_first(config('ris.deployment_stamps'));
 
         $this->actingAs($super)
-            ->patchJson("/api/v1/platform/tenants/{$this->businessA->id}/deployment", [
+            ->confirmStepUp()->patchJson("/api/v1/platform/tenants/{$this->businessA->id}/deployment", [
                 'region' => $region,
                 'deploymentStamp' => $stamp,
                 'isolationProfile' => 'database',
@@ -85,7 +85,7 @@ class PlatformDeploymentTest extends ApiTestCase
         $super = $this->platformUser('super_admin');
 
         $this->actingAs($super)
-            ->patchJson("/api/v1/platform/tenants/{$this->businessA->id}/deployment", [
+            ->confirmStepUp()->patchJson("/api/v1/platform/tenants/{$this->businessA->id}/deployment", [
                 'region' => 'atlantis-1',
                 'deploymentStamp' => array_key_first(config('ris.deployment_stamps')),
                 'isolationProfile' => 'pooled',
@@ -94,7 +94,7 @@ class PlatformDeploymentTest extends ApiTestCase
             ->assertJsonValidationErrors('region');
 
         $this->actingAs($super)
-            ->patchJson("/api/v1/platform/tenants/{$this->businessA->id}/deployment", [
+            ->confirmStepUp()->patchJson("/api/v1/platform/tenants/{$this->businessA->id}/deployment", [
                 'region' => array_key_first(config('ris.regions')),
                 'deploymentStamp' => 'stamp-zzz',
                 'isolationProfile' => 'pooled',
@@ -103,7 +103,7 @@ class PlatformDeploymentTest extends ApiTestCase
             ->assertJsonValidationErrors('deploymentStamp');
 
         $this->actingAs($super)
-            ->patchJson("/api/v1/platform/tenants/{$this->businessA->id}/deployment", [
+            ->confirmStepUp()->patchJson("/api/v1/platform/tenants/{$this->businessA->id}/deployment", [
                 'region' => array_key_first(config('ris.regions')),
                 'deploymentStamp' => array_key_first(config('ris.deployment_stamps')),
                 'isolationProfile' => 'sneaky-extra-isolation',
@@ -122,13 +122,13 @@ class PlatformDeploymentTest extends ApiTestCase
 
         // ops holds infrastructure.manage.
         $this->actingAs($this->platformUser('ops'))
-            ->patchJson("/api/v1/platform/tenants/{$this->businessA->id}/deployment", $payload)
+            ->confirmStepUp()->patchJson("/api/v1/platform/tenants/{$this->businessA->id}/deployment", $payload)
             ->assertOk();
 
         // billing / support / auditor do not.
         foreach (['billing', 'support', 'auditor'] as $role) {
             $this->actingAs($this->platformUser($role))
-                ->patchJson("/api/v1/platform/tenants/{$this->businessA->id}/deployment", $payload)
+                ->confirmStepUp()->patchJson("/api/v1/platform/tenants/{$this->businessA->id}/deployment", $payload)
                 ->assertStatus(403);
         }
 
@@ -145,7 +145,7 @@ class PlatformDeploymentTest extends ApiTestCase
             ->assertStatus(403);
 
         $this->actingAs($this->adminA)
-            ->patchJson("/api/v1/platform/tenants/{$this->businessA->id}/deployment", [
+            ->confirmStepUp()->patchJson("/api/v1/platform/tenants/{$this->businessA->id}/deployment", [
                 'region' => array_key_first(config('ris.regions')),
                 'deploymentStamp' => array_key_first(config('ris.deployment_stamps')),
                 'isolationProfile' => 'dedicated',

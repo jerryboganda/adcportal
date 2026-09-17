@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Activity, Building2, Loader2, Lock, Mail, Phone, ShieldCheck, User as UserIcon } from 'lucide-react';
+import { Activity, Building2, Hospital, Loader2, Lock, Mail, Phone, ShieldCheck, User as UserIcon } from 'lucide-react';
 import { fetchPublicTenantContext, login, registerTenant, SessionUser } from '../services/apiService';
 import { PublicTenantContext } from '../types';
 
@@ -24,6 +24,9 @@ export const LoginView: React.FC<LoginViewProps> = ({ onAuthenticated, onTwoFact
   const [clinicName, setClinicName] = useState('');
   const [fullName, setFullName] = useState('');
   const [phone, setPhone] = useState('');
+  // Registration flavor: clinic and hospital provision identically today —
+  // this only labels the tenant (hospital features arrive later).
+  const [registerType, setRegisterType] = useState<'clinic' | 'hospital'>('clinic');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [branding, setBranding] = useState<PublicTenantContext | null>(null);
@@ -47,7 +50,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onAuthenticated, onTwoFact
       return;
     }
     if (mode === 'register' && (!clinicName.trim() || !fullName.trim() || !email.trim() || password.length < 8)) {
-      setError('Clinic name, your name, email and a password of at least 8 characters are required.');
+      setError(`${registerType === 'hospital' ? 'Hospital' : 'Clinic'} name, your name, email and a password of at least 8 characters are required.`);
       return;
     }
 
@@ -63,6 +66,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onAuthenticated, onTwoFact
         user = result.user;
       } else {
         user = await registerTenant({
+          orgType: registerType,
           clinicName: clinicName.trim(),
           name: fullName.trim(),
           email: email.trim(),
@@ -143,19 +147,39 @@ export const LoginView: React.FC<LoginViewProps> = ({ onAuthenticated, onTwoFact
                 onClick={() => { setMode('register'); setError(''); }}
                 className={`flex-1 rounded-md py-2 transition ${mode === 'register' ? 'bg-white shadow text-slate-900' : 'text-slate-500 hover:text-slate-700'}`}
               >
-                Register Clinic
+                Register
               </button>
             </div>
 
             <form onSubmit={submit} className="space-y-4" noValidate>
               {mode === 'register' && (
                 <>
+                  <div className="flex rounded-lg bg-slate-100 p-1 text-[13px] font-semibold" aria-label="Registration type">
+                    <button
+                      type="button"
+                      onClick={() => setRegisterType('clinic')}
+                      aria-pressed={registerType === 'clinic'}
+                      className={`flex flex-1 items-center justify-center gap-1.5 rounded-md py-2 transition ${registerType === 'clinic' ? 'bg-white shadow text-slate-900' : 'text-slate-500 hover:text-slate-700'}`}
+                    >
+                      <Building2 className="w-3.5 h-3.5" />
+                      Clinic Registration
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setRegisterType('hospital')}
+                      aria-pressed={registerType === 'hospital'}
+                      className={`flex flex-1 items-center justify-center gap-1.5 rounded-md py-2 transition ${registerType === 'hospital' ? 'bg-white shadow text-slate-900' : 'text-slate-500 hover:text-slate-700'}`}
+                    >
+                      <Hospital className="w-3.5 h-3.5" />
+                      Hospital Registration
+                    </button>
+                  </div>
                   <Field icon={<Building2 className="w-4 h-4 text-slate-400" />}>
                     <input
                       type="text"
                       value={clinicName}
                       onChange={e => setClinicName(e.target.value)}
-                      placeholder="Diagnostic centre name"
+                      placeholder={registerType === 'hospital' ? 'Hospital name' : 'Diagnostic centre name'}
                       autoComplete="organization"
                       className="w-full bg-transparent outline-none text-sm placeholder:text-slate-400"
                     />
@@ -217,7 +241,11 @@ export const LoginView: React.FC<LoginViewProps> = ({ onAuthenticated, onTwoFact
                 className="w-full rounded-lg bg-cyan-600 hover:bg-cyan-700 disabled:opacity-60 text-white font-semibold text-sm py-2.5 flex items-center justify-center gap-2 transition"
               >
                 {busy && <Loader2 className="w-4 h-4 animate-spin" />}
-                {mode === 'login' ? 'Sign In' : 'Create Clinic Account (14-day trial)'}
+                {mode === 'login'
+                  ? 'Sign In'
+                  : registerType === 'hospital'
+                    ? 'Create Hospital Account (14-day trial)'
+                    : 'Create Clinic Account (14-day trial)'}
               </button>
             </form>
 

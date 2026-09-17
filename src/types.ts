@@ -736,6 +736,17 @@ export interface IntegrationCatalogEntry {
   secretKeys: string[];
 }
 
+/** One recorded delivery attempt through an integration (real send). */
+export interface IntegrationDeliveryRecord {
+  id: string;
+  event: string;
+  status: 'sent' | 'failed' | 'skipped';
+  target: string | null;
+  detail: string | null;
+  latencyMs: number | null;
+  at: string | null;
+}
+
 export interface TenantIntegrationRecord {
   id: string;
   type: string;
@@ -748,6 +759,8 @@ export interface TenantIntegrationRecord {
   status: IntegrationStatus;
   lastCheckedAt: string | null;
   lastError: string | null;
+  /** Last real delivery attempts through this integration (newest first). */
+  deliveryLog: IntegrationDeliveryRecord[];
   createdAt?: string | null;
 }
 
@@ -757,12 +770,15 @@ export interface TenantIntegrationsPayload {
   integrations: TenantIntegrationRecord[];
   integration?: TenantIntegrationRecord;
   probe?: { status: IntegrationStatus; detail: string; check: string };
+  test?: { status: string; detail: string; latencyMs?: number | null };
 }
 
 export interface TenantRecord {
   id: string;
   name: string;
   slug: string;
+  /** Organization flavor: clinic and hospital share the portal today. */
+  orgType: 'clinic' | 'hospital';
   tenantCode: string;
   subscriptionStatus: SubscriptionStatus;
   plan: Plan | null;
@@ -893,4 +909,22 @@ export interface UsageSummary {
   monthly: Record<string, Record<string, number>>;
 }
 
+/** Tenant-side custom-domain entry (GET /settings/branding). */
+export interface TenantBrandingDomainView {
+  host: string;
+  isPrimary: boolean;
+  verified: boolean;
+}
 
+/**
+ * Tenant-side white-label view — READ-ONLY. Branding is platform-managed;
+ * clinic/hospital admins can see the presentation settings that govern their
+ * portal and receive a change-request hint instead of an edit form.
+ */
+export interface TenantBrandingView {
+  branding: TenantBranding;
+  overridden: boolean;
+  domains: TenantBrandingDomainView[];
+  managedBy: 'platform';
+  changeHint: string;
+}

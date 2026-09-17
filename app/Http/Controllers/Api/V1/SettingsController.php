@@ -32,6 +32,37 @@ class SettingsController extends BaseApiController
         return $this->ok(['clinic' => ApiShape::clinicSettings($this->tenantId())]);
     }
 
+    /**
+     * Tenant-side white-label view — READ-ONLY by design. Branding is
+     * platform-managed (control-plane write path is the only writer, proven
+     * 403 for tenant admins in PlatformAccessTest). This endpoint closes the
+     * visibility asymmetry: clinic/hospital admins can SEE the presentation
+     * settings that govern their portal, with an explicit pointer for change
+     * requests instead of an edit form that would silently do nothing.
+     */
+    public function showBranding(): JsonResponse
+    {
+        $tenant = \App\Models\Business::find($this->tenantId());
+        abort_unless($tenant, 404, 'No active tenant.');
+
+        $domains = \App\Models\TenantDomain::where('business_id', $tenant->id)
+            ->orderByDesc('is_primary')
+            ->orderBy('host')
+            ->get(['host', 'is_primary', 'verified_at']);
+
+        return $this->ok([
+            'branding' => \App\Services\TenantBrandingService::forTenant($tenant),
+            'overridden' => \App\Models\TenantBranding::where('business_id', $tenant->id)->exists(),
+            'domains' => $domains->map(fn ($d) => [
+                'host' => $d->host,
+                'isPrimary' => (bool) $d->is_primary,
+                'verified' => $d->verified_at !== null,
+            ])->all(),
+            'managedBy' => 'platform',
+            'changeHint' => 'Contact platform support to request changes - the platform team applies and audits them on your behalf.',
+        ]);
+    }
+
     public function updateClinic(Request $request): JsonResponse
     {
         $this->denyUnless('setting manage');
@@ -329,25 +360,66 @@ class SettingsController extends BaseApiController
         }
 
         $status = 'pending';
+        $failureDetail = null;
+
+        $reportText = sprintf(
+            'Imaging report for %s (study: %s, ref: %s) is ready. — %s',
+            $appointment->patientDisplayName(),
+            $appointment->ServiceData?->name ?? 'imaging',
+            $appointment->token_number,
+            \App\Models\Business::find($this->tenantId())?->name ?? 'your imaging centre'
+        );
 
         if ($validated['channel'] === 'portal') {
             $status = 'delivered'; // signed report is already visible on the portal
         } elseif ($validated['channel'] === 'email') {
-            try {
-                $report = $appointment->radiologyReports()->whereNotNull('locked_at')->first();
-                Mail::raw(
-                    'Please find the imaging report for '.$appointment->patientDisplayName().'.',
-                    fn ($message) => $message->to($validated['recipientContact'])
-                        ->subject('Imaging Report '.$appointment->token_number)
-                );
-                $status = 'delivered';
-            } catch (\Throwable $e) {
-                report($e);
-                $status = 'pending';
+            // Tenant's OWN SMTP integration when configured; platform mail only
+            // as the fallback for tenants without one.
+            $smtp = \App\Models\TenantIntegration::where('business_id', $this->tenantId())
+                ->where('type', 'email')->where('status', 'active')->first();
+
+            if ($smtp && \App\Services\Delivery\EmailSender::tenantHasSmtp($smtp)) {
+                $result = app(\App\Services\Delivery\DeliveryDispatcher::class)->sendNow($smtp, 'report_dispatch', [
+                    'to' => $validated['recipientContact'],
+                    'subject' => 'Imaging Report '.$appointment->token_number,
+                    'message' => $reportText,
+                ]);
+                $status = $result->status === \App\Services\Delivery\DeliveryResult::SENT ? 'delivered' : 'failed';
+                $failureDetail = $result->status === \App\Services\Delivery\DeliveryResult::SENT ? null : $result->detail;
+            } else {
+                try {
+                    Mail::raw(
+                        $reportText,
+                        fn ($message) => $message->to($validated['recipientContact'])
+                            ->subject('Imaging Report '.$appointment->token_number)
+                    );
+                    $status = 'delivered';
+                } catch (\Throwable $e) {
+                    report($e);
+                    $status = 'pending';
+                    $failureDetail = 'Platform mail transport failed: '.$e->getMessage();
+                }
+            }
+        } elseif (in_array($validated['channel'], ['whatsapp', 'sms'], true)) {
+            // REAL gateway delivery through the tenant's configured integration.
+            $gateway = \App\Models\TenantIntegration::where('business_id', $this->tenantId())
+                ->where('type', $validated['channel'])->where('status', 'active')->first();
+
+            if ($gateway) {
+                $result = app(\App\Services\Delivery\DeliveryDispatcher::class)->sendNow($gateway, 'report_dispatch', [
+                    'to' => $validated['recipientContact'],
+                    'message' => $reportText,
+                ]);
+                $status = $result->status === \App\Services\Delivery\DeliveryResult::SENT ? 'delivered' : 'failed';
+                $failureDetail = $result->status === \App\Services\Delivery\DeliveryResult::SENT ? null : $result->detail;
+            } else {
+                // Truthful: with no gateway this dispatch can never leave —
+                // record it as failed with the reason, not as a fake "pending".
+                $status = 'failed';
+                $failureDetail = "No active {$validated['channel']} integration is configured for this tenant — register one in the platform console.";
             }
         }
 
-        // whatsapp / sms: no gateway credentials are configured — recorded as pending.
         $dispatch = DoctorDispatchLog::create([
             'appointment_id' => $appointment->id,
             'token_number' => $appointment->token_number,
@@ -358,6 +430,7 @@ class SettingsController extends BaseApiController
             'channel' => $validated['channel'],
             'recipient_contact' => $validated['recipientContact'],
             'status' => $status,
+            'failure_detail' => $failureDetail,
             'sent_by' => Auth::user()->name,
             'business_id' => $this->tenantId(),
         ]);

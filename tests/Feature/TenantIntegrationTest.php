@@ -53,7 +53,7 @@ class TenantIntegrationTest extends ApiTestCase
         $plaintext = 'super-secret-signing-value';
 
         $res = $this->actingAs($super)
-            ->postJson("/api/v1/platform/tenants/{$this->businessA->id}/integrations", [
+            ->confirmStepUp()->postJson("/api/v1/platform/tenants/{$this->businessA->id}/integrations", [
                 'type' => 'webhook',
                 'name' => 'EHR outbound webhook',
                 'config' => ['url' => 'https://ehr.alpha.test/hooks/ris'],
@@ -83,7 +83,7 @@ class TenantIntegrationTest extends ApiTestCase
         $super = $this->platformUser();
 
         $body = $this->actingAs($super)
-            ->postJson("/api/v1/platform/tenants/{$this->businessA->id}/integrations", [
+            ->confirmStepUp()->postJson("/api/v1/platform/tenants/{$this->businessA->id}/integrations", [
                 'type' => 'fhir',
                 'name' => 'FHIR — not yet configured',
                 'config' => [],
@@ -110,7 +110,7 @@ class TenantIntegrationTest extends ApiTestCase
         ]);
 
         $this->actingAs($super)
-            ->postJson("/api/v1/platform/tenants/{$this->businessA->id}/integrations", [
+            ->confirmStepUp()->postJson("/api/v1/platform/tenants/{$this->businessA->id}/integrations", [
                 'type' => 'fhir',
                 'name' => 'Blocked FHIR',
                 'config' => ['baseUrl' => 'https://fhir.alpha.test'],
@@ -119,7 +119,7 @@ class TenantIntegrationTest extends ApiTestCase
 
         // A type whose entitlement is still on keeps working.
         $this->actingAs($super)
-            ->postJson("/api/v1/platform/tenants/{$this->businessA->id}/integrations", [
+            ->confirmStepUp()->postJson("/api/v1/platform/tenants/{$this->businessA->id}/integrations", [
                 'type' => 'dicom',
                 'name' => 'PACS',
                 'config' => ['host' => '127.0.0.1', 'port' => '104', 'aeTitle' => 'RIS'],
@@ -139,7 +139,7 @@ class TenantIntegrationTest extends ApiTestCase
         ]);
 
         $this->actingAs($super)
-            ->postJson("/api/v1/platform/tenants/{$this->businessA->id}/integrations", [
+            ->confirmStepUp()->postJson("/api/v1/platform/tenants/{$this->businessA->id}/integrations", [
                 'type' => 'dicom',
                 'name' => 'Cross-facility attempt',
                 'facilityId' => $betaFacility->id,
@@ -153,7 +153,7 @@ class TenantIntegrationTest extends ApiTestCase
         $super = $this->platformUser();
 
         $id = (int) $this->actingAs($super)
-            ->postJson("/api/v1/platform/tenants/{$this->businessA->id}/integrations", [
+            ->confirmStepUp()->postJson("/api/v1/platform/tenants/{$this->businessA->id}/integrations", [
                 'type' => 'dicom',
                 'name' => 'Dead PACS',
                 'config' => ['host' => '127.0.0.1', 'port' => '1', 'aeTitle' => 'RIS'],
@@ -162,7 +162,7 @@ class TenantIntegrationTest extends ApiTestCase
             ->decodeResponseJson()['data']['integration']['id'];
 
         $this->actingAs($super)
-            ->postJson("/api/v1/platform/tenants/{$this->businessA->id}/integrations/{$id}/probe")
+            ->confirmStepUp()->postJson("/api/v1/platform/tenants/{$this->businessA->id}/integrations/{$id}/probe")
             ->assertOk()
             ->assertJsonPath('data.probe.status', 'error')
             ->assertJsonPath('data.probe.check', 'tcp');
@@ -177,7 +177,7 @@ class TenantIntegrationTest extends ApiTestCase
         $super = $this->platformUser();
 
         $id = (int) $this->actingAs($super)
-            ->postJson("/api/v1/platform/tenants/{$this->businessA->id}/integrations", [
+            ->confirmStepUp()->postJson("/api/v1/platform/tenants/{$this->businessA->id}/integrations", [
                 'type' => 'fhir',
                 'name' => 'FHIR server',
                 'config' => ['baseUrl' => 'https://fhir.alpha.test/baseR4'],
@@ -196,13 +196,13 @@ class TenantIntegrationTest extends ApiTestCase
         ]);
 
         $this->actingAs($super)
-            ->postJson("/api/v1/platform/tenants/{$this->businessA->id}/integrations/{$id}/probe")
+            ->confirmStepUp()->postJson("/api/v1/platform/tenants/{$this->businessA->id}/integrations/{$id}/probe")
             ->assertOk()
             ->assertJsonPath('data.probe.status', 'active')
-            ->assertJsonPath('data.probe.check', 'http');
+            ->assertJsonPath('data.probe.check', 'fhir'); // dedicated FHIR conformance probe
 
         $this->actingAs($super)
-            ->postJson("/api/v1/platform/tenants/{$this->businessA->id}/integrations/{$id}/probe")
+            ->confirmStepUp()->postJson("/api/v1/platform/tenants/{$this->businessA->id}/integrations/{$id}/probe")
             ->assertOk()
             ->assertJsonPath('data.probe.status', 'error');
     }
@@ -212,17 +212,17 @@ class TenantIntegrationTest extends ApiTestCase
         $super = $this->platformUser();
 
         $id = (int) $this->actingAs($super)
-            ->postJson("/api/v1/platform/tenants/{$this->businessA->id}/integrations", [
+            ->confirmStepUp()->postJson("/api/v1/platform/tenants/{$this->businessA->id}/integrations", [
                 'type' => 'sms',
                 'name' => 'SMS gateway',
-                'config' => ['provider' => 'twilio'],
+                'config' => ['provider' => 'twilio', 'endpoint' => 'https://sms.example.test/send'],
                 'secrets' => ['apiKey' => 'k', 'senderId' => 'RIS'],
             ])
             ->assertStatus(201)
             ->decodeResponseJson()['data']['integration']['id'];
 
         $res = $this->actingAs($super)
-            ->postJson("/api/v1/platform/tenants/{$this->businessA->id}/integrations/{$id}/probe")
+            ->confirmStepUp()->postJson("/api/v1/platform/tenants/{$this->businessA->id}/integrations/{$id}/probe")
             ->assertOk();
 
         $this->assertSame('active', $res->decodeResponseJson()['data']['probe']['status']);
@@ -235,7 +235,7 @@ class TenantIntegrationTest extends ApiTestCase
         $super = $this->platformUser();
 
         $id = (int) $this->actingAs($super)
-            ->postJson("/api/v1/platform/tenants/{$this->businessA->id}/integrations", [
+            ->confirmStepUp()->postJson("/api/v1/platform/tenants/{$this->businessA->id}/integrations", [
                 'type' => 'whatsapp',
                 'name' => 'WhatsApp',
                 'config' => ['phoneNumberId' => '1234'],
@@ -245,7 +245,7 @@ class TenantIntegrationTest extends ApiTestCase
             ->decodeResponseJson()['data']['integration']['id'];
 
         $this->actingAs($super)
-            ->postJson("/api/v1/platform/tenants/{$this->businessA->id}/integrations/{$id}/secrets", [
+            ->confirmStepUp()->postJson("/api/v1/platform/tenants/{$this->businessA->id}/integrations/{$id}/secrets", [
                 'secrets' => ['accessToken' => 'new-token'],
             ])
             ->assertOk();
@@ -255,7 +255,7 @@ class TenantIntegrationTest extends ApiTestCase
 
         // A payload with no recognised credential key is rejected outright.
         $this->actingAs($super)
-            ->postJson("/api/v1/platform/tenants/{$this->businessA->id}/integrations/{$id}/secrets", [
+            ->confirmStepUp()->postJson("/api/v1/platform/tenants/{$this->businessA->id}/integrations/{$id}/secrets", [
                 'secrets' => ['notACredential' => 'x'],
             ])
             ->assertStatus(422);
@@ -266,7 +266,7 @@ class TenantIntegrationTest extends ApiTestCase
         $super = $this->platformUser();
 
         $betaId = (int) $this->actingAs($super)
-            ->postJson("/api/v1/platform/tenants/{$this->businessB->id}/integrations", [
+            ->confirmStepUp()->postJson("/api/v1/platform/tenants/{$this->businessB->id}/integrations", [
                 'type' => 'dicom',
                 'name' => 'Beta PACS',
                 'config' => ['host' => '127.0.0.1', 'port' => '104', 'aeTitle' => 'BETA'],
@@ -288,7 +288,7 @@ class TenantIntegrationTest extends ApiTestCase
             ->getJson("/api/v1/platform/tenants/{$this->businessA->id}/integrations")
             ->assertStatus(403);
         $this->actingAs($this->adminA)
-            ->postJson("/api/v1/platform/tenants/{$this->businessA->id}/integrations", ['type' => 'dicom', 'name' => 'x'])
+            ->confirmStepUp()->postJson("/api/v1/platform/tenants/{$this->businessA->id}/integrations", ['type' => 'dicom', 'name' => 'x'])
             ->assertStatus(403);
 
         // Beta's integration survived every attempt and stays in Beta.
@@ -300,9 +300,9 @@ class TenantIntegrationTest extends ApiTestCase
         $super = $this->platformUser();
         $payload = ['type' => 'dicom', 'name' => 'Shared name', 'config' => ['host' => '127.0.0.1', 'port' => '104', 'aeTitle' => 'A']];
 
-        $this->actingAs($super)->postJson("/api/v1/platform/tenants/{$this->businessA->id}/integrations", $payload)->assertStatus(201);
-        $this->actingAs($super)->postJson("/api/v1/platform/tenants/{$this->businessA->id}/integrations", $payload)->assertStatus(422);
+        $this->actingAs($super)->confirmStepUp()->postJson("/api/v1/platform/tenants/{$this->businessA->id}/integrations", $payload)->assertStatus(201);
+        $this->actingAs($super)->confirmStepUp()->postJson("/api/v1/platform/tenants/{$this->businessA->id}/integrations", $payload)->assertStatus(422);
         // The same name is fine for a different tenant.
-        $this->actingAs($super)->postJson("/api/v1/platform/tenants/{$this->businessB->id}/integrations", $payload)->assertStatus(201);
+        $this->actingAs($super)->confirmStepUp()->postJson("/api/v1/platform/tenants/{$this->businessB->id}/integrations", $payload)->assertStatus(201);
     }
 }

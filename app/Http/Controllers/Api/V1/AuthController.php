@@ -135,6 +135,10 @@ class AuthController extends BaseApiController
     {
         $validated = $request->validate([
             'clinic_name' => ['required', 'string', 'max:255'],
+            // Clinic and hospital tenants provision identically today; the
+            // flavor is stored for hospital-specific features to come.
+            // Optional + defaulted so existing API consumers keep working.
+            'org_type' => ['nullable', 'in:clinic,hospital'],
             'name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'email', 'max:255', 'unique:users,email'],
             'phone' => ['nullable', 'string', 'max:40'],
@@ -158,11 +162,13 @@ class AuthController extends BaseApiController
                 ],
             ],
             planSlug: $validated['plan'] ?? 'starter',
+            orgType: $validated['org_type'] ?? 'clinic',
         );
 
         $tenant = $result['business'];
 
-        $this->audit('tenant_registered', $tenant, ['summary' => "New clinic registered: {$tenant->name}"]);
+        $orgNoun = ($validated['org_type'] ?? 'clinic') === 'hospital' ? 'hospital' : 'clinic';
+        $this->audit('tenant_registered', $tenant, ['summary' => "New {$orgNoun} registered: {$tenant->name}"]);
 
         Auth::attempt($request->only('email', 'password'), remember: true);
 

@@ -34,7 +34,7 @@ class TenantLifecycleService
      *                                  becomes owner) or full new-user attributes.
      * @return array{business: Business, admin: ?User, initialPassword: ?string}
      */
-    public function provision(string $clinicName, array $adminAttributes, ?Plan $plan = null, ?string $planSlug = null, ?int $trialDays = null, ?string $subscriptionEndsAt = null): array
+    public function provision(string $clinicName, array $adminAttributes, ?Plan $plan = null, ?string $planSlug = null, ?int $trialDays = null, ?string $subscriptionEndsAt = null, string $orgType = 'clinic'): array
     {
         $plan = $plan
             ?? Plan::where('slug', $planSlug ?? 'starter')->where('is_active', true)->first()
@@ -42,7 +42,7 @@ class TenantLifecycleService
 
         $initialPassword = null;
 
-        $business = DB::transaction(function () use ($clinicName, $adminAttributes, $plan, $trialDays, $subscriptionEndsAt, &$initialPassword) {
+        $business = DB::transaction(function () use ($clinicName, $adminAttributes, $plan, $trialDays, $subscriptionEndsAt, $orgType, &$initialPassword) {
             $existingOwner = $adminAttributes['user'] ?? null;
 
             if ($existingOwner instanceof User) {
@@ -63,6 +63,9 @@ class TenantLifecycleService
 
             $business = Business::create([
                 'name' => $clinicName,
+                // Clinic and hospital tenants share the portal; the flavor is
+                // stored/audited so hospital features can key off it later.
+                'org_type' => in_array($orgType, ['clinic', 'hospital'], true) ? $orgType : 'clinic',
                 'form_type' => 'form-layout',
                 'layouts' => 'Formlayout11',
                 'theme_color' => 'color1-Formlayout11',

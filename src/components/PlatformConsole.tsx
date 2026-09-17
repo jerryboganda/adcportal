@@ -1,12 +1,13 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Activity, Archive, ArrowLeft, BarChart3, Building2, CheckCircle2, ChevronRight, Copy, CreditCard,
-  Download, Edit2, HeartPulse, KeyRound, LifeBuoy, LogOut, Pause, Pencil, Play, Plus, RefreshCw, RotateCcw, ScrollText,
-  Search, Server, ShieldCheck, Trash2, Users as UsersIcon, XCircle,
+  Download, Edit2, HeartPulse, Hospital, KeyRound, LifeBuoy, LogOut, Pause, Pencil, Play, Plus, RefreshCw, RotateCcw, ScrollText,
+  Search, Server, ShieldCheck, Trash2, Users as UsersIcon, XCircle, Paintbrush,
 } from 'lucide-react';
 import * as api from '../services/apiService';
 import { SessionUser } from '../services/apiService';
 import { TwoFactorSettingsCard } from './TwoFactorSettingsCard';
+import { StepUpModal } from './StepUpModal';
 import {
   DeploymentCatalog,
   Entitlements,
@@ -74,6 +75,20 @@ function StatusBadge({ status }: { status: string }) {
   );
 }
 
+/** Clinic vs hospital tenant flavor (both share the portal today). */
+function OrgTypeBadge({ orgType }: { orgType?: string | null }) {
+  const isHospital = orgType === 'hospital';
+  return (
+    <span
+      title={isHospital ? 'Hospital tenant' : 'Clinic tenant'}
+      className={`inline-flex items-center gap-0.5 rounded-full border px-1.5 py-0.5 align-middle text-[10px] font-semibold ${isHospital ? 'border-violet-200 bg-violet-50 text-violet-700' : 'border-slate-200 bg-slate-50 text-slate-600'}`}
+    >
+      {isHospital ? <Hospital size={9} /> : <Building2 size={9} />}
+      {isHospital ? 'Hospital' : 'Clinic'}
+    </span>
+  );
+}
+
 function Card({ label, value, sub, tone = 'slate' }: { label: string; value: React.ReactNode; sub?: string; tone?: 'slate' | 'cyan' | 'emerald' | 'amber' | 'rose' }) {
   const tones: Record<string, string> = {
     slate: 'border-slate-200',
@@ -133,6 +148,7 @@ export const PlatformConsole: React.FC<{
   ], []);
 
   const [securityOpen, setSecurityOpen] = useState(false);
+  const [reconfirmOpen, setReconfirmOpen] = useState(false);
 
   return (
     <div className="min-h-screen bg-slate-100 text-slate-900 flex flex-col antialiased">
@@ -189,6 +205,14 @@ export const PlatformConsole: React.FC<{
           <div className="w-full max-w-lg" onClick={e => e.stopPropagation()}>
             <TwoFactorSettingsCard notify={notify} />
             <button
+              onClick={() => { setSecurityOpen(false); setReconfirmOpen(true); }}
+              className="mt-3 w-full rounded-lg border border-cyan-300 bg-cyan-50 px-3 py-2 text-xs font-semibold text-cyan-800 hover:bg-cyan-100"
+            >
+              <span className="inline-flex items-center gap-1.5">
+                <Paintbrush size={13} /> Re-confirm password for platform actions
+              </span>
+            </button>
+            <button
               onClick={() => setSecurityOpen(false)}
               className="mt-3 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50"
             >
@@ -221,6 +245,21 @@ export const PlatformConsole: React.FC<{
           </>
         )}
       </main>
+
+      <StepUpModal
+        open={reconfirmOpen}
+        onConfirm={async (password) => {
+          try {
+            await api.confirmPlatformStepUp(password);
+            setReconfirmOpen(false);
+            notify('success', 'Platform actions re-confirmed for 15 minutes.');
+            return true;
+          } catch {
+            return false;
+          }
+        }}
+        onCancel={() => setReconfirmOpen(false)}
+      />
     </div>
   );
 };
@@ -306,6 +345,7 @@ const TenantsSection: React.FC<{
   const [plans, setPlans] = useState<Plan[]>([]);
   const [q, setQ] = useState('');
   const [status, setStatus] = useState('');
+  const [orgFilter, setOrgFilter] = useState<'all' | 'clinic' | 'hospital'>('all');
   const [loading, setLoading] = useState(true);
   const [provisionOpen, setProvisionOpen] = useState(false);
 
@@ -327,10 +367,27 @@ const TenantsSection: React.FC<{
 
   useEffect(() => { load(); }, [load]);
 
+  const visibleTenants = useMemo(
+    () => (orgFilter === 'all' ? tenants : tenants.filter(t => (t.orgType ?? 'clinic') === orgFilter)),
+    [tenants, orgFilter],
+  );
+
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-2">
         <h2 className="text-lg font-bold mr-auto">Tenants</h2>
+        <div className="flex rounded-lg border border-slate-300 bg-white p-0.5 text-xs font-semibold">
+          {(['all', 'clinic', 'hospital'] as const).map(f => (
+            <button
+              key={f}
+              type="button"
+              onClick={() => setOrgFilter(f)}
+              className={`rounded-md px-2.5 py-1 transition ${orgFilter === f ? 'bg-slate-900 text-white' : 'text-slate-500 hover:text-slate-700'}`}
+            >
+              {f === 'all' ? 'All types' : `${f}s`}
+            </button>
+          ))}
+        </div>
         <div className="relative">
           <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
           <input
@@ -363,7 +420,7 @@ const TenantsSection: React.FC<{
       <div className="rounded-xl border border-slate-200 bg-white overflow-hidden">
         {loading && tenants.length === 0 ? (
           <SectionSpinner label="Loading tenants…" />
-        ) : tenants.length === 0 ? (
+        ) : visibleTenants.length === 0 ? (
           <p className="px-4 py-8 text-center text-sm text-slate-500">No tenants match.</p>
         ) : (
           <table className="w-full text-sm">
@@ -379,10 +436,12 @@ const TenantsSection: React.FC<{
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {tenants.map(t => (
+              {visibleTenants.map(t => (
                 <tr key={t.id} className="hover:bg-slate-50/70">
                   <td className="px-4 py-2.5">
-                    <p className="font-semibold text-slate-800">{t.name}</p>
+                    <p className="font-semibold text-slate-800">
+                      {t.name} <OrgTypeBadge orgType={t.orgType} />
+                    </p>
                     <p className="text-[11px] text-slate-400">{t.tenantCode}</p>
                   </td>
                   <td className="px-4 py-2.5"><StatusBadge status={t.subscriptionStatus} /></td>
@@ -491,6 +550,25 @@ const ProvisionModal: React.FC<{
 
 // ==================== Tenant 360 ====================
 
+/**
+ * Tab labels for Tenant 360. Generic words like "Branding" read like
+ * platform self-service from inside a tenant's record — every label names
+ * WHOSE setting this is and, where it matters, WHO may change it.
+ */
+const TENANT_TAB_LABELS: Record<(typeof TAB_KEYS)[number], string> = {
+  overview: 'Overview',
+  users: 'Tenant users',
+  facilities: 'Tenant facilities',
+  deployment: 'Deployment (platform)',
+  branding: 'Tenant branding',
+  integrations: 'Tenant integrations',
+  lifecycle: 'Lifecycle (platform)',
+  audit: 'Tenant audit',
+  features: 'Feature entitlements',
+};
+
+const TAB_KEYS = ['overview', 'users', 'facilities', 'deployment', 'branding', 'integrations', 'lifecycle', 'audit', 'features'] as const;
+
 const TenantDetail: React.FC<{
   tenantId: string;
   user: SessionUser;
@@ -543,6 +621,7 @@ const TenantDetail: React.FC<{
         </button>
         <h2 className="text-lg font-bold">{tenant.name}</h2>
         <StatusBadge status={tenant.subscriptionStatus} />
+        <OrgTypeBadge orgType={tenant.orgType} />
         <span className="text-xs text-slate-400">{tenant.tenantCode}</span>
         <div className="ml-auto flex flex-wrap items-center gap-2">
           {can(user, 'tenants.lifecycle') && tenant.subscriptionStatus === 'provisioning' && can(user, 'provisioning.manage') && (
@@ -597,14 +676,28 @@ const TenantDetail: React.FC<{
         />
       )}
 
+      {/*
+        Acting-context banner. This screen is the PLATFORM operating ON a
+        tenant (Tenant 360), not the tenant's own portal — make that
+        unmissable so platform actions can never be mistaken for tenant-side
+        self-service (and vice versa).
+      */}
+      <div className="rounded-lg border border-cyan-200 bg-cyan-50/60 px-3 py-2 text-xs leading-relaxed text-cyan-900">
+        <strong>Platform control-plane view.</strong> You are operating on{' '}
+        <strong>{tenant.name}</strong> ({tenant.orgType}) as platform staff. Every change below
+        — branding, features, integrations, users, lifecycle — applies to <strong>this tenant
+        only</strong>, is audited, and is invisible to the tenant's own admins until it takes
+        effect in their portal.
+      </div>
+
       <div className="flex gap-1 overflow-x-auto border-b border-slate-200">
-        {(['overview', 'users', 'facilities', 'deployment', 'branding', 'integrations', 'lifecycle', 'audit', 'features'] as const).map(t => (
+        {(TAB_KEYS).map(t => (
           <button
             key={t}
             onClick={() => setTab(t)}
             className={`whitespace-nowrap px-3 py-2 text-xs font-semibold capitalize border-b-2 -mb-px ${tab === t ? 'border-cyan-500 text-cyan-700' : 'border-transparent text-slate-500 hover:text-slate-800'}`}
           >
-            {t}
+            {TENANT_TAB_LABELS[t]}
           </button>
         ))}
       </div>
@@ -1418,7 +1511,7 @@ const InfrastructureSection: React.FC<{
   return (
     <div className="space-y-4">
       <div className="flex items-center gap-3">
-        <h2 className="text-sm font-bold text-slate-800">Deployment topology</h2>
+        <h2 className="text-sm font-bold text-slate-800">Deployment topology — platform-managed placement</h2>
         <button onClick={load} className={btnGhost}><RefreshCw size={13} /> Refresh</button>
         <span className="ml-auto text-xs text-slate-500">
           {can(user, 'infrastructure.manage') ? 'Re-place a tenant from its Deployment tab.' : 'Read-only for your platform role.'}
@@ -1537,7 +1630,7 @@ const BrandingTab: React.FC<{
       const updated = await fn();
       setPayload(updated);
       setForm(updated.branding);
-      notify('success', ok);
+      notify(updated.brandingOverridden ? 'success' : 'error', updated.brandingOverridden ? ok : 'No changes were saved — the form was identical to the current values.');
     } catch (err) {
       fail(err, 'Domain action failed.');
     } finally {
@@ -1552,9 +1645,14 @@ const BrandingTab: React.FC<{
     <div className="space-y-4">
       <div className="rounded-xl border border-slate-200 bg-white p-4 space-y-3">
         <div className="flex items-center gap-2">
-          <p className="text-sm font-bold text-slate-800">White-label presentation</p>
+          <p className="text-sm font-bold text-slate-800">White-label presentation — {tenant.name}'s portal, login screen and emails</p>
           {!payload.brandingOverridden && <span className="rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[11px] text-slate-600">using platform defaults</span>}
         </div>
+        <p className="text-xs text-slate-500">
+          Platform-managed presentation for this tenant only. These values change what
+          <strong> {tenant.name}'s users</strong> see — they never alter the PolytronX platform brand,
+          and the tenant's own admins cannot edit them here (this console is platform staff only).
+        </p>
         {!payload.entitlements.branding && (
           <p className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-800">
             The <code>branding</code> entitlement is disabled for this tenant — enable it in the Features tab first.
@@ -1596,14 +1694,14 @@ const BrandingTab: React.FC<{
           </label>
         </div>
         {canBrand ? (
-          <button onClick={saveBranding} disabled={busy} className={btnPrimarySm}><Pencil size={13} /> Save branding</button>
+          <button onClick={saveBranding} disabled={busy} className={btnPrimarySm}><Pencil size={13} /> Save {tenant.name} branding</button>
         ) : (
           <p className="text-[11px] text-slate-500">Read-only: you need <code>tenants.manage</code> and the tenant's <code>branding</code> entitlement.</p>
         )}
       </div>
 
       <div className="rounded-xl border border-slate-200 bg-white p-4 space-y-3">
-        <p className="text-sm font-bold text-slate-800">Custom domains</p>
+        <p className="text-sm font-bold text-slate-800">Custom domains — DNS-verified hosts that may serve {tenant.name} branding</p>
         <p className="text-xs text-slate-500">
           Publish a TXT record <code>{payload.verificationRecord.replace('<host>', 'your.host')}</code> containing{' '}
           <code>polytronx-ris-verify=&lt;tenant code&gt;</code>, then verify. Only verified hosts serve this tenant's brand,
@@ -1854,6 +1952,23 @@ const IntegrationsTab: React.FC<{
 
               {i.lastError && <p className="mt-2 rounded-lg border border-rose-200 bg-rose-50 px-2.5 py-1.5 text-[11px] text-rose-700">{i.lastError}</p>}
 
+              {i.deliveryLog.length > 0 && (
+                <div className="mt-2 rounded-lg border border-slate-200 bg-slate-50/60 px-2.5 py-2">
+                  <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Recent deliveries</p>
+                  <ul className="mt-1 space-y-0.5">
+                    {i.deliveryLog.map(d => (
+                      <li key={d.id} className="flex flex-wrap items-center gap-1.5 text-[11px]">
+                        <span className={`rounded px-1 py-px font-semibold ${d.status === 'sent' ? 'bg-emerald-100 text-emerald-700' : d.status === 'failed' ? 'bg-rose-100 text-rose-700' : 'bg-slate-200 text-slate-600'}`}>{d.status}</span>
+                        <span className="text-slate-600">{d.event}</span>
+                        {d.target && <span className="text-slate-400">→ {d.target}</span>}
+                        {d.latencyMs != null && <span className="text-slate-400">{d.latencyMs} ms</span>}
+                        <span className="ml-auto text-slate-400">{d.at ? new Date(d.at).toLocaleString() : ''}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
               {canManage && (
                 <div className="mt-3 flex flex-wrap items-center gap-2">
                   <button disabled={busy} onClick={() => { setEditFor(i); setEditName(i.name); setEditFacilityId(i.facilityId ?? ''); setEditConfig({ ...i.config }); }} className={btnGhost}>
@@ -1862,6 +1977,15 @@ const IntegrationsTab: React.FC<{
                   <button disabled={busy} onClick={() => run(() => api.probeTenantIntegration(tenant.id, i.id), `Health check ran for ${i.name}.`)} className={btnGhost}>
                     <Activity size={13} /> Run health check
                   </button>
+                  {i.type !== 'dicom' && (
+                    <button
+                      disabled={busy}
+                      onClick={() => run(() => api.testTenantIntegration(tenant.id, i.id), `Test delivery attempted for ${i.name} — result below.`)}
+                      className={btnGhost}
+                    >
+                      <CheckCircle2 size={13} /> Send test
+                    </button>
+                  )}
                   {Object.keys(i.secrets).length > 0 && (
                     <button disabled={busy} onClick={() => { setRotateFor(i); setRotateValues({}); }} className={btnGhost}>
                       <KeyRound size={13} /> Rotate credentials

@@ -30,6 +30,7 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->alias([
             'tenant.active' => EnsureTenantActive::class,
             'platform' => \App\Http\Middleware\EnsurePlatformAccess::class,
+            'platform.step-up' => \App\Http\Middleware\EnsureStepUpAuth::class,
         ]);
 
         // Append middleware to the 'web' group

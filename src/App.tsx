@@ -26,6 +26,7 @@ import {
   StudyScreeningAnswer,
   Entitlements,
   TenantBranding,
+  TenantBrandingView,
 } from './types';
 import {
   AppRole,
@@ -50,12 +51,13 @@ import { DoseCaptureModal } from './components/DoseCaptureModal';
 import { NewBookingModal } from './components/NewBookingModal';
 import { NotificationCenter } from './components/NotificationCenter';
 import { TerminalLockModal } from './components/TerminalLockModal';
+import { StepUpModal } from './components/StepUpModal';
 import { PlatformConsole } from './components/PlatformConsole';
 import { SubscriptionGateView } from './components/SubscriptionGateView';
 
 import * as api from './services/apiService';
 import { SessionUser } from './services/apiService';
-import { onUnauthorized, initCsrf } from './services/api';
+import { onUnauthorized, onStepUpRequired, initCsrf } from './services/api';
 
 type BootStatus = 'loading' | 'unauthenticated' | 'ready' | 'platform' | 'gated';
 
@@ -68,6 +70,12 @@ export const App: React.FC = () => {
   const [user, setUser] = useState<SessionUser | null>(null);
   const [gateInfo, setGateInfo] = useState<{ status: string; message: string } | null>(null);
   const [flash, setFlash] = useState<{ kind: 'error' | 'success'; message: string } | null>(null);
+  // Control-plane step-up re-auth: armed for platform identities, driven by
+  // the api-layer 428 interceptor; the modal collects the fresh password.
+  const [stepUpOpen, setStepUpOpen] = useState(false);
+  const [stepUpResolve, setStepUpResolve] = useState<(() => void) | null>(null);
+  const [stepUpReject, setStepUpReject] = useState<(() => void) | null>(null);
+  const [brandingView, setBrandingView] = useState<TenantBrandingView | null>(null);
   const [challengeEmail, setChallengeEmail] = useState<string | null>(null);
 
   // ==================== domain state (hydrated from the API) ====================
@@ -184,8 +192,28 @@ export const App: React.FC = () => {
       setUser(null);
       setBootStatus('unauthenticated');
     });
+
+    // Control-plane step-up: when a mutating platform action comes back 428,
+    // open the password modal; the interceptor awaits it, then replays.
+    onStepUpRequired(() => new Promise<void>((resolve, reject) => {
+      setStepUpResolve(() => resolve);
+      setStepUpReject(() => reject);
+      setStepUpOpen(true);
+    }));
+
     runBootstrap();
   }, [runBootstrap]);
+
+  const settleStepUp = useCallback((ok: boolean) => {
+    setStepUpOpen(false);
+    if (ok) {
+      stepUpResolve?.();
+    } else {
+      stepUpReject?.();
+    }
+    setStepUpResolve(null);
+    setStepUpReject(null);
+  }, [stepUpResolve, stepUpReject]);
 
   const showFlash = useCallback((kind: 'error' | 'success', message: string) => {
     setFlash({ kind, message });
@@ -664,6 +692,14 @@ export const App: React.FC = () => {
 
   // ==================== clinic / platform settings ====================
 
+  const handleOpenBrandingSettings = useCallback(async () => {
+    try {
+      setBrandingView(await api.fetchTenantBrandingView());
+    } catch {
+      setBrandingView(null);
+    }
+  }, []);
+
   const handleUpdateClinicSettings = useCallback(async (newSettings: ClinicProfileSettings) => {
     try {
       const clinic = await api.updateClinicSettings(newSettings);
@@ -861,6 +897,19 @@ export const App: React.FC = () => {
           onSignOut={handleLogout}
           onEnterTenant={handleEnterSupportTenant}
           notify={showFlash}
+        />
+        <StepUpModal
+          open={stepUpOpen}
+          onConfirm={async (password) => {
+            try {
+              await api.confirmPlatformStepUp(password);
+              settleStepUp(true);
+            } catch {
+              return false; // wrong password — modal stays open
+            }
+            return true;
+          }}
+          onCancel={() => settleStepUp(false)}
         />
       </>
     );
@@ -1122,6 +1171,8 @@ export const App: React.FC = () => {
             auditLogs={auditLogs}
             onRefreshAuditLogs={handleRefreshAuditLogs}
             onExportBackup={handleExportBackup}
+            brandingView={brandingView}
+            onLoadBrandingView={handleOpenBrandingSettings}
           />
         )}
       </main>

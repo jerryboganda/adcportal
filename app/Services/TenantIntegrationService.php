@@ -2,7 +2,11 @@
 
 namespace App\Services;
 
+use App\Models\IntegrationDelivery;
 use App\Models\TenantIntegration;
+use App\Services\Delivery\DeliveryDispatcher;
+use App\Services\Delivery\FhirSender;
+use App\Services\Delivery\WhatsAppSender;
 use Illuminate\Support\Facades\Http;
 
 /**
@@ -90,8 +94,81 @@ class TenantIntegrationService
             'status' => $i->status,
             'lastCheckedAt' => $i->last_checked_at?->toIso8601String(),
             'lastError' => $i->last_error,
+            'deliveryLog' => self::recentDeliveries($i),
             'createdAt' => $i->created_at?->toIso8601String(),
         ];
+    }
+
+    /**
+     * Real end-to-end delivery proof: sends a synthetic event through the
+     * integration's ACTUAL channel sender and records the outcome. Unlike
+     * the reachability probe, this is the same code path production sends
+     * use — a `sent` here means the third party truly accepted a payload.
+     */
+    public static function testDelivery(TenantIntegration $i): array
+    {
+        $payload = self::testPayloadFor($i);
+
+        $result = app(DeliveryDispatcher::class)->sendNow($i, 'test', $payload);
+
+        return [
+            'status' => $result->status,
+            'detail' => $result->detail ?? $result->status,
+            'latencyMs' => $result->latencyMs,
+        ];
+    }
+
+    /** Realistic synthetic payload per channel (never contains real PHI). */
+    private static function testPayloadFor(TenantIntegration $i): array
+    {
+        $config = is_array($i->config) ? $i->config : [];
+
+        return match ($i->type) {
+            'webhook' => [
+                'url' => (string) ($config['url'] ?? ''),
+                'message' => 'PolytronX RIS test event — verifying webhook delivery.',
+                'test' => true,
+            ],
+            'whatsapp', 'sms' => [
+                'to' => (string) ($config['testRecipient'] ?? ''),
+                'message' => 'PolytronX RIS test message — your '.self::typeLabel($i->type).' integration is working.',
+                'test' => true,
+            ],
+            'email' => [
+                'to' => (string) ($config['testRecipient'] ?? ($i->secrets['username'] ?? '')),
+                'subject' => 'PolytronX RIS — SMTP integration test',
+                'message' => 'This is a test delivery from your PolytronX RIS SMTP integration. If you received this, tenant SMTP works.',
+                'test' => true,
+            ],
+            'hl7' => [
+                'message' => '', // let the sender build a valid ADT test message
+                'test' => true,
+            ],
+            'fhir' => [
+                'baseUrl' => (string) ($config['baseUrl'] ?? ''),
+                'message' => 'PolytronX RIS test event — verifying FHIR connectivity.',
+                'test' => true,
+            ],
+            default => ['test' => true],
+        };
+    }
+
+    /** Last N delivery attempts for the console (newest first). */
+    public static function recentDeliveries(TenantIntegration $i, int $limit = 5): array
+    {
+        return IntegrationDelivery::where('tenant_integration_id', $i->id)
+            ->orderByDesc('id')
+            ->limit($limit)
+            ->get()
+            ->map(fn (IntegrationDelivery $d) => [
+                'id' => (string) $d->id,
+                'event' => $d->event,
+                'status' => $d->status,
+                'target' => $d->target,
+                'detail' => $d->detail,
+                'latencyMs' => $d->latency_ms,
+                'at' => $d->created_at?->toIso8601String(),
+            ])->all();
     }
 
     /**
@@ -150,6 +227,9 @@ class TenantIntegrationService
         return match ($probe) {
             'tcp' => self::probeTcp($integration, $config),
             'http' => self::probeHttp($integration, $config),
+            'fhir' => self::probeFhir($integration, $config),
+            'smtp' => self::probeSmtp($integration, $config),
+            'whatsapp' => self::probeWhatsapp($integration, $config),
             default => self::record(
                 $integration,
                 'active',
@@ -157,6 +237,67 @@ class TenantIntegrationService
                 'configuration'
             ),
         };
+    }
+
+    /** FHIR: GET {baseUrl}/metadata must answer a CapabilityStatement. */
+    private static function probeFhir(TenantIntegration $integration, array $config): array
+    {
+        $secrets = is_array($integration->secrets) ? $integration->secrets : [];
+
+        $outcome = FhirSender::probeMetadata(
+            (string) ($config['baseUrl'] ?? ''),
+            (string) ($secrets['clientId'] ?? ''),
+            (string) ($secrets['clientSecret'] ?? ''),
+        );
+
+        return self::record($integration, $outcome['status'], $outcome['detail'], 'fhir');
+    }
+
+    /** Email: the tenant's SMTP host must complete TCP connect + EHLO. */
+    private static function probeSmtp(TenantIntegration $integration, array $config): array
+    {
+        $host = (string) ($config['host'] ?? '');
+        $port = (int) ($config['port'] ?? 587);
+
+        $start = microtime(true);
+        $socket = @fsockopen($host, $port, $errNo, $errStr, 3);
+        $latency = (int) round((microtime(true) - $start) * 1000);
+
+        if (! is_resource($socket)) {
+            return self::record($integration, 'error', "SMTP host unreachable at {$host}:{$port} — ".trim((string) $errStr).'.', 'smtp');
+        }
+
+        $greeting = fgets($socket, 1024);
+        fclose($socket);
+
+        if ($greeting !== false && preg_match('/^220/', $greeting)) {
+            return self::record($integration, 'active', "SMTP server ready at {$host}:{$port} ({$latency} ms).", 'smtp');
+        }
+
+        return self::record($integration, 'error', "Connected to {$host}:{$port} but it did not answer with an SMTP greeting.", 'smtp');
+    }
+
+    /** WhatsApp: the configured phone number must exist on the Graph API. */
+    private static function probeWhatsapp(TenantIntegration $integration, array $config): array
+    {
+        $secrets = is_array($integration->secrets) ? $integration->secrets : [];
+        $phoneNumberId = (string) ($config['phoneNumberId'] ?? '');
+        $token = (string) ($secrets['accessToken'] ?? '');
+        $url = 'https://graph.facebook.com/'.WhatsAppSender::GRAPH_VERSION."/{$phoneNumberId}";
+
+        try {
+            $response = Http::timeout(6)->connectTimeout(5)->withToken($token)->acceptJson()->get($url);
+        } catch (\Throwable $e) {
+            return self::record($integration, 'error', 'WhatsApp Graph API request failed: '.$e->getMessage(), 'whatsapp');
+        }
+
+        if ($response->status() >= 200 && $response->status() < 300 && $response->json('id')) {
+            return self::record($integration, 'active', "WhatsApp number confirmed (id {$response->json('id')}).", 'whatsapp');
+        }
+
+        $error = $response->json('error.message') ?? ("HTTP {$response->status()}");
+
+        return self::record($integration, 'error', "WhatsApp Graph API rejected the check: {$error}", 'whatsapp');
     }
 
     private static function probeTcp(TenantIntegration $integration, array $config): array

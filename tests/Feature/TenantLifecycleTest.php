@@ -33,7 +33,7 @@ class TenantLifecycleTest extends ApiTestCase
     {
         $super = $this->superAdmin();
 
-        $response = $this->actingAs($super)->postJson('/api/v1/platform/tenants', [
+        $response = $this->actingAs($super)->confirmStepUp()->postJson('/api/v1/platform/tenants', [
             'name' => 'Gamma Health Group',
             'adminName' => 'Gamma Owner',
             'adminEmail' => 'gamma-owner@test.local',
@@ -67,7 +67,7 @@ class TenantLifecycleTest extends ApiTestCase
         $this->actingAs($this->adminA)->getJson('/api/v1/bootstrap')->assertOk();
 
         $this->actingAs($super)
-            ->postJson("/api/v1/platform/tenants/{$this->businessA->id}/suspend", ['reason' => 'Non-payment'])
+            ->confirmStepUp()->postJson("/api/v1/platform/tenants/{$this->businessA->id}/suspend", ['reason' => 'Non-payment'])
             ->assertOk()
             ->assertJsonPath('data.tenant.subscriptionStatus', 'suspended');
 
@@ -89,10 +89,10 @@ class TenantLifecycleTest extends ApiTestCase
         $super = $this->superAdmin();
         $service = $this->businessA->services()->first();
 
-        $this->actingAs($super)->postJson("/api/v1/platform/tenants/{$this->businessA->id}/suspend", ['reason' => 'Audit hold'])->assertOk();
+        $this->actingAs($super)->confirmStepUp()->postJson("/api/v1/platform/tenants/{$this->businessA->id}/suspend", ['reason' => 'Audit hold'])->assertOk();
         $this->actingAs($this->adminA)->getJson('/api/v1/bootstrap')->assertStatus(402);
 
-        $this->actingAs($super)->postJson("/api/v1/platform/tenants/{$this->businessA->id}/reactivate", ['reason' => 'Resolved'])->assertOk();
+        $this->actingAs($super)->confirmStepUp()->postJson("/api/v1/platform/tenants/{$this->businessA->id}/reactivate", ['reason' => 'Resolved'])->assertOk();
 
         $this->actingAs($this->adminA)->getJson('/api/v1/bootstrap')->assertOk();
         $this->assertSame('active', $this->businessA->fresh()->subscription_status);
@@ -107,7 +107,7 @@ class TenantLifecycleTest extends ApiTestCase
         $staff = $this->makeStaff($this->businessA, $this->adminA, 'receptionist');
 
         $this->actingAs($super)
-            ->postJson("/api/v1/platform/tenants/{$this->businessA->id}/offboard", ['reason' => 'Contract ended'])
+            ->confirmStepUp()->postJson("/api/v1/platform/tenants/{$this->businessA->id}/offboard", ['reason' => 'Contract ended'])
             ->assertOk()
             ->assertJsonPath('data.tenant.subscriptionStatus', 'offboarding');
 
@@ -130,11 +130,11 @@ class TenantLifecycleTest extends ApiTestCase
         $super = $this->superAdmin();
 
         $this->actingAs($super)
-            ->postJson("/api/v1/platform/tenants/{$this->businessA->id}/terminate", ['confirmCode' => 'WRONG'])
+            ->confirmStepUp()->postJson("/api/v1/platform/tenants/{$this->businessA->id}/terminate", ['confirmCode' => 'WRONG'])
             ->assertStatus(422);
 
         $this->actingAs($super)
-            ->postJson("/api/v1/platform/tenants/{$this->businessA->id}/terminate", ['confirmCode' => $this->businessA->tenant_code])
+            ->confirmStepUp()->postJson("/api/v1/platform/tenants/{$this->businessA->id}/terminate", ['confirmCode' => $this->businessA->tenant_code])
             ->assertOk()
             ->assertJsonPath('data.tenant.subscriptionStatus', 'terminated');
 
@@ -164,12 +164,12 @@ class TenantLifecycleTest extends ApiTestCase
         $admin->forceFill(['business_id' => $tenant->id, 'active_business' => $tenant->id, 'created_by' => $tenant->id])->save();
 
         // Retry provisions it fully and activates the trial.
-        $this->actingAs($super)->postJson("/api/v1/platform/tenants/{$tenant->id}/provision-retry")
+        $this->actingAs($super)->confirmStepUp()->postJson("/api/v1/platform/tenants/{$tenant->id}/provision-retry")
             ->assertOk()
             ->assertJsonPath('data.tenant.subscriptionStatus', 'trialing');
 
         // Retry again is refused: no longer awaiting provisioning.
-        $this->actingAs($super)->postJson("/api/v1/platform/tenants/{$tenant->id}/provision-retry")->assertStatus(422);
+        $this->actingAs($super)->confirmStepUp()->postJson("/api/v1/platform/tenants/{$tenant->id}/provision-retry")->assertStatus(422);
     }
 
     public function test_subscription_sweep_expires_finished_trials_and_terms(): void

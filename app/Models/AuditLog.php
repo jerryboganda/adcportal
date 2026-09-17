@@ -22,6 +22,7 @@ class AuditLog extends Model
         'tenant_integration_probed', 'tenant_integration_secret_rotated',
         'entitlements_reconciled',
         'failed_job_retried', 'failed_job_forgotten',
+        'platform_step_up_confirmed',
     ];
 
     protected $fillable = ['user_id', 'business_id', 'action', 'subject_type', 'subject_id', 'changes', 'ip'];

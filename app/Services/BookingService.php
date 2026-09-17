@@ -153,6 +153,22 @@ class BookingService
             'unit_price' => (float) ($service->price ?? 0),
         ]);
 
+        // Fan the booking out to the tenant's interoperability integrations
+        // (queued — HIS/RIS consumers hear about the study immediately).
+        \App\Services\Delivery\IntegrationEventFanout::dispatch(
+            $business->id,
+            ['webhook', 'hl7', 'fhir'],
+            'study.booked',
+            [
+                'studyId' => $appointment->id,
+                'token' => $appointment->token_number,
+                'patientName' => $appointment->patientDisplayName(),
+                'study' => $service->name,
+                'scheduledFor' => $appointment->scheduled_at?->toIso8601String(),
+                'bookedAt' => now()->toIso8601String(),
+            ],
+        );
+
         return $appointment;
     }
 

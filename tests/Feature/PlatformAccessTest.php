@@ -46,6 +46,35 @@ class PlatformAccessTest extends ApiTestCase
             ->assertStatus(403);
     }
 
+    public function test_tenant_admin_cannot_read_or_write_tenant_branding_via_platform_routes(): void
+    {
+        // White-label branding is platform-managed per tenant. A clinic or
+        // hospital admin must get 403 on BOTH read and write — the platform
+        // console is the only surface allowed to touch it.
+        $this->actingAs($this->adminA)
+            ->getJson("/api/v1/platform/tenants/{$this->businessA->id}/branding")
+            ->assertStatus(403);
+
+        $this->actingAs($this->adminA)
+            ->confirmStepUp()->putJson("/api/v1/platform/tenants/{$this->businessA->id}/branding", [
+                'appName' => 'Hijacked Name',
+            ])
+            ->assertStatus(403);
+
+        // Same for the domain registry attached to branding.
+        $this->actingAs($this->adminA)
+            ->confirmStepUp()->postJson("/api/v1/platform/tenants/{$this->businessA->id}/domains", [
+                'host' => 'evil.example.com',
+            ])
+            ->assertStatus(403);
+
+        // And the branding row must be untouched after all attempts.
+        $this->actingAs($this->makePlatformUser('super_admin'))
+            ->getJson("/api/v1/platform/tenants/{$this->businessA->id}/branding")
+            ->assertOk()
+            ->assertJsonPath('data.branding.appName', fn ($v) => $v !== 'Hijacked Name');
+    }
+
     public function test_super_admin_holds_every_capability(): void
     {
         $super = $this->makePlatformUser('super_admin');
@@ -67,15 +96,15 @@ class PlatformAccessTest extends ApiTestCase
         $this->actingAs($auditor)->getJson('/api/v1/platform/audit')->assertOk();
 
         // Mutations refused.
-        $this->actingAs($auditor)->postJson('/api/v1/platform/tenants', [
+        $this->actingAs($auditor)->confirmStepUp()->postJson('/api/v1/platform/tenants', [
             'name' => 'X', 'adminName' => 'Y', 'adminEmail' => 'x@test.local',
         ])->assertStatus(403);
 
         $this->actingAs($auditor)
-            ->postJson("/api/v1/platform/tenants/{$this->businessA->id}/suspend", ['reason' => 'nope'])
+            ->confirmStepUp()->postJson("/api/v1/platform/tenants/{$this->businessA->id}/suspend", ['reason' => 'nope'])
             ->assertStatus(403);
 
-        $this->actingAs($auditor)->postJson('/api/v1/platform/plans', [
+        $this->actingAs($auditor)->confirmStepUp()->postJson('/api/v1/platform/plans', [
             'name' => 'Nope', 'priceMonthly' => 1, 'currency' => 'PKR', 'trialDays' => 1,
         ])->assertStatus(403);
     }
@@ -85,12 +114,12 @@ class PlatformAccessTest extends ApiTestCase
         $billing = $this->makePlatformUser('billing');
 
         $this->actingAs($billing)->getJson('/api/v1/platform/tenants')->assertOk();
-        $this->actingAs($billing)->postJson('/api/v1/platform/plans', [
+        $this->actingAs($billing)->confirmStepUp()->postJson('/api/v1/platform/plans', [
             'name' => 'Billing Plan', 'priceMonthly' => 999, 'currency' => 'PKR', 'trialDays' => 7,
         ])->assertStatus(201)->assertJsonPath('data.plan.name', 'Billing Plan');
 
         $this->actingAs($billing)
-            ->postJson("/api/v1/platform/tenants/{$this->businessA->id}/suspend", ['reason' => 'nope'])
+            ->confirmStepUp()->postJson("/api/v1/platform/tenants/{$this->businessA->id}/suspend", ['reason' => 'nope'])
             ->assertStatus(403);
     }
 
@@ -98,11 +127,11 @@ class PlatformAccessTest extends ApiTestCase
     {
         $support = $this->makePlatformUser('support');
 
-        $this->actingAs($support)->postJson('/api/v1/platform/tenants', [
+        $this->actingAs($support)->confirmStepUp()->postJson('/api/v1/platform/tenants', [
             'name' => 'X', 'adminName' => 'Y', 'adminEmail' => 'x2@test.local',
         ])->assertStatus(403);
 
-        $this->actingAs($support)->postJson('/api/v1/platform/support-sessions', [
+        $this->actingAs($support)->confirmStepUp()->postJson('/api/v1/platform/support-sessions', [
             'businessId' => $this->businessA->id,
             'reason' => 'Ticket 42 — reception cannot print invoices',
         ])->assertStatus(201);
@@ -113,11 +142,11 @@ class PlatformAccessTest extends ApiTestCase
         $ops = $this->makePlatformUser('ops');
         $super = $this->makePlatformUser('super_admin');
 
-        $this->actingAs($ops)->postJson('/api/v1/platform/users', [
+        $this->actingAs($ops)->confirmStepUp()->postJson('/api/v1/platform/users', [
             'name' => 'New', 'email' => 'new.ops@test.local', 'password' => 'R1s!T3st#2026x', 'role' => 'ops',
         ])->assertStatus(403);
 
-        $this->actingAs($super)->postJson('/api/v1/platform/users', [
+        $this->actingAs($super)->confirmStepUp()->postJson('/api/v1/platform/users', [
             'name' => 'New Ops', 'email' => 'new.ops.'.md5(uniqid('', true)).'@test.local', 'password' => 'R1s!T3st#2026x', 'role' => 'ops',
         ])->assertStatus(201);
     }
@@ -128,12 +157,12 @@ class PlatformAccessTest extends ApiTestCase
         $superB = $this->makePlatformUser('super_admin');
 
         $this->actingAs($superA)
-            ->patchJson("/api/v1/platform/users/{$superB->id}", ['isActive' => false])
+            ->confirmStepUp()->patchJson("/api/v1/platform/users/{$superB->id}", ['isActive' => false])
             ->assertOk();
 
         // superB disabled; superA cannot disable themselves now.
         $this->actingAs($superA)
-            ->patchJson("/api/v1/platform/users/{$superA->id}", ['isActive' => false])
+            ->confirmStepUp()->patchJson("/api/v1/platform/users/{$superA->id}", ['isActive' => false])
             ->assertStatus(422);
     }
 
@@ -141,7 +170,7 @@ class PlatformAccessTest extends ApiTestCase
     {
         $super = $this->makePlatformUser('super_admin');
 
-        $this->actingAs($super)->postJson('/api/v1/platform/users', [
+        $this->actingAs($super)->confirmStepUp()->postJson('/api/v1/platform/users', [
             'name' => 'Creds', 'email' => 'creds.'.md5(uniqid('', true)).'@test.local', 'password' => 'R1s!T3st#2026x', 'role' => 'billing',
         ])->assertStatus(201);
 

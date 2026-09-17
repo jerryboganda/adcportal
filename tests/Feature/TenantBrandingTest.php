@@ -77,7 +77,7 @@ class TenantBrandingTest extends ApiTestCase
         $super = $this->platformUser();
 
         $this->actingAs($super)
-            ->putJson("/api/v1/platform/tenants/{$this->businessA->id}/branding", [
+            ->confirmStepUp()->putJson("/api/v1/platform/tenants/{$this->businessA->id}/branding", [
                 'appName' => 'Alpha Radiology Suite',
                 'primaryColor' => '#0f766e',
                 'loginMessage' => 'Authorised staff of Alpha Hospital Network only.',
@@ -116,7 +116,7 @@ class TenantBrandingTest extends ApiTestCase
         ]);
 
         $this->actingAs($super)
-            ->putJson("/api/v1/platform/tenants/{$this->businessA->id}/branding", ['appName' => 'Nope'])
+            ->confirmStepUp()->putJson("/api/v1/platform/tenants/{$this->businessA->id}/branding", ['appName' => 'Nope'])
             ->assertStatus(403);
     }
 
@@ -127,7 +127,7 @@ class TenantBrandingTest extends ApiTestCase
         $super = $this->platformUser();
 
         $created = $this->actingAs($super)
-            ->postJson("/api/v1/platform/tenants/{$this->businessA->id}/domains", [
+            ->confirmStepUp()->postJson("/api/v1/platform/tenants/{$this->businessA->id}/domains", [
                 'host' => 'HTTPS://Ris.Alpha-Hospital.test:8443/login',
                 'isPrimary' => true,
             ])
@@ -138,13 +138,13 @@ class TenantBrandingTest extends ApiTestCase
 
         foreach (['not a host', 'localhost', '-leading-hyphen.test', 'ris..test'] as $bad) {
             $this->actingAs($super)
-                ->postJson("/api/v1/platform/tenants/{$this->businessA->id}/domains", ['host' => $bad])
+                ->confirmStepUp()->postJson("/api/v1/platform/tenants/{$this->businessA->id}/domains", ['host' => $bad])
                 ->assertStatus(422);
         }
 
         // Same host cannot be claimed by another tenant (no cross-tenant hijack).
         $this->actingAs($super)
-            ->postJson("/api/v1/platform/tenants/{$this->businessB->id}/domains", ['host' => 'ris.alpha-hospital.test'])
+            ->confirmStepUp()->postJson("/api/v1/platform/tenants/{$this->businessB->id}/domains", ['host' => 'ris.alpha-hospital.test'])
             ->assertStatus(422);
     }
 
@@ -159,7 +159,7 @@ class TenantBrandingTest extends ApiTestCase
         ]);
 
         $this->actingAs($super)
-            ->postJson("/api/v1/platform/tenants/{$this->businessA->id}/domains", ['host' => 'blocked.test'])
+            ->confirmStepUp()->postJson("/api/v1/platform/tenants/{$this->businessA->id}/domains", ['host' => 'blocked.test'])
             ->assertStatus(403);
     }
 
@@ -168,11 +168,11 @@ class TenantBrandingTest extends ApiTestCase
         $super = $this->platformUser();
 
         $this->actingAs($super)
-            ->putJson("/api/v1/platform/tenants/{$this->businessA->id}/branding", ['appName' => 'Alpha Brand'])
+            ->confirmStepUp()->putJson("/api/v1/platform/tenants/{$this->businessA->id}/branding", ['appName' => 'Alpha Brand'])
             ->assertOk();
 
         $this->actingAs($super)
-            ->postJson("/api/v1/platform/tenants/{$this->businessA->id}/domains", ['host' => 'portal.alpha.test'])
+            ->confirmStepUp()->postJson("/api/v1/platform/tenants/{$this->businessA->id}/domains", ['host' => 'portal.alpha.test'])
             ->assertStatus(201);
 
         // Unverified: the public lookup falls back to platform defaults.
@@ -183,7 +183,7 @@ class TenantBrandingTest extends ApiTestCase
         // Ownership not yet published → verification fails and nothing is served.
         $this->fakeDns(null);
         $this->actingAs($super)
-            ->postJson("/api/v1/platform/tenants/{$this->businessA->id}/domains/".$this->domainId('portal.alpha.test')."/verify")
+            ->confirmStepUp()->postJson("/api/v1/platform/tenants/{$this->businessA->id}/domains/".$this->domainId('portal.alpha.test')."/verify")
             ->assertOk()
             ->assertJsonPath('data.verification.verified', false);
 
@@ -192,7 +192,7 @@ class TenantBrandingTest extends ApiTestCase
         // Correct TXT record published → verified, and the host now serves the brand.
         $this->fakeDns($this->businessA->tenant_code);
         $this->actingAs($super)
-            ->postJson("/api/v1/platform/tenants/{$this->businessA->id}/domains/".$this->domainId('portal.alpha.test')."/verify")
+            ->confirmStepUp()->postJson("/api/v1/platform/tenants/{$this->businessA->id}/domains/".$this->domainId('portal.alpha.test')."/verify")
             ->assertOk()
             ->assertJsonPath('data.verification.verified', true);
 
@@ -223,11 +223,11 @@ class TenantBrandingTest extends ApiTestCase
         $super = $this->platformUser();
 
         $this->actingAs($super)
-            ->postJson("/api/v1/platform/tenants/{$this->businessA->id}/domains", ['host' => 'portal.alpha.test'])
+            ->confirmStepUp()->postJson("/api/v1/platform/tenants/{$this->businessA->id}/domains", ['host' => 'portal.alpha.test'])
             ->assertStatus(201);
         $this->fakeDns($this->businessA->tenant_code);
         $this->actingAs($super)
-            ->postJson("/api/v1/platform/tenants/{$this->businessA->id}/domains/".$this->domainId('portal.alpha.test')."/verify")
+            ->confirmStepUp()->postJson("/api/v1/platform/tenants/{$this->businessA->id}/domains/".$this->domainId('portal.alpha.test')."/verify")
             ->assertOk();
 
         // Beta's admin hitting Alpha's host still gets Beta's own tenant data:
@@ -246,16 +246,16 @@ class TenantBrandingTest extends ApiTestCase
         $super = $this->platformUser();
 
         $this->actingAs($super)
-            ->postJson("/api/v1/platform/tenants/{$this->businessB->id}/domains", ['host' => 'portal.beta.test'])
+            ->confirmStepUp()->postJson("/api/v1/platform/tenants/{$this->businessB->id}/domains", ['host' => 'portal.beta.test'])
             ->assertStatus(201);
         $betaDomainId = $this->domainId('portal.beta.test');
 
         // Alpha's platform route cannot touch Beta's domain.
         $this->actingAs($super)
-            ->deleteJson("/api/v1/platform/tenants/{$this->businessA->id}/domains/{$betaDomainId}")
+            ->confirmStepUp()->deleteJson("/api/v1/platform/tenants/{$this->businessA->id}/domains/{$betaDomainId}")
             ->assertStatus(404);
         $this->actingAs($super)
-            ->postJson("/api/v1/platform/tenants/{$this->businessA->id}/domains/{$betaDomainId}/verify")
+            ->confirmStepUp()->postJson("/api/v1/platform/tenants/{$this->businessA->id}/domains/{$betaDomainId}/verify")
             ->assertStatus(404);
 
         // Tenant staff never reach the control plane.
@@ -263,7 +263,7 @@ class TenantBrandingTest extends ApiTestCase
             ->getJson("/api/v1/platform/tenants/{$this->businessA->id}/branding")
             ->assertStatus(403);
         $this->actingAs($this->adminA)
-            ->postJson("/api/v1/platform/tenants/{$this->businessA->id}/domains", ['host' => 'sneaky.test'])
+            ->confirmStepUp()->postJson("/api/v1/platform/tenants/{$this->businessA->id}/domains", ['host' => 'sneaky.test'])
             ->assertStatus(403);
 
         $this->assertDatabaseHas('tenant_domains', ['id' => $betaDomainId, 'host' => 'portal.beta.test']);
@@ -273,11 +273,11 @@ class TenantBrandingTest extends ApiTestCase
     {
         $super = $this->platformUser();
 
-        $this->actingAs($super)->postJson("/api/v1/platform/tenants/{$this->businessA->id}/domains", ['host' => 'one.alpha.test', 'isPrimary' => true])->assertStatus(201);
-        $this->actingAs($super)->postJson("/api/v1/platform/tenants/{$this->businessA->id}/domains", ['host' => 'two.alpha.test'])->assertStatus(201);
+        $this->actingAs($super)->confirmStepUp()->postJson("/api/v1/platform/tenants/{$this->businessA->id}/domains", ['host' => 'one.alpha.test', 'isPrimary' => true])->assertStatus(201);
+        $this->actingAs($super)->confirmStepUp()->postJson("/api/v1/platform/tenants/{$this->businessA->id}/domains", ['host' => 'two.alpha.test'])->assertStatus(201);
 
         $this->actingAs($super)
-            ->deleteJson("/api/v1/platform/tenants/{$this->businessA->id}/domains/".$this->domainId('one.alpha.test'))
+            ->confirmStepUp()->deleteJson("/api/v1/platform/tenants/{$this->businessA->id}/domains/".$this->domainId('one.alpha.test'))
             ->assertOk();
 
         $this->assertTrue((bool) TenantDomain::where('host', 'two.alpha.test')->first()->is_primary);

@@ -100,6 +100,60 @@ abstract class ApiTestCase extends TestCase
         return [$business, $admin];
     }
 
+    /**
+     * Step-up re-auth control for platform-mutation tests.
+     *
+     * confirmStepUp(): stamp the acting user's session as freshly
+     * re-authenticated (mirrors POST /platform/step-up) before the request.
+     * withoutStepUp(): disable the gate entirely for suites that test other
+     * concerns; a session-stamp is also fine, but this is explicit.
+     */
+    /**
+     * actingAs with Sanctum's AuthenticateSession kept consistent: when a
+     * stateful (SPA-origin) test client switches users mid-test, the session
+     * still holds the previous user's password hash and the next request
+     * would be logged out. Seeding the hash for the new acting user mirrors
+     * what a real login writes to the session.
+     */
+    public function actingAs($user, $guard = null)
+    {
+        $this->session(['password_hash_web' => $user->password]);
+
+        return parent::actingAs($user, $guard);
+    }
+
+    /**
+     * Make subsequent requests stateful (Sanctum SPA origin) so a session
+     * exists and persists across calls — required by the step-up flow.
+     */
+    protected function stateful(): static
+    {
+        $this->withHeader('referer', 'http://localhost:3000/'); // SPA origin = stateful domain
+
+        return $this;
+    }
+
+    protected function confirmStepUp(): static
+    {
+        // Stamp the (stateful) session as freshly re-authenticated. The
+        // referer makes the request stateful (Sanctum) so a session exists;
+        // the acting user's hash keeps AuthenticateSession consistent.
+        $this->withHeader('referer', 'http://localhost:3000/');
+        $this->session([
+            'platform_step_up_at' => now()->getTimestamp(),
+            'password_hash_web' => auth()->user()?->password,
+        ]);
+
+        return $this;
+    }
+
+    protected function withoutStepUp(): static
+    {
+        config(['ris.platform_step_up.enabled' => false]);
+
+        return $this;
+    }
+
     protected function makeStaff(Business $business, User $owner, string $portalRole): User
     {
         $roleName = match ($portalRole) {

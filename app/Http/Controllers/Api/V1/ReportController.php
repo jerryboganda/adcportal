@@ -215,6 +215,22 @@ class ReportController extends BaseApiController
             'channel' => $channel,
         ]);
 
+        // Fan the release out to the tenant's interoperability integrations
+        // (queued — never blocks the clinical request on third parties).
+        \App\Services\Delivery\IntegrationEventFanout::dispatch(
+            $this->tenantId(),
+            ['webhook', 'hl7', 'fhir'],
+            'report.released',
+            [
+                'studyId' => $report->appointment_id,
+                'token' => $report->appointment->token_number,
+                'patientName' => $report->appointment->patientDisplayName(),
+                'study' => $report->appointment->ServiceData?->name,
+                'releasedAt' => now()->toIso8601String(),
+                'channel' => $channel,
+            ],
+        );
+
         $this->notify([
             'title' => 'Report Dispatched ('.strtoupper($channel).')',
             'message' => "Diagnostic report for {$report->appointment->patientDisplayName()} (#{$report->appointment->token_number}) successfully dispatched via ".strtoupper($channel).'.',

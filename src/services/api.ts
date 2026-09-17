@@ -20,6 +20,23 @@ export function onUnauthorized(handler: () => void): void {
   unauthorizedHandler = handler;
 }
 
+/**
+ * Control-plane step-up: when a mutating platform action is answered 428
+ * (fresh password confirmation required), the interceptor pauses the
+ * request, lets the app collect the password, then replays it. The handler
+ * resolves when the confirmation succeeded; rejecting it (user cancelled)
+ * abandons the original request.
+ */
+let stepUpHandler: (() => Promise<void>) | null = null;
+
+export function onStepUpRequired(handler: (() => Promise<void>) | null): void {
+  stepUpHandler = handler;
+}
+
+export async function confirmStepUp(password: string): Promise<void> {
+  await http.post('/platform/step-up', { password });
+}
+
 let csrfRefresh: Promise<void> | null = null;
 
 /** Fetch a fresh CSRF token cookie; concurrent callers share one request. */
@@ -48,6 +65,17 @@ http.interceptors.response.use(
         // fall through — the replay will fail with a clear error
       }
       return http.request(error.config);
+    }
+
+    // Control-plane step-up (428): collect a fresh password confirmation
+    // once, then replay the original mutating request. `__stepUpRetried`
+    // guarantees a single prompt per request — no loops if it is cancelled.
+    if (status === 428 && error?.config && !(error.config as any).__stepUpRetried) {
+      (error.config as any).__stepUpRetried = true;
+      if (stepUpHandler) {
+        await stepUpHandler(); // throws (and abandons the request) if cancelled
+        return http.request(error.config);
+      }
     }
 
     if (status === 401 && unauthorizedHandler) {
