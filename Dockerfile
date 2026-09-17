@@ -23,7 +23,7 @@ FROM php:8.4-apache AS app
 
 # PHP extensions required by the app (see composer.json/platform reqs).
 RUN apt-get update && apt-get install -y --no-install-recommends \
-        libfreetype6-dev libjpeg62-turbo-dev libpng-dev libzip-dev libicu-dev zip unzip git default-mysql-client \
+        libfreetype6-dev libjpeg62-turbo-dev libpng-dev libzip-dev libicu-dev libpq-dev zip unzip git default-mysql-client \
     && docker-php-ext-configure gd --with-freetype --with-jpeg \
     && docker-php-ext-install -j"$(nproc)" gd pdo_mysql pdo_pgsql zip bcmath intl opcache pcntl \
     && pecl install redis && docker-php-ext-enable redis \
