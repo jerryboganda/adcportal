@@ -15,6 +15,11 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware) {
+        // Behind the shared reverse proxy (nginx-proxy-manager) and Cloudflare.
+        // Trust forwarded headers so request()->ip()/isSecure()/generated URLs
+        // reflect the real client and scheme, not the proxy hop.
+        $middleware->trustProxies(at: '*');
+
         // This is an API-only application: there is no `login` web route. The
         // framework's default guest redirect is `fn () => route('login')`, which
         // is invoked from inside the `auth` middleware (Authenticate::redirectTo),
