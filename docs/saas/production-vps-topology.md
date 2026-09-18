@@ -57,6 +57,26 @@ Cloudflare (DNS ris.polytronx.com → 185.252.233.186)
    `cd /opt/docker/adc-portal && docker compose pull app && docker compose up -d app`
 3. Entrypoint applies pending migrations + refreshes caches automatically.
 
+## Local dev <-> production realtime link
+
+Local dev can run directly against the LIVE production Postgres through an SSH
+tunnel (user-approved 2026-09-18). Every local change reads/writes real prod
+data in realtime; there is no copy or lag.
+
+- `bash scripts/dev-tunnel.sh start|stop|status` — forwards
+  `localhost:15433` → VPS `127.0.0.1:15432` (platform-postgres) and
+  `localhost:16380` → `127.0.0.1:16379` (platform-redis, spare).
+- `python scripts/dev-use-prod-db.py` — points local `.env` at the prod DB
+  (fetches credentials server-side, backs up `.env` first).
+- `python scripts/dev-use-local-db.py` — restores the backup, back to local DB.
+- `bash scripts/dev-migrate-prod.sh` — pg_dump backup on the VPS, then
+  `php artisan migrate --force` (the approved way to change prod schema from dev).
+- **Guard**: while linked, `migrate:fresh` / `migrate:refresh` / `db:wipe` /
+  `db:seed` are BLOCKED in `AppServiceProvider` (they would destroy prod data).
+  Deliberate override: `ALLOW_PROD_DESTRUCTIVE=true php artisan db:seed`.
+  Tests are unaffected (phpunit uses sqlite :memory:).
+- Local PHP needs the pgsql extensions enabled (done: php.ini pdo_pgsql/pgsql).
+
 ## Housekeeping facts
 
 - Image: multi-stage (Node SPA build → php:8.4-apache), ships `pdo_mysql` +
