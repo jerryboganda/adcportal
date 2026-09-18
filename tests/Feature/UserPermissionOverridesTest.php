@@ -155,7 +155,12 @@ class UserPermissionOverridesTest extends ApiTestCase
         flush_active_business_cache();
 
         $permissionsB = $this->actingAs($member)->getJson('/api/v1/me')->json('data.user.permissions');
-        $this->assertContains('study screen', $permissionsB);
+        // Radiologist (tenant B) set: clinical reporting, no denials applied.
         $this->assertContains('report sign', $permissionsB);
+        $this->assertContains('appointment manage', $permissionsB);
+        // The deny in A must not travel: in B the member is NOT a
+        // receptionist, so receptionist-only powers stay absent on their own
+        // merits — and nothing was subtracted from the radiologist set.
+        $this->assertNotContains('invoice payment', $permissionsB);
     }
 }
