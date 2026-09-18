@@ -22,7 +22,9 @@ enum StudyState: string
     {
         return match ($this) {
             self::Booked => [self::CheckedIn, self::Cancelled, self::NoShow],
-            self::CheckedIn => [self::Preparing, self::InProgress, self::Cancelled],
+            // NoShow from CheckedIn: a called patient who never reached the
+            // suite is cleared by reception instead of clogging the board.
+            self::CheckedIn => [self::Preparing, self::InProgress, self::Cancelled, self::NoShow],
             self::Preparing => [self::InProgress, self::Cancelled],
             self::InProgress => [self::Acquired, self::Cancelled],
             self::Acquired => [self::Reading, self::Reported, self::InProgress], // InProgress = repeat/redo after rejection

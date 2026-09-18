@@ -336,8 +336,22 @@ class StudyController extends BaseApiController
                 break;
 
             case 'call':
-                // Queue-board call: persisted so every terminal (and the
-                // audit trail) sees the same "now serving" state.
+                // Queue-board call: a served-patient marker, not a pipeline
+                // state. Guarded to pre-acquisition states so a completed,
+                // cancelled or no-show study can never be announced to the
+                // waiting room. Re-calling re-stamps called_at, which every
+                // polling TV picks up as a fresh announcement.
+                if (! in_array($appointment->state(), [
+                    StudyState::Booked,
+                    StudyState::CheckedIn,
+                    StudyState::Preparing,
+                    StudyState::InProgress,
+                ], true)) {
+                    throw ValidationException::withMessages([
+                        'call' => __('Only waiting or in-suite studies can be called to the queue board.'),
+                    ]);
+                }
+
                 $appointment->forceFill(['called_at' => now()])->save();
                 $this->audit('queue_patient_called', $appointment, [
                     'summary' => "Called {$appointment->patientDisplayName()} (#{$appointment->token_number}) to ".($appointment->room_number ?: 'the examination area').'.',

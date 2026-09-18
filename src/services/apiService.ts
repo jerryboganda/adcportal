@@ -53,11 +53,14 @@ import {
   TenantUserRecord,
   PublicTenantContext,
   PlatformOperationsPayload,
+  QueueDisplay,
+  QueueDisplayEntry,
+  QueueDisplaySettings,
   UsageSummary,
 } from '../types';
 
 /**
- * Typed client for the PolytronX - RIS API. Every function returns the same
+ * Typed client for the PolytronX - Enterprise PACS & RIS API. Every function returns the same
  * TypeScript models the UI already consumes (formerly hydrated from
  * localStorage); nulls from the server are normalized here so views keep
  * their null-safe rendering paths.
@@ -381,6 +384,78 @@ export async function updateStudy(appointmentId: string, updates: Partial<Appoin
 
   const { data } = await http.put(`/studies/${appointmentId}`, payload);
   return normalizeStudy(data.data.study);
+}
+
+// ==================== live queue TV ====================
+
+function normalizeQueueDisplay(raw: any): QueueDisplay {
+  const entry = (e: any): QueueDisplayEntry => ({
+    id: String(e?.id ?? ''),
+    token: String(e?.token ?? ''),
+    patientName: String(e?.patientName ?? 'Guest'),
+    priority: e?.priority ?? 'routine',
+    state: e?.state ?? 'booked',
+    modality: e?.modality ?? null,
+    roomName: String(e?.roomName ?? ''),
+    checkedInAt: e?.checkedInAt ?? null,
+    calledAt: e?.calledAt ?? null,
+    calledAtLabel: e?.calledAtLabel ?? null,
+    waitedMinutes: Number(e?.waitedMinutes ?? 0),
+  });
+
+  return {
+    serverTime: String(raw?.serverTime ?? new Date().toISOString()),
+    businessName: String(raw?.businessName ?? ''),
+    announcement: String(raw?.announcement ?? ''),
+    zones: (raw?.zones ?? []).map((z: any) => ({
+      id: Number(z?.id ?? 0),
+      code: String(z?.code ?? ''),
+      name: String(z?.name ?? ''),
+      color: String(z?.color ?? '#0080b6'),
+      waiting: Number(z?.waiting ?? 0),
+      serving: Number(z?.serving ?? 0),
+    })),
+    nowServing: (raw?.nowServing ?? []).map(entry),
+    upNext: (raw?.upNext ?? []).map(entry),
+    recentCalls: (raw?.recentCalls ?? []).map(entry),
+    stats: {
+      waiting: Number(raw?.stats?.waiting ?? 0),
+      serving: Number(raw?.stats?.serving ?? 0),
+      completed: Number(raw?.stats?.completed ?? 0),
+      noShow: Number(raw?.stats?.noShow ?? 0),
+    },
+  };
+}
+
+/** Staff console feed — session-authed, `queue view` enforced server-side. */
+export async function fetchQueueDisplay(): Promise<QueueDisplay> {
+  const { data } = await http.get('/queue/display');
+  return normalizeQueueDisplay(data.data);
+}
+
+/**
+ * Waiting-room kiosk feed — the display key IS the credential. A 404 means
+ * the link was regenerated/revoked; the TV view keeps polling either way.
+ */
+export async function fetchPublicQueueDisplay(key: string): Promise<QueueDisplay> {
+  const { data } = await http.get('/public/queue-display', { params: { key } });
+  return normalizeQueueDisplay(data.data);
+}
+
+export async function fetchQueueDisplaySettings(): Promise<QueueDisplaySettings> {
+  const { data } = await http.get('/queue/display/settings');
+  return {
+    displayKey: String(data.data?.displayKey ?? ''),
+    announcement: String(data.data?.announcement ?? ''),
+  };
+}
+
+export async function saveQueueDisplaySettings(input: { announcement?: string; regenerateKey?: boolean }): Promise<QueueDisplaySettings> {
+  const { data } = await http.put('/queue/display/settings', input);
+  return {
+    displayKey: String(data.data?.displayKey ?? ''),
+    announcement: String(data.data?.announcement ?? ''),
+  };
 }
 
 // ==================== screening ====================

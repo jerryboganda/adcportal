@@ -168,33 +168,6 @@ class StudyWorkflowController extends Controller
         return view('study.technologist', compact('studies', 'modalities'));
     }
 
-    // ==================== Live queue board (TV display) ====================
-
-    public function queueBoard(Request $request)
-    {
-        // Public display endpoint — gated by a configured access key.
-        $expected = company_setting('queue_board_key');
-        if (empty($expected) || ! hash_equals((string) $expected, (string) $request->query('key'))) {
-            abort(404);
-        }
-
-        $nowServing = Appointment::forClinic()
-            ->where('workflow_state', StudyState::InProgress->value)
-            ->whereDate('date_sort', today())
-            ->with(self::eagerForWorklist())
-            ->get();
-
-        $waiting = Appointment::forClinic()
-            ->whereIn('workflow_state', [StudyState::CheckedIn->value, StudyState::Preparing->value])
-            ->whereDate('date_sort', today())
-            ->with(self::eagerForWorklist())
-            ->orderBy('checked_in_at')
-            ->get();
-
-        return view('study.queue-board', compact('nowServing', 'waiting'))
-            ->with('refresh', (int) ($request->query('refresh', 30)));
-    }
-
     // ==================== Helpers ====================
 
     public static function eagerForWorklist(): array

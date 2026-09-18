@@ -105,7 +105,7 @@ export const App: React.FC = () => {
   // white-label appName → tenant account name → platform default.
   useEffect(() => {
     const brand = branding?.appName?.trim() || user?.businessBrandName?.trim() || user?.businessName?.trim() || '';
-    document.title = brand ? `${brand} — PolytronX RIS` : 'PolytronX - RIS';
+    document.title = brand ? `${brand} — PolytronX Enterprise PACS & RIS` : 'PolytronX - Enterprise PACS & RIS';
   }, [branding?.appName, user?.businessBrandName, user?.businessName]);
   const [dicomNodes, setDicomNodes] = useState<DicomNodeConfig[]>([]);
   const [notificationTemplates, setNotificationTemplates] = useState<api.NotificationTemplateT[]>([]);
@@ -386,7 +386,7 @@ export const App: React.FC = () => {
   }, [runTransition]);
 
   const handleMarkNoShow = useCallback((aptId: string) => {
-    runTransition(aptId, 'no_show').catch(() => undefined);
+    return runTransition(aptId, 'no_show').catch(() => undefined);
   }, [runTransition]);
 
   const handleStartPreparing = useCallback((aptId: string) => {
@@ -417,7 +417,7 @@ export const App: React.FC = () => {
 
   /** Queue-board call: persisted server-side so every terminal sees the same "now serving". */
   const handleCallPatient = useCallback((aptId: string) => {
-    runTransition(aptId, 'call').catch(() => undefined);
+    return runTransition(aptId, 'call').catch(() => undefined);
   }, [runTransition]);
 
   const handleRejectToTech = useCallback(async (aptId: string, reason: string) => {
@@ -981,7 +981,7 @@ export const App: React.FC = () => {
       const url = URL.createObjectURL(blob);
       const anchor = document.createElement('a');
       anchor.href = url;
-      anchor.download = `PolytronX_RIS_Database_Backup_${new Date().toISOString().split('T')[0]}.json`;
+      anchor.download = `PolytronX_Enterprise_PACS_RIS_Database_Backup_${new Date().toISOString().split('T')[0]}.json`;
       document.body.appendChild(anchor);
       anchor.click();
       anchor.remove();
@@ -1066,7 +1066,7 @@ export const App: React.FC = () => {
     return (
       <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center gap-4 text-slate-600">
         <div className="w-10 h-10 border-4 border-cyan-500/30 border-t-cyan-600 rounded-full animate-spin" />
-        <p className="text-sm">{bootError ? 'Connection problem' : 'Connecting to PolytronX - RIS…'}</p>
+        <p className="text-sm">{bootError ? 'Connection problem' : 'Connecting to PolytronX - Enterprise PACS & RIS…'}</p>
         {bootError && (
           <>
             <p className="text-xs text-rose-600 max-w-sm text-center">{bootError}</p>
@@ -1220,10 +1220,11 @@ export const App: React.FC = () => {
 
         {activeTab === 'queue' && (
           <QueueBoardView
-            appointments={appointments}
-            clinicName={clinicSettings.name}
             permissions={permissions}
+            brandName={branding?.appName ?? null}
+            clinicName={clinicSettings?.name ?? null}
             onCallPatient={handleCallPatient}
+            onMarkNoShow={handleMarkNoShow}
           />
         )}
 

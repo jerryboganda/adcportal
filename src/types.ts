@@ -1003,3 +1003,52 @@ export interface EffectiveAccess {
   allowedOverrides: string[];
   deniedOverrides: string[];
 }
+
+// ==================== Live Queue TV ====================
+
+/**
+ * Queue board entry — MINIMAL PHI by design (server contract, see
+ * ApiShape::queueEntry): token, display name, modality, room and queue
+ * timestamps only. Never MRN / contact / DOB / financials.
+ */
+export interface QueueDisplayEntry {
+  id: string;
+  token: string;
+  patientName: string;
+  priority: Priority;
+  state: StudyState;
+  modality: Pick<Modality, 'id' | 'code' | 'name' | 'color'> | null;
+  roomName: string;
+  checkedInAt: string | null;
+  calledAt: string | null;
+  calledAtLabel: string | null;
+  waitedMinutes: number;
+}
+
+/** One waiting-area zone = one active tenant modality (open set, server-derived). */
+export interface QueueZone {
+  id: number;
+  code: string;
+  name: string;
+  color: string;
+  waiting: number;
+  serving: number;
+}
+
+/** Aggregate payload of GET /queue/display and GET /public/queue-display. */
+export interface QueueDisplay {
+  serverTime: string;
+  businessName: string;
+  announcement: string;
+  zones: QueueZone[];
+  nowServing: QueueDisplayEntry[];
+  upNext: QueueDisplayEntry[];
+  recentCalls: QueueDisplayEntry[];
+  stats: { waiting: number; serving: number; completed: number; noShow: number };
+}
+
+export interface QueueDisplaySettings {
+  /** Empty until the first admin save provisions the kiosk link. */
+  displayKey: string;
+  announcement: string;
+}

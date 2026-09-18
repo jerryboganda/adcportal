@@ -159,3 +159,69 @@ test('tenant admin RBAC console lists roles, matrix and access preview', async (
     await page.getByRole('button', { name: 'Preview as role' }).first().click();
     await expect(page.getByText(/What .* sees/)).toBeVisible({ timeout: 10000 });
 });
+
+async function bookWalkin(page, name) {
+    await page.getByRole('button', { name: 'Book Study' }).click();
+    await expect(page.getByText('Book Diagnostic Imaging Study')).toBeVisible({ timeout: 15000 });
+    await page.getByRole('button', { name: '+ New Walk-In' }).click();
+    await page.getByPlaceholder('e.g. Tariq Mehmood').fill(name);
+    await page.getByLabel('Phone Number').fill('0300-7788990');
+    await page.getByLabel('Patient age').fill('41');
+    await page.getByLabel('Modality', { exact: true }).selectOption({ label: 'Computed Tomography (CT)' });
+    await page.getByLabel('Procedure Service').selectOption({ label: 'CT Brain Non-Contrast (NCCT) - Rs. 6,500' });
+    await page.getByLabel('Payment Status').selectOption('unpaid');
+    await page.getByRole('button', { name: 'Confirm & Generate Token' }).click();
+    await expect(page.getByText('Book Diagnostic Imaging Study')).toBeHidden({ timeout: 15000 });
+}
+
+test('live queue console moves a called patient into now-serving', async ({ page }) => {
+    await login(page);
+    await bookWalkin(page, 'E2E Queue Walkin');
+
+    await page.getByRole('button', { name: 'Live Queue TV' }).click();
+    await expect(page.getByText('Live Queue Console')).toBeVisible({ timeout: 15000 });
+
+    // The new walk-in waits in "Next in Line" within one poll interval.
+    const row = page.locator('div.bg-white.border', { hasText: 'E2E Queue Walkin' }).first();
+    await expect(row).toBeVisible({ timeout: 15000 });
+
+    // Call → server-stamped → the entry LEAVES the waiting list and appears
+    // as "Called" in Now Serving (polled, not local-only).
+    await row.getByRole('button', { name: 'Call', exact: true }).click();
+    await expect(
+        page.locator('div.border-sky-300', { hasText: 'E2E Queue Walkin' })
+    ).toBeVisible({ timeout: 15000 });
+});
+
+test('waiting-room TV kiosk renders the live queue with no login', async ({ page }) => {
+    await login(page);
+    await bookWalkin(page, 'E2E TV Walkin');
+
+    await page.getByRole('button', { name: 'Live Queue TV' }).click();
+    await expect(page.getByText('Live Queue Console')).toBeVisible({ timeout: 15000 });
+
+    // Call the patient: the TV shows names on now-serving cards only.
+    const row = page.locator('div.bg-white.border', { hasText: 'E2E TV Walkin' }).first();
+    await expect(row).toBeVisible({ timeout: 15000 });
+    await row.getByRole('button', { name: 'Call', exact: true }).click();
+    await expect(
+        page.locator('div.border-sky-300', { hasText: 'E2E TV Walkin' })
+    ).toBeVisible({ timeout: 15000 });
+
+    // Admin copies the private display link from Display Setup.
+    await page.getByRole('button', { name: 'Display Setup' }).click();
+    const linkInput = page.locator('input[readonly]');
+    await expect(linkInput).toHaveValue(/\/tv\?key=/, { timeout: 15000 });
+    const tvLink = await linkInput.inputValue();
+
+    // The kiosk renders outside the app shell: no login gate, live zones.
+    await page.goto(tvLink);
+    await expect(page.getByText(/Patient Calling System/i)).toBeVisible({ timeout: 15000 });
+    await expect(page.getByText('E2E TV Walkin')).toBeVisible({ timeout: 15000 });
+    await expect(page.getByPlaceholder('Work email')).toHaveCount(0);
+
+    // An invalid key degrades to a setup hint — never a login screen.
+    await page.goto('/tv?key=bogus-key');
+    await expect(page.getByText('Display link is no longer valid')).toBeVisible({ timeout: 15000 });
+    await expect(page.getByPlaceholder('Work email')).toHaveCount(0);
+});

@@ -61,6 +61,12 @@ permission. Full matrix and semantics: `RBAC_ADMIN.md`.
 | catalog view | ✓ | — | — | — | — |
 | doctors view | ✓ | — | — | — | — |
 
+`queue view` is enforced SERVER-SIDE on the Live Queue TV feed
+(`GET /api/v1/queue/display`, `QueueDisplayController`) — a session without
+it receives 403, not just a hidden nav tab. The public waiting-room kiosk
+(`/tv?key=…`) carries no session and no role: the rotatable display key is
+its only credential (see `QUEUE_TV.md`).
+
 Roles are no longer limited to the five system bundles: tenant admins can
 create custom roles, edit permission sets (dependency-checked), duplicate
 roles and apply per-user allow/deny overrides — all server-enforced and

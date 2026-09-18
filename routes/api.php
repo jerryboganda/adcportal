@@ -20,6 +20,7 @@ use App\Http\Controllers\Api\V1\Platform\PlatformTenantController;
 use App\Http\Controllers\Api\V1\Platform\PlatformUserController;
 use App\Http\Controllers\Api\V1\ReportController;
 use App\Http\Controllers\Api\V1\PublicTenantContextController;
+use App\Http\Controllers\Api\V1\QueueDisplayController;
 use App\Http\Controllers\Api\V1\SettingsController;
 use App\Http\Controllers\Api\V1\StaffUserController;
 use App\Http\Controllers\Api\V1\StudyController;
@@ -73,6 +74,11 @@ Route::post('/two-factor/challenge/cancel', [TwoFactorController::class, 'cancel
 // DNS-verified custom domain. Cosmetic only — never an authorization input.
 Route::get('/tenant-context', [PublicTenantContextController::class, 'show'])->middleware('throttle:60,1');
 
+// Waiting-room TV kiosk feed: the display key IS the credential (rotatable
+// from the staff console). Minimal-PHI payload, throttled per IP — see
+// QueueDisplayController for the exposure contract.
+Route::get('/public/queue-display', [QueueDisplayController::class, 'publicShow'])->middleware('throttle:20,1');
+
 // ---------- authenticated: identity + context (never tenant-gated) ----------
 
 Route::middleware(['auth'])->group(function () {
@@ -96,6 +102,12 @@ Route::middleware(['auth', 'tenant.active', 'throttle:tenant'])->group(function 
     Route::post('/two-factor/setup', [TwoFactorController::class, 'setup']);
     Route::post('/two-factor/confirm', [TwoFactorController::class, 'confirm']);
     Route::post('/two-factor/disable', [TwoFactorController::class, 'disable']);
+
+    // Live Queue TV: staff console feed (`queue view` enforced server-side)
+    // + admin display-link/announcement settings (`setting manage`).
+    Route::get('/queue/display', [QueueDisplayController::class, 'show']);
+    Route::get('/queue/display/settings', [QueueDisplayController::class, 'settings']);
+    Route::put('/queue/display/settings', [QueueDisplayController::class, 'saveSettings']);
 
     // Studies (booking + pipeline + screening)
     Route::get('/studies', [StudyController::class, 'index']);

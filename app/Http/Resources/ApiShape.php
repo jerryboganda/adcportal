@@ -323,6 +323,38 @@ class ApiShape
         ];
     }
 
+    /**
+     * Live Queue TV board entry — MINIMAL PHI by design: token, display
+     * name, modality, room and queue timestamps only. This shape feeds the
+     * key-gated public waiting-room screen and must never grow MRN,
+     * contact, DOB or financial fields (see QueueDisplayController).
+     */
+    public static function queueEntry(Appointment $a): array
+    {
+        $modality = $a->ServiceData?->modality;
+
+        return [
+            'id' => self::id($a->id),
+            'token' => (string) ($a->token_number ?? ''),
+            'patientName' => $a->patientDisplayName(),
+            'priority' => $a->priority ?: 'routine',
+            'state' => $a->workflow_state,
+            'modality' => $modality ? [
+                'id' => (int) $modality->id,
+                'code' => (string) $modality->code,
+                'name' => (string) $modality->name,
+                'color' => $modality->color ?: '#0080b6',
+            ] : null,
+            'roomName' => (string) ($a->room_number ?? ''),
+            'checkedInAt' => $a->checked_in_at?->toIso8601String(),
+            'calledAt' => $a->called_at?->toIso8601String(),
+            'calledAtLabel' => $a->called_at ? self::time($a->called_at) : null,
+            'waitedMinutes' => $a->checked_in_at !== null
+                ? max(0, (int) round($a->checked_in_at->diffInMinutes(now())))
+                : 0,
+        ];
+    }
+
     // ==================== billing ====================
 
     public static function invoice(Invoice $inv): array
