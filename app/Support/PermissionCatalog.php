@@ -217,11 +217,15 @@ final class PermissionCatalog
     /**
      * Sync the `permissions` table with this catalog: create missing rows and
      * refresh labels/groups. Idempotent — safe to run on every deploy.
+     *
+     * Soft-deleted rows (Permission uses SoftDeletes) are RESTORED rather
+     * than re-created: the unique `name` index spans trashed rows, so a
+     * create would collide with any previously retired permission.
      */
     public static function sync(): void
     {
         foreach (self::definitions() as $name => $meta) {
-            $permission = Permission::query()->where('name', $name)->first();
+            $permission = Permission::withTrashed()->where('name', $name)->first();
 
             if (! $permission) {
                 Permission::create([
@@ -232,6 +236,10 @@ final class PermissionCatalog
                 ]);
 
                 continue;
+            }
+
+            if ($permission->trashed()) {
+                $permission->restore();
             }
 
             if ($permission->display_name !== $meta['label'] || $permission->module !== $meta['group']) {
