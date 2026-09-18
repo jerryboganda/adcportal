@@ -9,11 +9,13 @@ use Illuminate\Support\Facades\DB;
 
 /**
  * Tenant-scoped authorization. Permission checks NEVER span tenants: a user's
- * effective permission set for a request is the union of permissions carried
- * by the laratrust roles that belong to the ACTIVE tenant (a role belongs to
- * the tenant of the admin user who created it). Platform staff hold zero
- * tenant permissions unless an active, unexpired break-glass support session
- * grants them this tenant's admin permission set for troubleshooting.
+ * effective permission set for a request is (permissions of the laratrust
+ * roles that belong to the ACTIVE tenant) ∪ (tenant-scoped allow overrides)
+ * − (tenant-scoped deny overrides). A role belongs to the tenant of the admin
+ * user who created it; overrides are rows in user_permission_overrides and
+ * therefore cannot leak across tenants. Platform staff hold zero tenant
+ * permissions unless an active, unexpired break-glass support session grants
+ * them this tenant's full admin permission set for troubleshooting.
  */
 class TenantAuthorizer
 {
@@ -34,9 +36,23 @@ class TenantAuthorizer
 
         if (self::hasActiveSupportSession($user->id, $businessId)) {
             // Break-glass: the full operational permission set of this tenant.
-            $permissions = self::tenantPermissions($businessId, null);
+            $permissions = self::tenantRolePermissions($businessId, null);
         } else {
-            $permissions = self::tenantPermissions($businessId, $user->id);
+            $rolePermissions = self::tenantRolePermissions($businessId, $user->id);
+            $denied = self::deniedPermissions($user->id, $businessId);
+
+            $permissions = $denied === []
+                ? array_values(array_unique(array_merge(
+                    $rolePermissions,
+                    self::allowedPermissions($user->id, $businessId)
+                )))
+                : array_values(array_diff(
+                    array_unique(array_merge(
+                        $rolePermissions,
+                        self::allowedPermissions($user->id, $businessId)
+                    )),
+                    $denied
+                ));
         }
 
         return self::$cache[$key] = $permissions;
@@ -64,6 +80,27 @@ class TenantAuthorizer
             ->all();
     }
 
+    /**
+     * Full effective-access picture for the RBAC admin screens: the effective
+     * set plus its provenance (role-derived, allow-overrides, deny-overrides).
+     *
+     * @return array{permissions: list<string>, role: list<string>, allowed: list<string>, denied: list<string>}
+     */
+    public static function effectiveWithSources(User $user, int $businessId): array
+    {
+        if ($businessId <= 0) {
+            return ['permissions' => [], 'role' => [], 'allowed' => [], 'denied' => []];
+        }
+
+        $role = self::tenantRolePermissions($businessId, $user->id);
+        $allowed = self::allowedPermissions($user->id, $businessId);
+        $denied = self::deniedPermissions($user->id, $businessId);
+        $permissions = array_values(array_diff(array_unique(array_merge($role, $allowed)), $denied));
+        sort($permissions, SORT_STRING);
+
+        return ['permissions' => $permissions, 'role' => $role, 'allowed' => $allowed, 'denied' => $denied];
+    }
+
     public static function flushUser(int $userId): void
     {
         foreach (array_keys(self::$cache) as $key) {
@@ -85,7 +122,7 @@ class TenantAuthorizer
     }
 
     /** Union of permissions from a user's tenant roles — or ALL tenant roles for support. */
-    private static function tenantPermissions(int $businessId, ?int $userId): array
+    private static function tenantRolePermissions(int $businessId, ?int $userId): array
     {
         $adminIds = self::tenantAdminIds($businessId);
         if ($adminIds->isEmpty()) {
@@ -107,6 +144,32 @@ class TenantAuthorizer
             ->whereIn('permission_role.role_id', $roleIds)
             ->pluck('permissions.name')
             ->unique()
+            ->values()
+            ->all();
+    }
+
+    /** @return list<string> tenant-scoped per-user allow overrides */
+    private static function allowedPermissions(int $userId, int $businessId): array
+    {
+        return DB::table('user_permission_overrides')
+            ->join('permissions', 'permissions.id', '=', 'user_permission_overrides.permission_id')
+            ->where('user_permission_overrides.user_id', $userId)
+            ->where('user_permission_overrides.business_id', $businessId)
+            ->where('user_permission_overrides.mode', 'allow')
+            ->pluck('permissions.name')
+            ->values()
+            ->all();
+    }
+
+    /** @return list<string> tenant-scoped per-user deny overrides */
+    private static function deniedPermissions(int $userId, int $businessId): array
+    {
+        return DB::table('user_permission_overrides')
+            ->join('permissions', 'permissions.id', '=', 'user_permission_overrides.permission_id')
+            ->where('user_permission_overrides.user_id', $userId)
+            ->where('user_permission_overrides.business_id', $businessId)
+            ->where('user_permission_overrides.mode', 'deny')
+            ->pluck('permissions.name')
             ->values()
             ->all();
     }

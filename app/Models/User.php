@@ -118,7 +118,11 @@ class User extends Authenticatable implements LaratrustUser,MustVerifyEmail
             'receptionist' => 'receptionist',
             'billing' => 'billing',
             'customer' => 'patient',
-            default => 'admin',
+            'admin' => 'admin',
+            // Custom tenant roles keep their own name; the SPA treats it as
+            // cosmetic only — navigation is permission-driven.
+            null => 'admin',
+            default => (string) $primary,
         };
     }
 

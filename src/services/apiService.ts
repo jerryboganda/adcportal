@@ -1,5 +1,6 @@
 import { http } from './api';
 import {
+  AccessRoleRecord,
   ActiveTab,
   AdverseReactionReport,
   AppNotification,
@@ -7,6 +8,7 @@ import {
   AuditLogEntry,
   ClinicProfileSettings,
   DicomNodeConfig,
+  EffectiveAccess,
   DoctorDispatchLog,
   DoseLog,
   Entitlements,
@@ -21,6 +23,8 @@ import {
   InvoicePayment,
   Modality,
   Patient,
+  PaymentMethod,
+  PermissionGroup,
   Plan,
   PlatformAuditEntry,
   PlatformOverviewStats,
@@ -30,6 +34,7 @@ import {
   RadiologyReport,
   Referrer,
   ReportTemplate,
+  Room,
   ScreeningForm,
   Service,
   StaffRole,
@@ -70,6 +75,12 @@ export interface SessionUser extends StaffUser {
   platformRole?: PlatformRole | null;
   memberships: TenantMembership[];
   supportSession?: SupportSessionInfo | null;
+  /** Server-issued tenant permission names — UI gating only; the server
+   *  remains the only enforcement point (mirrors TenantAuthorizer). */
+  permissions: string[];
+  /** Bumped server-side on every RBAC mutation; the SPA polls /me and
+   *  re-hydrates when this counter moves (permission auto-refresh). */
+  permissionsVersion: number;
 }
 
 export interface BootstrapPayload {
@@ -81,7 +92,9 @@ export interface BootstrapPayload {
   invoices: Invoice[];
   patients: Patient[];
   modalities: Modality[];
+  rooms: Room[];
   services: Service[];
+  paymentMethods: PaymentMethod[];
   referrers: Referrer[];
   screeningForms: ScreeningForm[];
   templates: ReportTemplate[];
@@ -234,20 +247,36 @@ export async function bootstrap(): Promise<BootstrapPayload> {
     dicomNodes: data.data.dicomNodes ?? [],
     notificationTemplates: data.data.notificationTemplates ?? [],
     staff: data.data.staff ?? [],
+    rooms: data.data.rooms ?? [],
+    paymentMethods: data.data.paymentMethods ?? [],
   };
 }
 
 // ==================== studies ====================
 
+export type PaymentStatus = 'unpaid' | 'partial' | 'paid';
+
 export interface BookingInput {
   patientId?: string;
   newPatient?: Partial<Patient>;
   serviceId: number;
+  roomId?: number;
   referrerId?: number;
   date: string;
   time: string;
   priority: 'routine' | 'urgent' | 'stat';
   notes?: string;
+  /** Booking-time cash discount — requires `invoice edit` on the server. */
+  discountAmount?: number;
+  /** Booking-time settlement against the auto-issued invoice — requires
+   *  `invoice payment` on the server. Totals are computed server-side. */
+  payment?: {
+    status: PaymentStatus;
+    amountPaid?: number;
+    /** Id of a tenant-configured, active PaymentMethod. */
+    methodId?: number;
+    reference?: string;
+  };
 }
 
 export interface BookingResult {
@@ -261,11 +290,16 @@ export async function createBooking(input: BookingInput): Promise<BookingResult>
     patientId: input.patientId ? Number(input.patientId) : undefined,
     newPatient: input.newPatient,
     serviceId: input.serviceId,
+    roomId: input.roomId ?? undefined,
     referrerId: input.referrerId ?? undefined,
     date: input.date,
     time: input.time,
     priority: input.priority,
     notes: input.notes,
+    discount: input.discountAmount !== undefined && input.discountAmount > 0
+      ? { amount: input.discountAmount }
+      : undefined,
+    payment: input.payment,
   });
   return {
     study: normalizeStudy(data.data.study),
@@ -442,6 +476,42 @@ export async function updateModality(modality: Modality): Promise<Modality> {
 
 export async function deleteModality(id: string): Promise<void> {
   await http.delete(`/modalities/${id}`);
+}
+
+// ==================== rooms (imaging suites) ====================
+
+export async function createRoom(input: Omit<Room, 'id'>): Promise<Room> {
+  const { data } = await http.post('/rooms', input);
+  return data.data.room;
+}
+
+export async function updateRoom(room: Room): Promise<Room> {
+  const { data } = await http.put(`/rooms/${room.id}`, room);
+  return data.data.room;
+}
+
+export async function deleteRoom(id: string): Promise<void> {
+  await http.delete(`/rooms/${id}`);
+}
+
+// ==================== payment methods ====================
+
+export async function createPaymentMethod(input: { code: string; name: string; isActive?: boolean; sortOrder?: number }): Promise<PaymentMethod> {
+  const { data } = await http.post('/payment-methods', input);
+  return data.data.paymentMethod;
+}
+
+export async function updatePaymentMethod(method: Pick<PaymentMethod, 'id'> & { name: string; isActive?: boolean; sortOrder?: number }): Promise<PaymentMethod> {
+  const { data } = await http.put(`/payment-methods/${method.id}`, {
+    name: method.name,
+    isActive: method.isActive,
+    sortOrder: method.sortOrder,
+  });
+  return data.data.paymentMethod;
+}
+
+export async function deletePaymentMethod(id: string): Promise<void> {
+  await http.delete(`/payment-methods/${id}`);
 }
 
 export async function createService(input: Omit<Service, 'id'>): Promise<Service> {
@@ -1041,4 +1111,61 @@ export async function fetchPlatformStepUpStatus(): Promise<{ required: boolean; 
 export async function fetchTenantBrandingView(): Promise<TenantBrandingView> {
   const { data } = await http.get('/settings/branding');
   return data.data;
+}
+
+// ==================== tenant RBAC: roles & permissions admin ====================
+
+export async function fetchAccessCatalog(): Promise<PermissionGroup[]> {
+  const { data } = await http.get('/access/catalog');
+  return data.data.catalog;
+}
+
+export async function fetchAccessRoles(): Promise<AccessRoleRecord[]> {
+  const { data } = await http.get('/access/roles');
+  return data.data.roles;
+}
+
+export async function createAccessRole(input: {
+  name: string;
+  displayName?: string;
+  description?: string;
+  permissions: string[];
+}): Promise<AccessRoleRecord> {
+  const { data } = await http.post('/access/roles', input);
+  return data.data.role;
+}
+
+export async function updateAccessRole(
+  id: string,
+  input: { displayName?: string; description?: string }
+): Promise<AccessRoleRecord> {
+  const { data } = await http.patch(`/access/roles/${id}`, input);
+  return data.data.role;
+}
+
+export async function syncAccessRolePermissions(id: string, permissions: string[]): Promise<AccessRoleRecord> {
+  const { data } = await http.put(`/access/roles/${id}/permissions`, { permissions });
+  return data.data.role;
+}
+
+export async function duplicateAccessRole(id: string, input?: { name?: string; displayName?: string }): Promise<AccessRoleRecord> {
+  const { data } = await http.post(`/access/roles/${id}/duplicate`, input ?? {});
+  return data.data.role;
+}
+
+export async function deleteAccessRole(id: string): Promise<void> {
+  await http.delete(`/access/roles/${id}`);
+}
+
+export async function fetchEffectiveAccess(userId: string): Promise<EffectiveAccess> {
+  const { data } = await http.get(`/access/users/${userId}/effective`);
+  return data.data.access;
+}
+
+export async function syncUserOverrides(
+  userId: string,
+  input: { allow: string[]; deny: string[] }
+): Promise<EffectiveAccess> {
+  const { data } = await http.put(`/access/users/${userId}/overrides`, input);
+  return data.data.access;
 }

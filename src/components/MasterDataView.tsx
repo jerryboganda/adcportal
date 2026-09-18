@@ -32,11 +32,16 @@ import {
   ChevronRight,
   Eye,
 } from 'lucide-react';
-import { Modality, Service, Referrer, ScreeningForm, ReportTemplate, ScreeningQuestion } from '../types';
+import { Modality, Service, Referrer, ScreeningForm, ReportTemplate, ScreeningQuestion, Room, PaymentMethod } from '../types';
+import { canAny } from '../services/permissions';
 
 interface MasterDataViewProps {
   modalities: Modality[];
+  /** Server-issued effective permission set — drives CRUD visibility. */
+  permissions: string[];
+  rooms: Room[];
   services: Service[];
+  paymentMethods: PaymentMethod[];
   referrers: Referrer[];
   forms: ScreeningForm[];
   templates: ReportTemplate[];
@@ -46,6 +51,12 @@ interface MasterDataViewProps {
   onAddModality?: (newMod: Omit<Modality, 'id'>) => void;
   onUpdateModality?: (updatedMod: Modality) => void;
   onDeleteModality?: (modalityId: number) => void;
+  onAddRoom?: (newRoom: Omit<Room, 'id'>) => void;
+  onUpdateRoom?: (updatedRoom: Room) => void;
+  onDeleteRoom?: (roomId: number) => void;
+  onAddPaymentMethod?: (input: { code: string; name: string; isActive?: boolean; sortOrder?: number }) => void;
+  onUpdatePaymentMethod?: (method: { id: number; name: string; isActive?: boolean; sortOrder?: number }) => void;
+  onDeletePaymentMethod?: (methodId: number) => void;
   onAddReferrer?: (newRef: Omit<Referrer, 'id'>) => void;
   onUpdateReferrer?: (updatedRef: Referrer) => void;
   onDeleteReferrer?: (refId: number) => void;
@@ -69,8 +80,11 @@ interface MasterDataViewProps {
 }
 
 export const MasterDataView: React.FC<MasterDataViewProps> = ({
+  permissions,
   modalities,
+  rooms,
   services,
+  paymentMethods,
   referrers,
   forms,
   templates,
@@ -80,6 +94,12 @@ export const MasterDataView: React.FC<MasterDataViewProps> = ({
   onAddModality,
   onUpdateModality,
   onDeleteModality,
+  onAddRoom,
+  onUpdateRoom,
+  onDeleteRoom,
+  onAddPaymentMethod,
+  onUpdatePaymentMethod,
+  onDeletePaymentMethod,
   onAddReferrer,
   onUpdateReferrer,
   onDeleteReferrer,
@@ -90,7 +110,27 @@ export const MasterDataView: React.FC<MasterDataViewProps> = ({
   onDeleteTemplate,
   onExportBackup,
 }) => {
-  const [activeSubTab, setActiveSubTab] = useState<'services' | 'modalities' | 'referrers' | 'forms' | 'templates'>('services');
+  // Server-issued catalog permissions (API enforces the same checks).
+  const canCrud = {
+    service: { edit: canAny(permissions, ['service edit', 'service create']), del: canAny(permissions, ['service delete']) },
+    modality: { edit: canAny(permissions, ['modality edit', 'modality create']), del: canAny(permissions, ['modality delete']) },
+    room: { edit: canAny(permissions, ['room edit', 'room create']), del: canAny(permissions, ['room delete']) },
+    paymentMethod: { edit: canAny(permissions, ['payment method edit', 'payment method create']), del: canAny(permissions, ['payment method delete']) },
+    form: { edit: canAny(permissions, ['setting manage']), del: canAny(permissions, ['setting manage']) },
+    template: { edit: canAny(permissions, ['report template edit', 'report template create']), del: canAny(permissions, ['report template delete']) },
+    referrer: { edit: canAny(permissions, ['referrer edit', 'referrer create']), del: canAny(permissions, ['referrer delete']) },
+  };
+  const canCreate = {
+    service: canAny(permissions, ['service create']),
+    modality: canAny(permissions, ['modality create']),
+    room: canAny(permissions, ['room create']),
+    paymentMethod: canAny(permissions, ['payment method create']),
+    form: canAny(permissions, ['setting manage']),
+    template: canAny(permissions, ['report template create']),
+    referrer: canAny(permissions, ['referrer create']),
+  };
+
+  const [activeSubTab, setActiveSubTab] = useState<'services' | 'modalities' | 'suites' | 'payment-methods' | 'referrers' | 'forms' | 'templates'>('services');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedModalityFilter, setSelectedModalityFilter] = useState<string>('ALL');
   const [copiedId, setCopiedId] = useState<string | null>(null);
@@ -101,6 +141,12 @@ export const MasterDataView: React.FC<MasterDataViewProps> = ({
 
   const [modalityModalOpen, setModalityModalOpen] = useState(false);
   const [editingModality, setEditingModality] = useState<Modality | null>(null);
+
+  const [roomModalOpen, setRoomModalOpen] = useState(false);
+  const [editingRoom, setEditingRoom] = useState<Room | null>(null);
+
+  const [paymentMethodModalOpen, setPaymentMethodModalOpen] = useState(false);
+  const [editingPaymentMethod, setEditingPaymentMethod] = useState<PaymentMethod | null>(null);
 
   const [referrerModalOpen, setReferrerModalOpen] = useState(false);
   const [editingReferrer, setEditingReferrer] = useState<Referrer | null>(null);
@@ -183,6 +229,27 @@ export const MasterDataView: React.FC<MasterDataViewProps> = ({
     );
   }, [modalities, searchQuery]);
 
+  // Filtered Imaging Suites (rooms)
+  const filteredRooms = useMemo(() => {
+    return rooms.filter(room => {
+      const mod = modalities.find(m => m.id === room.modalityId);
+      const matchesSearch =
+        room.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (room.description ?? '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (mod?.name ?? '').toLowerCase().includes(searchQuery.toLowerCase());
+      const matchesModality = selectedModalityFilter === 'ALL' || mod?.code === selectedModalityFilter;
+      return matchesSearch && matchesModality;
+    });
+  }, [rooms, modalities, searchQuery, selectedModalityFilter]);
+
+  // Filtered Payment Methods
+  const filteredPaymentMethods = useMemo(() => {
+    return paymentMethods.filter(m =>
+      m.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      m.code.toLowerCase().includes(searchQuery.toLowerCase())
+    );
+  }, [paymentMethods, searchQuery]);
+
   // Filtered Referrers
   const filteredReferrers = useMemo(() => {
     return referrers.filter(ref =>
@@ -261,7 +328,7 @@ export const MasterDataView: React.FC<MasterDataViewProps> = ({
             <span>Export CSV</span>
           </button>
 
-          {activeSubTab === 'services' && (
+          {activeSubTab === 'services' && canCreate.service && canCrud.service.edit && (
             <button
               onClick={() => {
                 setEditingService(null);
@@ -274,7 +341,7 @@ export const MasterDataView: React.FC<MasterDataViewProps> = ({
             </button>
           )}
 
-          {activeSubTab === 'modalities' && (
+          {activeSubTab === 'modalities' && canCreate.modality && canCrud.modality.edit && (
             <button
               onClick={() => {
                 setEditingModality(null);
@@ -287,7 +354,33 @@ export const MasterDataView: React.FC<MasterDataViewProps> = ({
             </button>
           )}
 
-          {activeSubTab === 'forms' && (
+          {activeSubTab === 'suites' && canCreate.room && canCrud.room.edit && (
+            <button
+              onClick={() => {
+                setEditingRoom(null);
+                setRoomModalOpen(true);
+              }}
+              className="px-3.5 py-1.5 bg-cyan-600 hover:bg-cyan-700 text-white rounded-lg text-xs font-semibold flex items-center space-x-1.5 shadow-xs transition-colors cursor-pointer"
+            >
+              <PlusCircle className="w-3.5 h-3.5" />
+              <span>Add Imaging Suite</span>
+            </button>
+          )}
+
+          {activeSubTab === 'payment-methods' && canCreate.paymentMethod && canCrud.paymentMethod.edit && (
+            <button
+              onClick={() => {
+                setEditingPaymentMethod(null);
+                setPaymentMethodModalOpen(true);
+              }}
+              className="px-3.5 py-1.5 bg-cyan-600 hover:bg-cyan-700 text-white rounded-lg text-xs font-semibold flex items-center space-x-1.5 shadow-xs transition-colors cursor-pointer"
+            >
+              <PlusCircle className="w-3.5 h-3.5" />
+              <span>Add Payment Method</span>
+            </button>
+          )}
+
+          {activeSubTab === 'forms' && canCreate.form && canCrud.form.edit && (
             <button
               onClick={() => {
                 setEditingForm(null);
@@ -300,7 +393,7 @@ export const MasterDataView: React.FC<MasterDataViewProps> = ({
             </button>
           )}
 
-          {activeSubTab === 'templates' && (
+          {activeSubTab === 'templates' && canCreate.template && canCrud.template.edit && (
             <button
               onClick={() => {
                 setEditingTemplate(null);
@@ -313,7 +406,7 @@ export const MasterDataView: React.FC<MasterDataViewProps> = ({
             </button>
           )}
 
-          {activeSubTab === 'referrers' && (
+          {activeSubTab === 'referrers' && canCreate.referrer && canCrud.referrer.edit && (
             <button
               onClick={() => {
                 setEditingReferrer(null);
@@ -347,6 +440,22 @@ export const MasterDataView: React.FC<MasterDataViewProps> = ({
             }`}
           >
             Modalities ({modalities.length})
+          </button>
+          <button
+            onClick={() => setActiveSubTab('suites')}
+            className={`px-3 py-1.5 rounded-lg font-semibold transition-colors cursor-pointer ${
+              activeSubTab === 'suites' ? 'bg-cyan-600 text-white shadow-xs' : 'text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            Imaging Suites ({rooms.length})
+          </button>
+          <button
+            onClick={() => setActiveSubTab('payment-methods')}
+            className={`px-3 py-1.5 rounded-lg font-semibold transition-colors cursor-pointer ${
+              activeSubTab === 'payment-methods' ? 'bg-cyan-600 text-white shadow-xs' : 'text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            Payment Methods ({paymentMethods.length})
           </button>
           <button
             onClick={() => setActiveSubTab('forms')}
@@ -508,6 +617,7 @@ export const MasterDataView: React.FC<MasterDataViewProps> = ({
                         </td>
                         <td className="py-3 px-4 text-right whitespace-nowrap">
                           <div className="flex items-center justify-end space-x-1">
+{canCrud.service.edit && (
                             <button
                               onClick={() => {
                                 setEditingService(svc);
@@ -518,7 +628,8 @@ export const MasterDataView: React.FC<MasterDataViewProps> = ({
                             >
                               <Edit2 className="w-3.5 h-3.5" />
                             </button>
-                            {onDeleteService && (
+                          )}
+                            {canCrud.service.del && onDeleteService && (
                               <button
                                 onClick={() => {
                                   if (confirm(`Are you sure you want to remove procedure: "${svc.name}"?`)) {
@@ -590,6 +701,7 @@ export const MasterDataView: React.FC<MasterDataViewProps> = ({
                   <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-xs">
                     <span className="text-slate-400 text-[11px]">Primary Imaging Suite</span>
                     <div className="flex items-center space-x-3">
+{canCrud.modality.edit && (
                       <button
                         onClick={() => {
                           setEditingModality(mod);
@@ -600,7 +712,8 @@ export const MasterDataView: React.FC<MasterDataViewProps> = ({
                         <Edit2 className="w-3 h-3" />
                         <span>Configure Suite</span>
                       </button>
-                      {onDeleteModality && (
+                          )}
+                      {canCrud.modality.del && onDeleteModality && (
                         <button
                           onClick={() => {
                             if (confirm(`Delete modality suite: "${mod.name}"? Suites with procedures assigned cannot be deleted.`)) {
@@ -618,6 +731,185 @@ export const MasterDataView: React.FC<MasterDataViewProps> = ({
                 </div>
               );
             })}
+          </div>
+        </div>
+      )}
+
+      {/* Imaging Suites (Rooms) Tab */}
+      {activeSubTab === 'suites' && (
+        <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+          <div className="p-4 bg-slate-50/70 border-b border-slate-200 flex items-center justify-between">
+            <div className="text-xs font-semibold text-slate-700 flex items-center space-x-2">
+              <span>Imaging Suites &amp; Scan Rooms</span>
+              <span className="bg-cyan-100 text-cyan-800 text-[10px] px-2 py-0.5 rounded-sm font-bold">
+                {filteredRooms.length} suites
+              </span>
+            </div>
+            <div className="text-[11px] text-slate-500">
+              Selectable in the booking form per modality; auto-assignment uses these when no suite is picked
+            </div>
+          </div>
+          <div className="w-full overflow-x-hidden">
+            <table className="w-full text-left text-xs table-auto">
+              <thead className="bg-slate-100/90 text-slate-600 uppercase font-bold text-[11px] tracking-wider border-b border-slate-200">
+                <tr>
+                  <th className="py-3 px-4">Suite / Room</th>
+                  <th className="py-3 px-3 whitespace-nowrap">Modality</th>
+                  <th className="py-3 px-3 whitespace-nowrap">Capacity / Slot</th>
+                  <th className="py-3 px-3">Notes</th>
+                  <th className="py-3 px-3 whitespace-nowrap">Status</th>
+                  <th className="py-3 px-4 text-right whitespace-nowrap">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 text-slate-700">
+                {filteredRooms.length === 0 ? (
+                  <tr>
+                    <td colSpan={6} className="py-8 text-center text-slate-400 text-xs">
+                      No imaging suites configured yet. Add one so the front desk can book studies against a specific room.
+                    </td>
+                  </tr>
+                ) : (
+                  filteredRooms.map((room) => {
+                    const mod = modalities.find(m => m.id === room.modalityId);
+                    return (
+                      <tr key={room.id} className="hover:bg-slate-50/80 transition-colors">
+                        <td className="py-3 px-4">
+                          <div className="font-bold text-slate-900 leading-snug">{room.name}</div>
+                          <div className="font-mono text-[10px] text-slate-400">ID #{room.id}</div>
+                        </td>
+                        <td className="py-3 px-3 whitespace-nowrap">
+                          <span className="font-mono font-bold text-[10px] px-2 py-0.5 rounded text-white" style={{ backgroundColor: mod?.color ?? '#64748b' }}>
+                            {mod?.code ?? '—'}
+                          </span>
+                          <span className="text-[11px] text-slate-600 ml-1.5">{mod?.name ?? 'Unknown modality'}</span>
+                        </td>
+                        <td className="py-3 px-3 whitespace-nowrap font-mono text-slate-800">{room.capacityPerSlot}</td>
+                        <td className="py-3 px-3 text-slate-500 max-w-[220px] truncate" title={room.description}>
+                          {room.description || '—'}
+                        </td>
+                        <td className="py-3 px-3 whitespace-nowrap">
+                          <span className={`text-[10px] px-2 py-0.5 rounded-md font-bold border ${room.isActive ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-slate-100 text-slate-500 border-slate-200'}`}>
+                            {room.isActive ? 'ACTIVE' : 'INACTIVE'}
+                          </span>
+                        </td>
+                        <td className="py-3 px-4 text-right whitespace-nowrap">
+                          <div className="flex items-center justify-end space-x-3">
+{canCrud.room.edit && (
+                            <button
+                              onClick={() => {
+                                setEditingRoom(room);
+                                setRoomModalOpen(true);
+                              }}
+                              className="text-cyan-600 hover:text-cyan-800 font-semibold text-xs flex items-center space-x-1 cursor-pointer"
+                            >
+                              <Edit2 className="w-3 h-3" />
+                              <span>Edit</span>
+                            </button>
+                          )}
+                            {canCrud.room.del && onDeleteRoom && (
+                              <button
+                                onClick={() => {
+                                  if (confirm(`Delete imaging suite: "${room.name}"? Suites with booked studies cannot be deleted — deactivate instead.`)) {
+                                    onDeleteRoom(room.id);
+                                  }
+                                }}
+                                className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-md transition-colors cursor-pointer"
+                                title="Delete Imaging Suite"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* Payment Methods Tab */}
+      {activeSubTab === 'payment-methods' && (
+        <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+          <div className="p-4 bg-slate-50/70 border-b border-slate-200 flex items-center justify-between">
+            <div className="text-xs font-semibold text-slate-700 flex items-center space-x-2">
+              <span>Payment Method Configuration</span>
+              <span className="bg-cyan-100 text-cyan-800 text-[10px] px-2 py-0.5 rounded-sm font-bold">
+                {filteredPaymentMethods.length} methods
+              </span>
+            </div>
+            <div className="text-[11px] text-slate-500">
+              Only active methods are collectable at booking, Reception POS and Billing
+            </div>
+          </div>
+          <div className="w-full overflow-x-hidden">
+            <table className="w-full text-left text-xs table-auto">
+              <thead className="bg-slate-100/90 text-slate-600 uppercase font-bold text-[11px] tracking-wider border-b border-slate-200">
+                <tr>
+                  <th className="py-3 px-4">Method</th>
+                  <th className="py-3 px-3 whitespace-nowrap">Code (immutable)</th>
+                  <th className="py-3 px-3 whitespace-nowrap">Sort</th>
+                  <th className="py-3 px-3 whitespace-nowrap">Status</th>
+                  <th className="py-3 px-4 text-right whitespace-nowrap">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 text-slate-700">
+                {filteredPaymentMethods.length === 0 ? (
+                  <tr>
+                    <td colSpan={5} className="py-8 text-center text-slate-400 text-xs">
+                      No payment methods configured. Add the tenders this facility accepts (cash, card, panel…).
+                    </td>
+                  </tr>
+                ) : (
+                  filteredPaymentMethods.map((m) => (
+                    <tr key={m.id} className="hover:bg-slate-50/80 transition-colors">
+                      <td className="py-3 px-4 font-bold text-slate-900">{m.name}</td>
+                      <td className="py-3 px-3 whitespace-nowrap">
+                        <span className="font-mono text-[11px] text-cyan-700 font-bold">{m.code}</span>
+                      </td>
+                      <td className="py-3 px-3 whitespace-nowrap font-mono text-slate-800">{m.sortOrder}</td>
+                      <td className="py-3 px-3 whitespace-nowrap">
+                        <span className={`text-[10px] px-2 py-0.5 rounded-md font-bold border ${m.isActive ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-slate-100 text-slate-500 border-slate-200'}`}>
+                          {m.isActive ? 'ACTIVE' : 'INACTIVE'}
+                        </span>
+                      </td>
+                      <td className="py-3 px-4 text-right whitespace-nowrap">
+                        <div className="flex items-center justify-end space-x-3">
+{canCrud.paymentMethod.edit && (
+                          <button
+                            onClick={() => {
+                              setEditingPaymentMethod(m);
+                              setPaymentMethodModalOpen(true);
+                            }}
+                            className="text-cyan-600 hover:text-cyan-800 font-semibold text-xs flex items-center space-x-1 cursor-pointer"
+                          >
+                            <Edit2 className="w-3 h-3" />
+                            <span>Edit</span>
+                          </button>
+                          )}
+                          {canCrud.paymentMethod.del && onDeletePaymentMethod && (
+                            <button
+                              onClick={() => {
+                                if (confirm(`Delete payment method: "${m.name}"? Methods with recorded payments cannot be deleted — deactivate instead.`)) {
+                                  onDeletePaymentMethod(m.id);
+                                }
+                              }}
+                              className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-md transition-colors cursor-pointer"
+                              title="Delete Payment Method"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
           </div>
         </div>
       )}
@@ -774,6 +1066,7 @@ export const MasterDataView: React.FC<MasterDataViewProps> = ({
                   <div className="pt-3 border-t border-slate-100 flex items-center justify-between text-slate-500">
                     <span className="text-[11px] font-mono">Template ID: {tpl.id}</span>
                     <div className="flex items-center space-x-2">
+{canCrud.template.edit && (
                       <button
                         onClick={() => {
                           setEditingTemplate(tpl);
@@ -784,7 +1077,8 @@ export const MasterDataView: React.FC<MasterDataViewProps> = ({
                         <Edit2 className="w-3 h-3" />
                         <span>Edit Macro</span>
                       </button>
-                      {onDeleteTemplate && (
+                          )}
+                      {canCrud.template.del && onDeleteTemplate && (
                         <button
                           onClick={() => {
                             if (confirm(`Delete reporting template "${tpl.name}"?`)) {
@@ -851,6 +1145,7 @@ export const MasterDataView: React.FC<MasterDataViewProps> = ({
                     <ExternalLink className="w-2.5 h-2.5" />
                   </a>
                   <div className="flex items-center space-x-1">
+{canCrud.referrer.edit && (
                     <button
                       onClick={() => {
                         setEditingReferrer(r);
@@ -861,7 +1156,8 @@ export const MasterDataView: React.FC<MasterDataViewProps> = ({
                     >
                       <Edit2 className="w-3.5 h-3.5" />
                     </button>
-                    {onDeleteReferrer && (
+                          )}
+                    {canCrud.referrer.del && onDeleteReferrer && (
                       <button
                         onClick={() => {
                           if (confirm(`Remove referring doctor: ${r.name}?`)) {
@@ -921,6 +1217,47 @@ export const MasterDataView: React.FC<MasterDataViewProps> = ({
           onClose={() => {
             setModalityModalOpen(false);
             setEditingModality(null);
+          }}
+        />
+      )}
+
+      {/* 2b. Add / Edit Imaging Suite (Room) Modal */}
+      {roomModalOpen && (
+        <RoomFormModal
+          room={editingRoom}
+          modalities={modalities}
+          onSave={(roomData) => {
+            if (editingRoom && onUpdateRoom) {
+              onUpdateRoom({ ...roomData, id: editingRoom.id });
+            } else if (onAddRoom) {
+              onAddRoom(roomData);
+            }
+            setRoomModalOpen(false);
+            setEditingRoom(null);
+          }}
+          onClose={() => {
+            setRoomModalOpen(false);
+            setEditingRoom(null);
+          }}
+        />
+      )}
+
+      {/* 2c. Add / Edit Payment Method Modal */}
+      {paymentMethodModalOpen && (
+        <PaymentMethodFormModal
+          method={editingPaymentMethod}
+          onSave={(data) => {
+            if (editingPaymentMethod && onUpdatePaymentMethod) {
+              onUpdatePaymentMethod({ ...data, id: editingPaymentMethod.id });
+            } else if (onAddPaymentMethod) {
+              onAddPaymentMethod(data as { code: string; name: string; isActive?: boolean });
+            }
+            setPaymentMethodModalOpen(false);
+            setEditingPaymentMethod(null);
+          }}
+          onClose={() => {
+            setPaymentMethodModalOpen(false);
+            setEditingPaymentMethod(null);
           }}
         />
       )}
@@ -1886,6 +2223,221 @@ const AddQuestionModal: React.FC<AddQuestionModalProps> = ({ formId, onSave, onC
             </button>
             <button type="submit" className="px-4 py-1.5 bg-cyan-600 text-white rounded-lg text-xs font-semibold">
               Add Question
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+};
+
+// Imaging Suite (Room) Form Modal
+interface RoomFormModalProps {
+  room: Room | null;
+  modalities: Modality[];
+  onSave: (roomData: Omit<Room, 'id'>) => void;
+  onClose: () => void;
+}
+
+const RoomFormModal: React.FC<RoomFormModalProps> = ({ room, modalities, onSave, onClose }) => {
+  const [name, setName] = useState(room?.name || '');
+  const [modalityId, setModalityId] = useState<number>(room?.modalityId || modalities[0]?.id || 0);
+  const [capacityPerSlot, setCapacityPerSlot] = useState(room?.capacityPerSlot || 1);
+  const [description, setDescription] = useState(room?.description || '');
+  const [isActive, setIsActive] = useState(room ? room.isActive : true);
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!name.trim() || !modalityId) return;
+    onSave({
+      name: name.trim(),
+      modalityId: Number(modalityId),
+      locationId: room?.locationId ?? null,
+      capacityPerSlot: Number(capacityPerSlot),
+      description: description.trim(),
+      isActive,
+    });
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+      <div className="bg-white rounded-2xl max-w-md w-full shadow-2xl border border-slate-200 animate-in fade-in zoom-in-95 duration-150">
+        <form onSubmit={handleSubmit} className="flex flex-col">
+          <div className="p-4 border-b border-slate-200 flex items-center justify-between">
+            <h3 className="font-bold text-slate-900 text-sm">
+              {room ? 'Edit Imaging Suite' : 'Add Imaging Suite'}
+            </h3>
+            <button type="button" onClick={onClose} className="text-slate-400 hover:text-slate-600">
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+          <div className="p-5 space-y-4 text-xs">
+            <div>
+              <label className="block font-semibold text-slate-700 mb-1">Suite / Room Name</label>
+              <input
+                type="text"
+                required
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="e.g. CT Suite 1, US Room 2, Mammo Suite"
+                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs"
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block font-semibold text-slate-700 mb-1">Modality</label>
+                <select
+                  value={modalityId}
+                  onChange={(e) => setModalityId(Number(e.target.value))}
+                  required
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-semibold"
+                >
+                  {modalities.length === 0 && <option value={0}>No modalities configured</option>}
+                  {modalities.map(m => (
+                    <option key={m.id} value={m.id}>{m.name}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block font-semibold text-slate-700 mb-1">Capacity / Slot</label>
+                <input
+                  type="number"
+                  min="1"
+                  max="20"
+                  required
+                  value={capacityPerSlot}
+                  onChange={(e) => setCapacityPerSlot(Number(e.target.value))}
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-mono"
+                />
+              </div>
+            </div>
+            <div>
+              <label className="block font-semibold text-slate-700 mb-1">Notes (optional)</label>
+              <input
+                type="text"
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                placeholder="e.g. 128-slice scanner, ground floor, wheelchair access"
+                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs"
+              />
+            </div>
+            <label className="flex items-center space-x-2 cursor-pointer pt-2">
+              <input
+                type="checkbox"
+                checked={isActive}
+                onChange={(e) => setIsActive(e.target.checked)}
+                className="w-4 h-4 text-cyan-600 rounded"
+              />
+              <span className="font-semibold text-slate-800">Active — bookable from the front desk</span>
+            </label>
+          </div>
+          <div className="p-4 border-t border-slate-200 flex justify-end space-x-2">
+            <button type="button" onClick={onClose} className="px-3 py-1.5 bg-slate-100 text-slate-700 rounded-lg text-xs font-semibold">
+              Cancel
+            </button>
+            <button type="submit" className="px-4 py-1.5 bg-cyan-600 text-white rounded-lg text-xs font-semibold">
+              {room ? 'Save Changes' : 'Add Suite'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+};
+
+// Payment Method Form Modal
+interface PaymentMethodFormModalProps {
+  method: PaymentMethod | null;
+  onSave: (data: { code: string; name: string; isActive?: boolean; sortOrder?: number }) => void;
+  onClose: () => void;
+}
+
+const PaymentMethodFormModal: React.FC<PaymentMethodFormModalProps> = ({ method, onSave, onClose }) => {
+  const [code, setCode] = useState(method?.code || '');
+  const [name, setName] = useState(method?.name || '');
+  const [isActive, setIsActive] = useState(method ? method.isActive : true);
+  const [sortOrder, setSortOrder] = useState(method?.sortOrder ?? 0);
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!name.trim()) return;
+    if (!method && !code.trim()) return;
+    const cleanedCode = method
+      ? method.code
+      : code.trim().toLowerCase().replace(/[^a-z0-9_-]/g, '-');
+    onSave({
+      code: cleanedCode,
+      name: name.trim(),
+      isActive,
+      sortOrder: Number(sortOrder),
+    });
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+      <div className="bg-white rounded-2xl max-w-md w-full shadow-2xl border border-slate-200 animate-in fade-in zoom-in-95 duration-150">
+        <form onSubmit={handleSubmit} className="flex flex-col">
+          <div className="p-4 border-b border-slate-200 flex items-center justify-between">
+            <h3 className="font-bold text-slate-900 text-sm">
+              {method ? 'Edit Payment Method' : 'Add Payment Method'}
+            </h3>
+            <button type="button" onClick={onClose} className="text-slate-400 hover:text-slate-600">
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+          <div className="p-5 space-y-4 text-xs">
+            <div>
+              <label className="block font-semibold text-slate-700 mb-1">Display Name</label>
+              <input
+                type="text"
+                required
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="e.g. Cash (Counter Drawer), Corporate Panel Billing"
+                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs"
+              />
+            </div>
+            <div>
+              <label className="block font-semibold text-slate-700 mb-1">
+                Method Code {method && <span className="text-slate-400 font-normal">(immutable — payment history references it)</span>}
+              </label>
+              <input
+                type="text"
+                required
+                disabled={!!method}
+                value={code}
+                onChange={(e) => setCode(e.target.value)}
+                placeholder="e.g. cash, card, corporate-panel"
+                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-mono disabled:opacity-60"
+              />
+            </div>
+            <div>
+              <label className="block font-semibold text-slate-700 mb-1">Sort Order</label>
+              <input
+                type="number"
+                min="0"
+                max="999"
+                value={sortOrder}
+                onChange={(e) => setSortOrder(Number(e.target.value))}
+                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-mono"
+              />
+            </div>
+            <label className="flex items-center space-x-2 cursor-pointer pt-2">
+              <input
+                type="checkbox"
+                checked={isActive}
+                onChange={(e) => setIsActive(e.target.checked)}
+                className="w-4 h-4 text-cyan-600 rounded"
+              />
+              <span className="font-semibold text-slate-800">Active — collectable at booking, POS and Billing</span>
+            </label>
+          </div>
+          <div className="p-4 border-t border-slate-200 flex justify-end space-x-2">
+            <button type="button" onClick={onClose} className="px-3 py-1.5 bg-slate-100 text-slate-700 rounded-lg text-xs font-semibold">
+              Cancel
+            </button>
+            <button type="submit" className="px-4 py-1.5 bg-cyan-600 text-white rounded-lg text-xs font-semibold">
+              {method ? 'Save Changes' : 'Add Method'}
             </button>
           </div>
         </form>

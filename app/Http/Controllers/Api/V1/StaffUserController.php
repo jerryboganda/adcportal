@@ -47,6 +47,8 @@ class StaffUserController extends BaseApiController
         // Account + role + membership must land atomically: a partial staff
         // row (user without role/membership) is an unusable, invisible account.
         $user = DB::transaction(function () use ($validated) {
+            $targetRole = $this->resolveTargetRole($validated);
+
             $user = User::create([
                 'name' => $validated['name'],
                 'email' => $validated['email'],
@@ -63,12 +65,12 @@ class StaffUserController extends BaseApiController
                 'lang' => 'en',
             ]);
 
-            $this->assignRole($user, $validated['role']);
+            $this->syncRole($user, $targetRole);
 
             TenantMembership::create([
                 'user_id' => $user->id,
                 'business_id' => $this->tenantId(),
-                'role' => $validated['role'],
+                'role' => $this->membershipRoleLabel($targetRole),
                 'is_default' => false,
                 'status' => 'active',
             ]);
@@ -77,7 +79,7 @@ class StaffUserController extends BaseApiController
         });
 
         $this->audit('user_created', $user, [
-            'summary' => "Provisioned user account for {$user->name} ({$validated['role']})",
+            'summary' => "Provisioned user account for {$user->name} ({$user->portalRole()})",
         ]);
 
         return response()->json(['data' => ['staff' => ApiShape::staffUser($user)]], 201);
@@ -109,8 +111,22 @@ class StaffUserController extends BaseApiController
 
         $user->update($updates);
 
-        if (isset($validated['role'])) {
-            $this->assignRole($user, $validated['role']);
+        if (isset($validated['role']) || isset($validated['roleId'])) {
+            $previous = \App\Services\TenantAuthorizer::roleNamesFor($user, $this->tenantId());
+            $targetRole = $this->resolveTargetRole($validated);
+            $this->syncRole($user, $targetRole);
+
+            // Keep the membership label in step with the effective role.
+            $membership = TenantMembership::where('user_id', $user->id)
+                ->where('business_id', $this->tenantId())
+                ->first();
+            if ($membership) {
+                $membership->update(['role' => $this->membershipRoleLabel($targetRole)]);
+            }
+
+            $this->audit('user_role_assigned', $user, [
+                'summary' => "Role of {$user->name} changed: ".(implode(', ', $previous) ?: 'none').' → '.($targetRole?->display_name ?: $targetRole?->name ?: 'none'),
+            ]);
         }
 
         $this->audit('user_updated', $user, [
@@ -151,7 +167,8 @@ class StaffUserController extends BaseApiController
             'name' => [$required ? 'required' : 'sometimes', 'string', 'max:255'],
             'email' => [$required ? 'required' : 'sometimes', 'email', 'max:255', 'unique:users,email'.($required ? '' : ','.(int) $request->route('staff').',id')],
             'password' => [$required ? 'required' : 'sometimes', ...array_slice(\App\Services\PasswordPolicy::rules(), 1)],
-            'role' => [$required ? 'required' : 'sometimes', 'in:admin,radiologist,technologist,receptionist,billing'],
+            'role' => [$required ? 'required_without:roleId' : 'sometimes', 'nullable', 'in:admin,radiologist,technologist,receptionist,billing'],
+            'roleId' => [$required ? 'required_without:role' : 'sometimes', 'nullable', 'integer'],
             'department' => ['nullable', 'string', 'max:255'],
             'phone' => ['nullable', 'string', 'max:50'],
             'isActive' => ['nullable', 'boolean'],
@@ -174,9 +191,35 @@ class StaffUserController extends BaseApiController
         ];
     }
 
-    /** Frontend role vocabulary → per-tenant laratrust role name. */
-    private function assignRole(User $user, string $portalRole): void
+    /**
+     * Resolve the target role from the request: a tenant-scoped `roleId`
+     * (any role of this clinic, including custom ones) wins over the legacy
+     * SPA vocabulary. Out-of-tenant ids are validation errors, never 500s.
+     */
+    private function resolveTargetRole(array $validated): ?\App\Models\Role
     {
+        if (! empty($validated['roleId'])) {
+            $role = \App\Models\Role::query()
+                ->whereKey((int) $validated['roleId'])
+                ->where('guard_name', 'web')
+                ->whereIn('created_by', User::where('business_id', $this->tenantId())->pluck('id'))
+                ->first();
+
+            if (! $role) {
+                throw \Illuminate\Validation\ValidationException::withMessages([
+                    'roleId' => 'The selected role does not exist in this clinic.',
+                ]);
+            }
+
+            return $role;
+        }
+
+        $portalRole = $validated['role'] ?? null;
+
+        if (! $portalRole) {
+            return null;
+        }
+
         $roleName = match ($portalRole) {
             'radiologist' => 'radiologist',
             'technologist' => 'technician',
@@ -186,17 +229,48 @@ class StaffUserController extends BaseApiController
             default => 'receptionist',
         };
 
-        $role = \App\Models\Role::where('name', $roleName)
+        return \App\Models\Role::where('name', $roleName)
             ->where('guard_name', 'web')
-            ->where('created_by', $this->tenantId() === 0 ? $user->created_by : $this->tenantOwnerId())
+            ->where('created_by', $this->tenantId() === 0 ? null : $this->tenantOwnerId())
             ->first();
+    }
 
-        if ($role && ! $user->hasRole($roleName)) {
-            $user->addRole($role);
-            if (method_exists($user, 'flushCache')) {
-                $user->flushCache();
+    /**
+     * REPLACE semantics: the user's tenant roles are swapped for the target.
+     * Roles must never accumulate across edits — overlapping roles would
+     * silently stack their permission sets.
+     */
+    private function syncRole(User $user, ?\App\Models\Role $targetRole): void
+    {
+        DB::transaction(function () use ($user, $targetRole) {
+            $tenantRoleIds = \App\Models\Role::query()
+                ->whereIn('created_by', User::where('business_id', $this->tenantId())->pluck('id'))
+                ->pluck('id');
+
+            DB::table('role_user')
+                ->where('user_id', $user->id)
+                ->whereIn('role_id', $tenantRoleIds)
+                ->delete();
+
+            if ($targetRole && ! $user->hasRole($targetRole->name)) {
+                $user->addRole($targetRole);
             }
+        });
+
+        if (method_exists($user, 'flushCache')) {
+            $user->flushCache();
         }
+        \App\Services\TenantAuthorizer::flushUser($user->id);
+    }
+
+    /** SPA-facing label stored on the tenant membership row. */
+    private function membershipRoleLabel(?\App\Models\Role $role): string
+    {
+        if (! $role) {
+            return 'receptionist';
+        }
+
+        return $role->name === 'technician' ? 'technologist' : $role->name;
     }
 
     private function tenantOwnerId(): int

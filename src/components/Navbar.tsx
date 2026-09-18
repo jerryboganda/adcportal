@@ -20,19 +20,13 @@ import { ActiveTab, AppRole, Appointment, Patient, Invoice, StaffUser, AppNotifi
 import { GlobalSearchBar } from './GlobalSearchBar';
 import { UserProfileMenu } from './UserProfileMenu';
 import { SessionUser } from '../services/apiService';
+import { allowedTabs } from '../services/permissions';
 
 /**
- * Tab visibility is derived from the SERVER-ISSUED role (never picked
- * client-side) plus the tenant's server-enforced module entitlements.
+ * Tab visibility is PERMISSION-DRIVEN from the server-issued effective
+ * permission set (currentUser.permissions — never picked client-side from the
+ * role label) plus the tenant's server-enforced module entitlements.
  */
-const ROLE_TABS: Record<string, ActiveTab[]> = {
-  admin: ['dashboard', 'checkin', 'technologist', 'reporting', 'billing', 'queue', 'inventory', 'masters', 'doctors', 'settings'],
-  radiologist: ['dashboard', 'reporting', 'queue', 'settings'],
-  technologist: ['dashboard', 'technologist', 'queue', 'settings'],
-  receptionist: ['dashboard', 'checkin', 'billing', 'queue', 'settings'],
-  billing: ['dashboard', 'billing', 'queue', 'settings'],
-  patient: ['dashboard'],
-};
 
 interface NavbarProps {
   activeTab: ActiveTab;
@@ -45,6 +39,8 @@ interface NavbarProps {
   entitlements?: Entitlements | null;
   onSelectAppointment?: (apt: Appointment) => void;
   onOpenBookingModal?: () => void;
+  /** Server-issued `appointment create` — hides booking affordances otherwise. */
+  canOpenBooking?: boolean;
   staffUsers?: StaffUser[];
   currentUser: SessionUser;
   onSignOut: () => void;
@@ -68,6 +64,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   entitlements,
   onSelectAppointment,
   onOpenBookingModal,
+  canOpenBooking,
   staffUsers = [],
   currentUser,
   onSignOut,
@@ -89,6 +86,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   const hasCriticalNotif = unreadNotifications.some(n => n.priority === 'critical' || n.category === 'stat');
 
   const navItems = useMemo(() => {
+    const allowed = new Set(allowedTabs(currentUser.permissions, entitlements));
     const all = [
       { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
       { id: 'checkin', label: 'Reception Desk', icon: UserCheck, badge: waitingCount, badgeColor: 'bg-cyan-500' },
@@ -101,12 +99,8 @@ export const Navbar: React.FC<NavbarProps> = ({
       { id: 'doctors', label: 'Doctor Network', icon: Stethoscope },
       { id: 'settings', label: 'Settings', icon: Settings },
     ];
-    const allowed = ROLE_TABS[role] ?? ROLE_TABS.admin;
-    const moduleDisabled = (id: string) =>
-      (id === 'inventory' && entitlements?.features && entitlements.features.inventory === false) ||
-      (id === 'doctors' && entitlements?.features && entitlements.features.dispatch === false);
-    return all.filter(item => allowed.includes(item.id as ActiveTab) && !moduleDisabled(item.id));
-  }, [role, entitlements, waitingCount, statCount, readingCount, lowStockCount]);
+    return all.filter(item => allowed.has(item.id as ActiveTab));
+  }, [currentUser.permissions, entitlements, waitingCount, statCount, readingCount, lowStockCount]);
 
   // If the persisted/active tab is not permitted in this role+tenant context,
   // snap back to the first allowed tab (never render an ungated surface).
@@ -135,11 +129,13 @@ export const Navbar: React.FC<NavbarProps> = ({
           <GlobalSearchBar
             appointments={appointments}
             patients={patients}
+            permissions={currentUser.permissions}
             invoices={invoices}
             inventoryItems={inventoryItems}
             setActiveTab={setActiveTab}
             onSelectAppointment={onSelectAppointment}
             onOpenBookingModal={onOpenBookingModal}
+            canOpenBooking={canOpenBooking}
           />
 
           {/* Quick Metrics Bar (Desktop) */}

@@ -35,9 +35,12 @@ import {
   Modality,
   ClinicProfileSettings
 } from '../types';
+import { canAny } from '../services/permissions';
 
 interface DoctorNetworkViewProps {
   referrers: Referrer[];
+  /** Server-issued effective permission set — drives action visibility. */
+  permissions: string[];
   appointments: Appointment[];
   patients: Patient[];
   modalities: Modality[];
@@ -56,6 +59,7 @@ interface DoctorNetworkViewProps {
 type DoctorSubTab = 'directory' | 'manifest' | 'dispatches' | 'commission' | 'analytics';
 
 export const DoctorNetworkView: React.FC<DoctorNetworkViewProps> = ({
+  permissions,
   referrers,
   appointments,
   patients,
@@ -75,6 +79,11 @@ export const DoctorNetworkView: React.FC<DoctorNetworkViewProps> = ({
   // Doctor Form Modal
   const [doctorModalOpen, setDoctorModalOpen] = useState(false);
   const [editingDoctor, setEditingDoctor] = useState<Referrer | null>(null);
+
+  // Server-issued permissions (API enforces the same checks).
+  const canEditReferrer = canAny(permissions, ['referrer edit', 'referrer create']);
+  const canDeleteReferrer = canAny(permissions, ['referrer delete']);
+  const canDispatch = canAny(permissions, ['report release', 'referrer manage']);
   const [docName, setDocName] = useState('');
   const [docClinic, setDocClinic] = useState('');
   const [docSpecialty, setDocSpecialty] = useState('');
@@ -170,6 +179,9 @@ export const DoctorNetworkView: React.FC<DoctorNetworkViewProps> = ({
   };
 
   const handleOpenDispatchModal = (apt: Appointment) => {
+    if (!canDispatch) {
+      return;
+    }
     setDispatchApt(apt);
     const doctor = referrers.find(r => r.id === apt.referrerId);
     setDispatchRecipient(doctor?.phone || doctor?.email || '');
@@ -417,6 +429,7 @@ export const DoctorNetworkView: React.FC<DoctorNetworkViewProps> = ({
                       </button>
                     </div>
                     <div className="flex items-center space-x-1">
+                      {canEditReferrer && (
                       <button
                         onClick={() => handleOpenDoctorModal(doctor)}
                         className="p-1.5 rounded-lg text-slate-500 hover:text-sky-600 hover:bg-slate-100 cursor-pointer"
@@ -424,6 +437,8 @@ export const DoctorNetworkView: React.FC<DoctorNetworkViewProps> = ({
                       >
                         <Edit2 className="w-3.5 h-3.5" />
                       </button>
+                      )}
+                      {canDeleteReferrer && (
                       <button
                         onClick={() => {
                           if (confirm(`Remove referring physician record for ${doctor.name}?`)) {
@@ -435,6 +450,7 @@ export const DoctorNetworkView: React.FC<DoctorNetworkViewProps> = ({
                       >
                         <Trash2 className="w-3.5 h-3.5" />
                       </button>
+                      )}
                     </div>
                   </div>
                 </div>

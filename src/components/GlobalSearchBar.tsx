@@ -24,19 +24,25 @@ import {
   FolderOpen
 } from 'lucide-react';
 import { Appointment, Patient, ActiveTab, Invoice, InventoryItem } from '../types';
+import { allowedTabs } from '../services/permissions';
 import { Boxes, Droplet, ThermometerSnowflake } from 'lucide-react';
 
 interface GlobalSearchBarProps {
   appointments: Appointment[];
   patients: Patient[];
+  /** Server-issued effective permission set — jump targets stay in-scope. */
+  permissions: string[];
   invoices?: Invoice[];
   inventoryItems?: InventoryItem[];
   setActiveTab: (tab: ActiveTab) => void;
   onSelectAppointment?: (apt: Appointment) => void;
   onOpenBookingModal?: () => void;
+  /** Server-issued `appointment create` — booking affordances render only when true. */
+  canOpenBooking?: boolean;
 }
 
 export const GlobalSearchBar: React.FC<GlobalSearchBarProps> = ({
+  permissions,
   appointments,
   patients,
   invoices = [],
@@ -44,6 +50,7 @@ export const GlobalSearchBar: React.FC<GlobalSearchBarProps> = ({
   setActiveTab,
   onSelectAppointment,
   onOpenBookingModal,
+  canOpenBooking = false,
 }) => {
   const [query, setQuery] = useState('');
   const [isOpen, setIsOpen] = useState(false);
@@ -178,11 +185,11 @@ export const GlobalSearchBar: React.FC<GlobalSearchBarProps> = ({
     }
     // Route smartly based on study state
     if (['reading', 'reported', 'delivered'].includes(apt.workflowState)) {
-      setActiveTab('reporting');
+      jumpTo(['reporting', 'technologist', 'checkin']);
     } else if (['preparing', 'in_progress', 'acquired'].includes(apt.workflowState)) {
-      setActiveTab('technologist');
+      jumpTo(['technologist', 'reporting', 'checkin']);
     } else {
-      setActiveTab('checkin');
+      jumpTo(['checkin', 'technologist', 'reporting']);
     }
     setIsOpen(false);
   };
@@ -192,14 +199,21 @@ export const GlobalSearchBar: React.FC<GlobalSearchBarProps> = ({
     if (patientApt && onSelectAppointment) {
       onSelectAppointment(patientApt);
       if (['reading', 'reported', 'delivered'].includes(patientApt.workflowState)) {
-        setActiveTab('reporting');
+        jumpTo(['reporting', 'technologist', 'checkin']);
       } else {
-        setActiveTab('checkin');
+        jumpTo(['checkin', 'technologist', 'reporting']);
       }
     } else {
-      setActiveTab('checkin');
+      jumpTo(['checkin', 'technologist', 'reporting']);
     }
     setIsOpen(false);
+  };
+
+  /** Jump to the first preferred tab this session may actually open
+      (never lands on a module the permission set does not include). */
+  const jumpTo = (preferred: ActiveTab[]) => {
+    const allowed = allowedTabs(permissions);
+    setActiveTab(preferred.find(t => allowed.includes(t)) ?? 'dashboard');
   };
 
   const getStateBadge = (state: string) => {
@@ -369,7 +383,7 @@ export const GlobalSearchBar: React.FC<GlobalSearchBarProps> = ({
                 <p className="text-xs text-slate-500 max-w-sm mx-auto mt-1">
                   No patient, MRN, token, appointment, or consumable SKU matched <span className="font-semibold text-slate-700">"{query}"</span>.
                 </p>
-                {onOpenBookingModal && (
+                {onOpenBookingModal && canOpenBooking && (
                   <button
                     onClick={() => {
                       setIsOpen(false);
@@ -724,7 +738,7 @@ export const GlobalSearchBar: React.FC<GlobalSearchBarProps> = ({
               </button>
             </div>
 
-            {onOpenBookingModal && (
+            {onOpenBookingModal && canOpenBooking && (
               <button
                 onClick={() => {
                   setIsOpen(false);

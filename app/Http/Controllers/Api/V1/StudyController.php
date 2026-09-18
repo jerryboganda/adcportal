@@ -6,6 +6,7 @@ use App\Enums\StudyState;
 use App\Http\Resources\ApiShape;
 use App\Models\Appointment;
 use App\Models\Customer;
+use App\Models\PaymentMethod;
 use App\Models\Room;
 use App\Models\ScreeningForm;
 use App\Models\ScreeningQuestion;
@@ -75,17 +76,69 @@ class StudyController extends BaseApiController
             'newPatient.bloodGroup' => ['nullable', 'string', 'max:8'],
             'newPatient.allergies' => ['nullable', 'string', 'max:2000'],
             'serviceId' => ['required', 'integer'],
+            'roomId' => ['nullable', 'integer'],
             'referrerId' => ['nullable', 'integer'],
             'date' => ['required', 'date_format:Y-m-d'],
             'time' => ['required', 'string', 'max:20'],
             'priority' => ['required', 'in:routine,urgent,stat'],
             'notes' => ['nullable', 'string', 'max:2000'],
+            // Booking-time financials: settled server-side against the
+            // auto-issued invoice — the client never dictates totals.
+            'discount' => ['nullable', 'array'],
+            'discount.amount' => ['required_with:discount', 'numeric', 'min:0'],
+            'payment' => ['nullable', 'array'],
+            'payment.status' => ['required_with:payment', 'in:unpaid,partial,paid'],
+            'payment.amountPaid' => ['nullable', 'numeric', 'min:0'],
+            'payment.method' => ['nullable', 'string', 'max:20'],
+            'payment.reference' => ['nullable', 'string', 'max:255'],
         ]);
+
+        // Layered RBAC: booking needs `appointment create`; touching the
+        // booking invoice's money needs the matching billing permission.
+        $wantsPayment = isset($validated['payment'])
+            && in_array($validated['payment']['status'], ['partial', 'paid'], true);
+        $wantsDiscount = isset($validated['discount'])
+            && (float) ($validated['discount']['amount'] ?? 0) > 0;
+
+        if ($wantsPayment) {
+            $this->denyUnless('invoice payment');
+        }
+        if ($wantsDiscount) {
+            $this->denyUnless('invoice edit');
+        }
+
+        if (isset($validated['payment']) && $validated['payment']['status'] === 'unpaid'
+            && (float) ($validated['payment']['amountPaid'] ?? 0) > 0) {
+            throw ValidationException::withMessages([
+                'payment.amountPaid' => 'An unpaid booking cannot record an amount received.',
+            ]);
+        }
 
         $service = Service::forClinic($this->tenantId())->with('modality')->findOrFail($validated['serviceId']);
         $modality = $service->modality;
 
-        [$appointment, $invoice] = DB::transaction(function () use ($validated, $service, $modality) {
+        // Imaging suite: explicitly chosen (validated against tenant, activity
+        // and modality) or auto-assigned as before. No suite configured → the
+        // study simply has no room yet; the SPA shows the honest empty state.
+        $room = null;
+        if (! empty($validated['roomId'])) {
+            $room = Room::forClinic($this->tenantId())->findOrFail($validated['roomId']);
+
+            if (! $room->is_active) {
+                throw ValidationException::withMessages(['roomId' => 'The selected modality suite is inactive.']);
+            }
+            if ((int) $room->modality_id !== (int) $service->modality_id) {
+                throw ValidationException::withMessages(['roomId' => 'The selected suite does not belong to the selected modality.']);
+            }
+        } else {
+            $room = Room::forClinic($this->tenantId())
+                ->where('modality_id', $service->modality_id)
+                ->where('is_active', true)
+                ->orderBy('id')
+                ->first();
+        }
+
+        [$appointment, $invoice, $paymentSummary] = DB::transaction(function () use ($validated, $service, $modality, $room, $wantsPayment, $wantsDiscount) {
             // Resolve or create the patient (tenant-scoped).
             if (! empty($validated['patientId'])) {
                 $customer = Customer::where('business_id', $this->tenantId())->findOrFail($validated['patientId']);
@@ -107,12 +160,6 @@ class StudyController extends BaseApiController
 
             $requiresScreening = $service->requires_screening || $service->contrast_type !== 'none';
 
-            $room = Room::forClinic($this->tenantId())
-                ->where('modality_id', $service->modality_id)
-                ->where('is_active', true)
-                ->orderBy('id')
-                ->first();
-
             $appointment = Appointment::create([
                 'customer_id' => $customer->user_id,   // legacy convention: customers.user_id
                 'name' => $customer->name,
@@ -120,6 +167,8 @@ class StudyController extends BaseApiController
                 'contact' => $customer->phone,
                 'service_id' => $service->id,
                 'location_id' => $room?->location_id,
+                'room_id' => $room?->id,
+                'room_number' => $room?->name,
                 'referrer_id' => $validated['referrerId'] ?? null,
                 'date' => $validated['date'],
                 'time' => $this->normalizeTime($validated['time']),
@@ -127,7 +176,6 @@ class StudyController extends BaseApiController
                 'workflow_state' => StudyState::Booked->value,
                 'screening_required' => $requiresScreening,
                 'screening_cleared' => false,
-                'room_number' => $room?->name ?? 'Room 1',
                 'notes' => $validated['notes'] ?? null,
                 'business_id' => $this->tenantId(),
                 'created_by' => Auth::id(),
@@ -145,12 +193,43 @@ class StudyController extends BaseApiController
             // can no longer lose the clinical fact).
             event(new \App\Events\Study\StudyBooked($appointment, $service->name, $modality?->name));
 
-            return [$appointment, $this->issueBookingInvoice($appointment, $service)];
+            $invoice = $this->issueBookingInvoice($appointment, $service);
+
+            // Booking-time cash discount — recorded on the invoice, whose
+            // recalculateTotals() clamps it against the subtotal.
+            if ($wantsDiscount) {
+                $invoice->forceFill(['manual_discount' => (float) $validated['discount']['amount']])->save();
+                $invoice->recalculateTotals();
+            }
+
+            // Settle against the freshly issued booking invoice. All money
+            // math (payable total, balance) is server-computed from the
+            // tenant's configured service price — never from the client.
+            $paymentSummary = null;
+            if ($wantsPayment) {
+                $paymentSummary = $this->settleBookingPayment($invoice, $validated['payment']);
+            }
+
+            return [$appointment, $invoice, $paymentSummary];
         });
 
         $this->audit('appointment_created', $appointment, [
             'summary' => "Booked {$service->name} for {$appointment->patientDisplayName()} (token {$appointment->token_number}).",
         ]);
+
+        if ($paymentSummary !== null) {
+            $this->audit('payment_recorded', $invoice, [
+                'summary' => sprintf(
+                    'Collected Rs. %s via %s for %s at booking (token %s).',
+                    number_format($paymentSummary['amount'], 2),
+                    strtoupper($paymentSummary['method']),
+                    $invoice->invoice_number,
+                    $appointment->token_number,
+                ),
+                'amount' => $paymentSummary['amount'],
+                'method' => $paymentSummary['method'],
+            ]);
+        }
 
         // Fan the booking out to the tenant's interoperability integrations
         // (queued — HIS/RIS consumers hear about the study without adding
@@ -500,6 +579,60 @@ class StudyController extends BaseApiController
         $invoice->recalculateTotals();
 
         return $invoice;
+    }
+
+    /**
+     * Settle the booking invoice at booking time. Validation rules:
+     * partial → 0 < amountPaid < payable; paid → amountPaid == payable
+     * (over-collection is a POS concern, mirror of the POS balance rule);
+     * the method must be one of THIS tenant's ACTIVE configured methods.
+     * Runs inside the booking transaction.
+     */
+    private function settleBookingPayment(\App\Models\Invoice $invoice, array $payment): array
+    {
+        $amount = round((float) ($payment['amountPaid'] ?? 0), 2);
+        $payable = round((float) $invoice->total, 2);
+
+        if ($amount <= 0) {
+            throw ValidationException::withMessages([
+                'payment.amountPaid' => 'An amount greater than zero is required for this payment status.',
+            ]);
+        }
+
+        if (empty($payment['method'])) {
+            throw ValidationException::withMessages([
+                'payment.method' => 'A payment method is required for this payment status.',
+            ]);
+        }
+
+        // Tenant-scoped lookup: another clinic's method id must not resolve.
+        $method = PaymentMethod::forClinic($this->tenantId())->findOrFail($payment['method']);
+
+        if (! $method->is_active) {
+            throw ValidationException::withMessages(['payment.method' => 'The selected payment method is inactive.']);
+        }
+
+        if ($payment['status'] === 'partial' && $amount >= $payable) {
+            throw ValidationException::withMessages([
+                'payment.amountPaid' => 'A partial payment must be less than the payable amount (Rs. '.number_format($payable, 2).').',
+            ]);
+        }
+
+        if ($payment['status'] === 'paid' && abs($amount - $payable) > 0.001) {
+            throw ValidationException::withMessages([
+                'payment.amountPaid' => 'The paid amount must match the payable amount (Rs. '.number_format($payable, 2).').',
+            ]);
+        }
+
+        app(\App\Services\InvoicePaymentService::class)->record(
+            $invoice,
+            $amount,
+            $method->code,
+            $payment['reference'] ?? null,
+            Auth::id(),
+        );
+
+        return ['amount' => $amount, 'method' => $method->code, 'reference' => $payment['reference'] ?? null];
     }
 
 }

@@ -26,11 +26,16 @@ exposing `/api/v1` (Sanctum cookie sessions) + **React/Vite SPA frontend**.
   `POST /api/v1/tenant/switch` (server-verified). Platform staff hold no
   tenant context except inside an audited break-glass support session.
 - **Auth**: Laravel session cookies (Sanctum SPA mode, same-origin). Roles
-  (admin/radiologist/technician/receptionist/billing) are per-tenant laratrust
-  roles; permission checks are TENANT-SCOPED via `App\Services\TenantAuthorizer`
-  (a user's privileges in one clinic never apply in another). The React app
-  receives its role + capability flags from the server and must never pick
-  roles client-side.
+  (admin/radiologist/technician/receptionist/billing + tenant-created custom
+  roles) are per-tenant laratrust roles; permission checks are TENANT-SCOPED
+  via `App\Services\TenantAuthorizer` (effective set = role permissions ∪
+  per-user allow overrides − deny overrides; a user's privileges in one
+  clinic never apply in another). The taxonomy lives in
+  `app/Support/PermissionCatalog.php`; tenant admins manage roles/permissions
+  at `Settings → Users & RBAC` (see `docs/saas/RBAC_ADMIN.md`). The React app
+  derives ALL navigation/actions from the server-issued `permissions[]`
+  (`src/services/permissions.ts`) and must never pick roles client-side;
+  `/bootstrap` ships only collections the session is authorized to act on.
 - **Control plane**: `/api/v1/platform/*` is guarded by the `platform`
   middleware (`App\Http\Middleware\EnsurePlatformAccess`) with explicit
   capabilities mapped from `users.platform_role` in `config/ris.php`

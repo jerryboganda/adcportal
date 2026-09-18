@@ -20,6 +20,18 @@ export function onUnauthorized(handler: () => void): void {
   unauthorizedHandler = handler;
 }
 
+let permissionDeniedHandler: (() => void) | null = null;
+
+/**
+ * Structured 403 (`permission.denied`) hook: fires when the backend rejects
+ * a request the UI believed was allowed (permissions changed server-side
+ * mid-session). The app reacts by re-hydrating its permission set + data —
+ * never by retrying the denied request.
+ */
+export function onPermissionDenied(handler: (() => void) | null): void {
+  permissionDeniedHandler = handler;
+}
+
 /**
  * Control-plane step-up: when a mutating platform action is answered 428
  * (fresh password confirmation required), the interceptor pauses the
@@ -83,6 +95,15 @@ http.interceptors.response.use(
     }
 
     const data = error?.response?.data;
+
+    if (
+      status === 403 &&
+      data?.error === 'permission.denied' &&
+      permissionDeniedHandler
+    ) {
+      permissionDeniedHandler();
+    }
+
     const serverMessage: string | undefined =
       data?.message ??
       (typeof data?.error === 'string' ? data.error : undefined) ??

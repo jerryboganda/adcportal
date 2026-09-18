@@ -10,6 +10,7 @@ import {
   SwitchCamera,
 } from 'lucide-react';
 import { ActiveTab, AppRole, StaffUser } from '../types';
+import { canAny } from '../services/permissions';
 import { SessionUser } from '../services/apiService';
 
 interface UserProfileMenuProps {
@@ -197,12 +198,14 @@ export const UserProfileMenu: React.FC<UserProfileMenuProps> = ({
             </div>
           )}
 
-          {/* Quick RIS Actions & Settings */}
+          {/* Quick RIS Actions & Settings — every entry is permission-gated
+              so the menu mirrors the server-issued effective access. */}
           <div className="p-2 space-y-0.5">
             <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block px-2 py-1">
               Management & Tools
             </span>
 
+            {canAny(currentUser.permissions, ['setting manage', 'user manage', 'user logs history', 'role view']) && (
             <button
               onClick={() => {
                 setActiveTab('settings');
@@ -218,7 +221,9 @@ export const UserProfileMenu: React.FC<UserProfileMenuProps> = ({
                 {staffUsers.length} Staff
               </span>
             </button>
+            )}
 
+            {canAny(currentUser.permissions, ['doctors view']) && (
             <button
               onClick={() => {
                 setActiveTab('doctors');
@@ -229,7 +234,9 @@ export const UserProfileMenu: React.FC<UserProfileMenuProps> = ({
               <Stethoscope className="w-4 h-4 text-slate-500" />
               <span>Doctor Referral Network & Dispatch</span>
             </button>
+            )}
 
+            {canAny(currentUser.permissions, ['catalog view']) && (
             <button
               onClick={() => {
                 setActiveTab('masters');
@@ -240,8 +247,9 @@ export const UserProfileMenu: React.FC<UserProfileMenuProps> = ({
               <Building className="w-4 h-4 text-slate-500" />
               <span>Service Catalog & Screening Forms</span>
             </button>
+            )}
 
-            {onExportBackup && (
+            {onExportBackup && canAny(currentUser.permissions, ['setting manage']) && (
               <button
                 onClick={() => {
                   onExportBackup();

@@ -17,10 +17,31 @@ export type Priority = 'routine' | 'urgent' | 'stat';
 export interface Modality {
   id: number;
   name: string;
-  code: 'DX' | 'US' | 'CT' | 'MR' | 'MG';
+  /** DICOM-style code (DX/US/CT/MR/MG...) — server-issued, not a closed set. */
+  code: string;
   color: string;
   bufferMinutes: number;
   isActive: boolean;
+}
+
+/** Imaging suite (room) — tenant-configured, scoped to one modality. */
+export interface Room {
+  id: number;
+  name: string;
+  modalityId: number;
+  locationId?: number | null;
+  capacityPerSlot: number;
+  description: string;
+  isActive: boolean;
+}
+
+/** Tenant-configured payment method (code = wire format on payments). */
+export interface PaymentMethod {
+  id: number;
+  code: string;
+  name: string;
+  isActive: boolean;
+  sortOrder: number;
 }
 
 export interface Service {
@@ -149,6 +170,8 @@ export interface Appointment {
   service: Service;
   modalityId: number;
   modality: Modality;
+  /** Imaging suite the study is booked against (server-validated). */
+  roomId?: number | null;
   referrerId?: number;
   referrer?: Referrer;
   date: string;
@@ -191,7 +214,8 @@ export interface InvoiceItem {
 export interface InvoicePayment {
   id: string;
   amount: number;
-  method: 'cash' | 'card' | 'bank' | 'mobile' | 'insurance';
+  /** Code of a TENANT-CONFIGURED payment method (see PaymentMethod). */
+  method: string;
   reference?: string;
   paidAt: string;
   receivedBy: string;
@@ -239,8 +263,11 @@ export interface ReportTemplate {
 // the API cannot issue must not exist in the client vocabulary.
 export type StaffRole = 'admin' | 'radiologist' | 'technologist' | 'receptionist' | 'billing';
 
-/** Role vocabulary used by the SPA shell (server-issued, never client-picked). */
-export type AppRole = 'admin' | 'radiologist' | 'technologist' | 'receptionist' | 'billing';
+/** Role vocabulary used by the SPA shell (server-issued, never client-picked).
+ *  The five canonical names are issued by system roles; tenant CUSTOM roles
+ *  surface their own name — the role string is cosmetic (avatar/labels) while
+ *  all real gating is permission-driven. */
+export type AppRole = 'admin' | 'radiologist' | 'technologist' | 'receptionist' | 'billing' | (string & {});
 
 export interface StaffUser {
   id: string;
@@ -931,4 +958,48 @@ export interface TenantBrandingView {
   domains: TenantBrandingDomainView[];
   managedBy: 'platform';
   changeHint: string;
+}
+
+// ==================== Tenant RBAC (Roles & Permissions admin) ====================
+
+/** One permission in the server catalog (app/Support/PermissionCatalog). */
+export interface PermissionDef {
+  /** Stable key — the security contract; never renamed. */
+  name: string;
+  label: string;
+  /** Visual danger marker (delete/void/manage-access class actions). */
+  dangerous: boolean;
+  /** Permissions auto-required when this one is granted. */
+  implies: string[];
+}
+
+/** Permissions grouped by catalog category, in display order. */
+export interface PermissionGroup {
+  group: string;
+  permissions: PermissionDef[];
+}
+
+export interface AccessRoleRecord {
+  id: string;
+  /** Stable machine name. */
+  name: string;
+  displayName: string;
+  description: string;
+  /** One of the five platform-provisioned system roles. */
+  system: boolean;
+  /** Cannot be deleted (admin) — protected against tenant lockout. */
+  undeletable: boolean;
+  /** Active staff users holding this role. */
+  users: number;
+  permissions: string[];
+}
+
+/** Effective permission set + provenance for one staff member. */
+export interface EffectiveAccess {
+  userId: string;
+  role: AppRole;
+  permissions: string[];
+  rolePermissions: string[];
+  allowedOverrides: string[];
+  deniedOverrides: string[];
 }

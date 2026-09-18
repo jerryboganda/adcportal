@@ -10,6 +10,8 @@ Consequences:
 - A user with roles in two tenants can never spend tenant A's privileges inside tenant B (tested: `TenantSwitchTest::test_privileges_do_not_travel_across_tenants`).
 - A platform user without an active support session has an **empty** tenant permission set → 403 on every tenant mutation and an empty data plane (tested).
 - Break-glass: inside an active, unexpired `support_sessions` row for tenant T, the platform user is granted T's **full operational permission set** — the session is reason-mandated, time-boxed, audited at open/close, and revoked on expiry/offboarding/termination.
+- **Effective set** (since the RBAC access-control release): role permissions ∪ tenant-scoped per-user allow overrides − tenant-scoped per-user deny overrides (`user_permission_overrides`, `business_id`-scoped). Full taxonomy, module views, defaults, invalidation (`businesses.permissions_version` + SPA auto-refresh) and the tenant admin API: see `RBAC_ADMIN.md`.
+- **Data plane follows the permission plane**: `/bootstrap` ships only the collections the session's effective set authorizes (invoices require billing permissions, the staff directory requires `user manage`, audit logs require `user logs history`, …), so an over-exposed role no longer downloads data it cannot act on.
 
 ## Request authorization flow (tenant route)
 

@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Api\V1\AccessControlController;
 use App\Http\Controllers\Api\V1\AppNotificationController;
 use App\Http\Controllers\Api\V1\AuthController;
 use App\Http\Controllers\Api\V1\BillingController;
@@ -123,6 +124,12 @@ Route::middleware(['auth', 'tenant.active', 'throttle:tenant'])->group(function 
     Route::post('/modalities', [MastersController::class, 'storeModality']);
     Route::put('/modalities/{modality}', [MastersController::class, 'updateModality'])->whereNumber('modality');
     Route::delete('/modalities/{modality}', [MastersController::class, 'destroyModality'])->whereNumber('modality');
+    Route::post('/rooms', [MastersController::class, 'storeRoom']);
+    Route::put('/rooms/{room}', [MastersController::class, 'updateRoom'])->whereNumber('room');
+    Route::delete('/rooms/{room}', [MastersController::class, 'destroyRoom'])->whereNumber('room');
+    Route::post('/payment-methods', [MastersController::class, 'storePaymentMethod']);
+    Route::put('/payment-methods/{paymentMethod}', [MastersController::class, 'updatePaymentMethod'])->whereNumber('paymentMethod');
+    Route::delete('/payment-methods/{paymentMethod}', [MastersController::class, 'destroyPaymentMethod'])->whereNumber('paymentMethod');
     Route::post('/services', [MastersController::class, 'storeService']);
     Route::put('/services/{service}', [MastersController::class, 'updateService'])->whereNumber('service');
     Route::delete('/services/{service}', [MastersController::class, 'destroyService'])->whereNumber('service');
@@ -148,6 +155,17 @@ Route::middleware(['auth', 'tenant.active', 'throttle:tenant'])->group(function 
     Route::post('/staff', [StaffUserController::class, 'store']);
     Route::put('/staff/{staff}', [StaffUserController::class, 'update'])->whereNumber('staff');
     Route::delete('/staff/{staff}', [StaffUserController::class, 'destroy'])->whereNumber('staff');
+
+    // Roles & permissions administration (tenant-scoped RBAC control center)
+    Route::get('/access/catalog', [AccessControlController::class, 'catalog']);
+    Route::get('/access/roles', [AccessControlController::class, 'roles']);
+    Route::post('/access/roles', [AccessControlController::class, 'storeRole']);
+    Route::patch('/access/roles/{role}', [AccessControlController::class, 'updateRole'])->whereNumber('role');
+    Route::put('/access/roles/{role}/permissions', [AccessControlController::class, 'syncPermissions'])->whereNumber('role');
+    Route::post('/access/roles/{role}/duplicate', [AccessControlController::class, 'duplicateRole'])->whereNumber('role');
+    Route::delete('/access/roles/{role}', [AccessControlController::class, 'destroyRole'])->whereNumber('role');
+    Route::get('/access/users/{user}/effective', [AccessControlController::class, 'userEffective'])->whereNumber('user');
+    Route::put('/access/users/{user}/overrides', [AccessControlController::class, 'syncOverrides'])->whereNumber('user');
 
     // Settings / platform surfaces
     Route::get('/clinic', [SettingsController::class, 'showClinic']);

@@ -24,7 +24,8 @@ import {
   Percent,
   Check
 } from 'lucide-react';
-import { Invoice, Appointment, Patient, InvoiceItem, InvoicePayment, ClinicProfileSettings } from '../types';
+import { Invoice, Appointment, Patient, InvoiceItem, ClinicProfileSettings, PaymentMethod } from '../types';
+import { canAny } from '../services/permissions';
 import { generateShiftClosingPdf, ShiftClosingData } from '../utils/pdfGenerator';
 import { invoicePdfUrl } from '../services/apiService';
 import { PrintableInvoiceModal } from './PrintableInvoiceModal';
@@ -32,13 +33,17 @@ import { Barcode } from './Barcode';
 
 interface BillingViewProps {
   invoices: Invoice[];
+  /** Server-issued effective permission set — drives action visibility. */
+  permissions: string[];
   appointments: Appointment[];
   patients: Patient[];
   clinicSettings?: ClinicProfileSettings;
+  /** Tenant-configured payment methods (replaces the fixed method list). */
+  paymentMethods?: PaymentMethod[];
   onRecordPayment: (
     invoiceId: string,
     amount: number,
-    method: 'cash' | 'card' | 'bank' | 'mobile' | 'insurance',
+    method: string,
     reference: string
   ) => void;
   onCreateInvoice: (
@@ -46,17 +51,19 @@ interface BillingViewProps {
     discount: number,
     notes: string,
     extraItems?: InvoiceItem[],
-    initialPayment?: { amount: number; method: 'cash' | 'card' | 'bank' | 'mobile' | 'insurance'; reference: string }
+    initialPayment?: { amount: number; method: string; reference: string }
   ) => void;
   onAddInvoiceItem?: (invoiceId: string, item: InvoiceItem) => void;
   onVoidInvoice?: (invoiceId: string, reason: string) => void;
 }
 
 export const BillingView: React.FC<BillingViewProps> = ({
+  permissions,
   invoices,
   appointments,
   patients,
   clinicSettings,
+  paymentMethods = [],
   onRecordPayment,
   onCreateInvoice,
   onAddInvoiceItem,
@@ -71,7 +78,8 @@ export const BillingView: React.FC<BillingViewProps> = ({
   // Modals state
   const [paymentModalInvoice, setPaymentModalInvoice] = useState<Invoice | null>(null);
   const [payAmount, setPayAmount] = useState<number>(0);
-  const [payMethod, setPayMethod] = useState<'cash' | 'card' | 'bank' | 'mobile' | 'insurance'>('cash');
+  // Method = code of a TENANT-CONFIGURED payment method.
+  const [payMethod, setPayMethod] = useState<string>('');
   const [payRef, setPayRef] = useState('');
   const [cashTendered, setCashTendered] = useState<number>(0);
 
@@ -112,7 +120,7 @@ export const BillingView: React.FC<BillingViewProps> = ({
   const [panelAuthCode, setPanelAuthCode] = useState('');
   const [invoiceNotes, setInvoiceNotes] = useState('');
   const [collectUpfront, setCollectUpfront] = useState(true);
-  const [upfrontMethod, setUpfrontMethod] = useState<'cash' | 'card' | 'bank' | 'mobile' | 'insurance'>('cash');
+  const [upfrontMethod, setUpfrontMethod] = useState<string>('');
   const [upfrontAmount, setUpfrontAmount] = useState<number>(0);
 
   // Shift Closing & Reconciliation State
@@ -138,13 +146,30 @@ export const BillingView: React.FC<BillingViewProps> = ({
   const totalDue = invoices.filter(i => i.status !== 'void').reduce((acc, curr) => acc + curr.balanceDue, 0);
   const totalDiscounts = invoices.filter(i => i.status !== 'void').reduce((acc, curr) => acc + curr.discountTotal, 0);
 
-  // Collections by Tender
+  // Collections by Tender — keyed by the tenant's CONFIGURED method codes.
   const allPayments = invoices.flatMap(i => (i.status !== 'void' ? i.payments : []));
-  const cashCollected = allPayments.filter(p => p.method === 'cash').reduce((sum, p) => sum + p.amount, 0);
-  const cardCollected = allPayments.filter(p => p.method === 'card').reduce((sum, p) => sum + p.amount, 0);
-  const bankCollected = allPayments.filter(p => p.method === 'bank').reduce((sum, p) => sum + p.amount, 0);
-  const mobileCollected = allPayments.filter(p => p.method === 'mobile').reduce((sum, p) => sum + p.amount, 0);
-  const insuranceCollected = allPayments.filter(p => p.method === 'insurance').reduce((sum, p) => sum + p.amount, 0);
+  const collectionsByMethod = allPayments.reduce<Record<string, number>>((acc, p) => {
+    acc[p.method] = (acc[p.method] ?? 0) + p.amount;
+    return acc;
+  }, {});
+  const methodTotal = (code: string) => collectionsByMethod[code] ?? 0;
+  const cashCollected = methodTotal('cash');
+  const cardCollected = methodTotal('card');
+  const bankCollected = methodTotal('bank');
+  const mobileCollected = methodTotal('mobile');
+  const insuranceCollected = methodTotal('insurance');
+
+  // Only the tenant's ACTIVE methods are collectable at the counter.
+  const activePaymentMethods = paymentMethods.filter(m => m.isActive);
+
+  // Tender breakdown = every configured method + any code already present in
+  // payment history (legacy/deactivated methods still need their totals shown).
+  const tenderBreakdown: Array<{ code: string; label: string; total: number }> = (() => {
+    const labels = new Map<string, string>();
+    paymentMethods.forEach(m => labels.set(m.code, m.name));
+    allPayments.forEach(p => { if (!labels.has(p.method)) labels.set(p.method, p.method.toUpperCase()); });
+    return Array.from(labels.entries()).map(([code, label]) => ({ code, label, total: methodTotal(code) }));
+  })();
 
   // Physical Cash Calculation for Shift Closing
   const physicalCashCounted = Object.entries(denominations).reduce(
@@ -177,6 +202,12 @@ export const BillingView: React.FC<BillingViewProps> = ({
     return matchSearch && matchStatus && matchMethod;
   });
 
+  // Server-issued billing permissions (the API enforces the same checks).
+  const canCreateInvoice = canAny(permissions, ['invoice create']);
+  const canEditInvoice = canAny(permissions, ['invoice edit']);
+  const canCollectPayment = canAny(permissions, ['invoice payment']);
+  const canVoidInvoicePerm = canAny(permissions, ['invoice delete']);
+
   // Eligible appointments for invoicing
   const existingInvoicedAptIds = new Set(invoices.map(i => i.appointmentId));
   const unInvoicedAppointments = appointments.filter(a => !existingInvoicedAptIds.has(a.id));
@@ -186,12 +217,13 @@ export const BillingView: React.FC<BillingViewProps> = ({
     setPaymentModalInvoice(inv);
     setPayAmount(inv.balanceDue);
     setCashTendered(inv.balanceDue);
-    setPayMethod('cash');
+    setPayMethod(activePaymentMethods[0]?.code ?? '');
     setPayRef(`RCP-${Date.now().toString().slice(-5)}`);
   };
 
   const submitPayment = () => {
     if (!paymentModalInvoice || payAmount <= 0) return;
+    if (!payMethod) return; // no configured method — nothing collectable
     onRecordPayment(
       paymentModalInvoice.id,
       payAmount,
@@ -242,7 +274,7 @@ export const BillingView: React.FC<BillingViewProps> = ({
 
     const totalBeforeInitialPay = apt.service.price - calculatedDiscount + extraItems.reduce((s, i) => s + i.lineTotal, 0);
 
-    const initialPayObj = collectUpfront && upfrontAmount > 0
+    const initialPayObj = collectUpfront && upfrontAmount > 0 && upfrontMethod
       ? {
           amount: Math.min(totalBeforeInitialPay, upfrontAmount),
           method: upfrontMethod,
@@ -383,6 +415,7 @@ export const BillingView: React.FC<BillingViewProps> = ({
             <span>Export CSV</span>
           </button>
 
+{canCreateInvoice && (
           <button
             onClick={() => {
               setCreateModalOpen(true);
@@ -396,6 +429,7 @@ export const BillingView: React.FC<BillingViewProps> = ({
             <PlusCircle className="w-4 h-4" />
             <span>Create Study Invoice</span>
           </button>
+                          )}
         </div>
       </div>
 
@@ -454,21 +488,16 @@ export const BillingView: React.FC<BillingViewProps> = ({
           <span>Shift Tender Breakdown:</span>
         </div>
         <div className="flex flex-wrap items-center gap-3">
-          <span className="px-2.5 py-1 rounded-lg bg-white border border-slate-200 text-slate-700 font-medium">
-            💵 Cash: <strong className="text-emerald-700 font-mono">Rs. {cashCollected.toLocaleString()}</strong>
-          </span>
-          <span className="px-2.5 py-1 rounded-lg bg-white border border-slate-200 text-slate-700 font-medium">
-            💳 Card POS: <strong className="text-cyan-700 font-mono">Rs. {cardCollected.toLocaleString()}</strong>
-          </span>
-          <span className="px-2.5 py-1 rounded-lg bg-white border border-slate-200 text-slate-700 font-medium">
-            📱 Raast / Bank: <strong className="text-indigo-700 font-mono">Rs. {bankCollected.toLocaleString()}</strong>
-          </span>
-          <span className="px-2.5 py-1 rounded-lg bg-white border border-slate-200 text-slate-700 font-medium">
-            📲 Mobile: <strong className="text-purple-700 font-mono">Rs. {mobileCollected.toLocaleString()}</strong>
-          </span>
-          <span className="px-2.5 py-1 rounded-lg bg-white border border-slate-200 text-slate-700 font-medium">
-            🏢 Panel: <strong className="text-amber-700 font-mono">Rs. {insuranceCollected.toLocaleString()}</strong>
-          </span>
+          {tenderBreakdown.length === 0 && (
+            <span className="px-2.5 py-1 rounded-lg bg-white border border-slate-200 text-slate-500 font-medium">
+              No payment methods configured
+            </span>
+          )}
+          {tenderBreakdown.map(t => (
+            <span key={t.code} className="px-2.5 py-1 rounded-lg bg-white border border-slate-200 text-slate-700 font-medium">
+              {t.label}: <strong className="text-slate-900 font-mono">Rs. {t.total.toLocaleString()}</strong>
+            </span>
+          ))}
         </div>
       </div>
 
@@ -510,11 +539,9 @@ export const BillingView: React.FC<BillingViewProps> = ({
               className="bg-slate-50 text-slate-800 px-3 py-2 rounded-xl border border-slate-300 text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-emerald-500 cursor-pointer"
             >
               <option value="all">All Channels</option>
-              <option value="cash">Cash Tender</option>
-              <option value="card">Card POS</option>
-              <option value="bank">Bank / Raast</option>
-              <option value="mobile">Easypaisa / JazzCash</option>
-              <option value="insurance">Insurance / Panel</option>
+              {tenderBreakdown.map(t => (
+                <option key={t.code} value={t.code}>{t.label}</option>
+              ))}
             </select>
           </div>
         </div>
@@ -650,7 +677,7 @@ export const BillingView: React.FC<BillingViewProps> = ({
                       <td className="py-2.5 px-3.5 text-right whitespace-nowrap">
                         <div className="flex items-center justify-end space-x-1.5">
                           {/* Collect button if balance > 0 */}
-                          {!isVoided && inv.balanceDue > 0 && (
+                          {!isVoided && canCollectPayment && inv.balanceDue > 0 && (
                             <button
                               onClick={() => handleOpenPayment(inv)}
                               className="px-2.5 py-1 rounded bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-[11px] transition-all shadow-xs cursor-pointer whitespace-nowrap inline-flex items-center gap-1"
@@ -689,7 +716,7 @@ export const BillingView: React.FC<BillingViewProps> = ({
                           </a>
 
                           {/* Add Item */}
-                          {!isVoided && onAddInvoiceItem && (
+                          {!isVoided && canEditInvoice && onAddInvoiceItem && (
                             <button
                               onClick={() => setAddItemInvoice(inv)}
                               title="Add Billable Consumable / Extra Item"
@@ -709,7 +736,7 @@ export const BillingView: React.FC<BillingViewProps> = ({
                           </button>
 
                           {/* Void Invoice */}
-                          {!isVoided && onVoidInvoice && inv.paidTotal === 0 && (
+                          {!isVoided && canVoidInvoicePerm && onVoidInvoice && inv.paidTotal === 0 && (
                             <button
                               onClick={() => setVoidInvoiceModal(inv)}
                               title="Void Invoice"
@@ -829,14 +856,16 @@ export const BillingView: React.FC<BillingViewProps> = ({
                 </label>
                 <select
                   value={payMethod}
-                  onChange={(e) => setPayMethod(e.target.value as any)}
+                  onChange={(e) => setPayMethod(e.target.value)}
                   className="w-full bg-white text-slate-800 p-2.5 rounded-xl border border-slate-300 text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-emerald-500 cursor-pointer shadow-xs"
                 >
-                  <option value="cash">💵 Cash (Counter Drawer)</option>
-                  <option value="card">💳 Credit / Debit Card (POS Machine)</option>
-                  <option value="bank">📱 Direct Bank Transfer / Raast Instant QR</option>
-                  <option value="mobile">📲 Easypaisa / JazzCash</option>
-                  <option value="insurance">🏢 Corporate / Insurance Panel Direct</option>
+                  <option value="" disabled>Select method…</option>
+                  {activePaymentMethods.length === 0 && (
+                    <option value="" disabled>No payment methods configured — contact your administrator</option>
+                  )}
+                  {activePaymentMethods.map(m => (
+                    <option key={m.id} value={m.code}>{m.name}</option>
+                  ))}
                 </select>
               </div>
 
@@ -1114,14 +1143,13 @@ export const BillingView: React.FC<BillingViewProps> = ({
                       <label className="block text-[11px] font-semibold text-slate-600 mb-1">Payment Method</label>
                       <select
                         value={upfrontMethod}
-                        onChange={(e) => setUpfrontMethod(e.target.value as any)}
+                        onChange={(e) => setUpfrontMethod(e.target.value)}
                         className="w-full bg-white text-slate-800 p-2 rounded-lg border border-slate-300 text-xs font-semibold"
                       >
-                        <option value="cash">💵 Cash (Counter Drawer)</option>
-                        <option value="card">💳 Card (POS Machine)</option>
-                        <option value="bank">📱 Raast / Bank Transfer</option>
-                        <option value="mobile">📲 Easypaisa / JazzCash</option>
-                        <option value="insurance">🏢 Corporate / Insurance Panel</option>
+                        <option value="" disabled>Select method…</option>
+                        {activePaymentMethods.map(m => (
+                          <option key={m.id} value={m.code}>{m.name}</option>
+                        ))}
                       </select>
                     </div>
                     <div>

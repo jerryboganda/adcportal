@@ -26,15 +26,20 @@ import {
   UserCheck
 } from 'lucide-react';
 import { Appointment } from '../types';
+import { canAny } from '../services/permissions';
 
 interface QueueBoardViewProps {
   appointments: Appointment[];
+  /** Server-issued effective permission set — gates the call action. */
+  permissions: string[];
   clinicName?: string;
   /** Persists the call server-side (across terminals) — the chime stays local. */
   onCallPatient?: (aptId: string) => void;
 }
 
-export const QueueBoardView: React.FC<QueueBoardViewProps> = ({ appointments, clinicName, onCallPatient }) => {
+export const QueueBoardView: React.FC<QueueBoardViewProps> = ({ appointments, clinicName, onCallPatient, permissions }) => {
+  // Calling a patient is a `study checkin` workflow action (server-enforced).
+  const canCall = canAny(permissions, ['study checkin']);
   const [currentTime, setCurrentTime] = useState(new Date());
   const [calledToken, setCalledToken] = useState<{ token: string; room: string; service: string; modality: string } | null>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -463,14 +468,14 @@ export const QueueBoardView: React.FC<QueueBoardViewProps> = ({ appointments, cl
                         {isScanning ? 'Inside Scanner' : 'Patient Prep'}
                       </span>
 
-                      <button
+                      {canCall && (<button
                         onClick={() => callPatient(apt)}
                         title="Re-Chime on TV with Voice Announcement"
                         className="px-2.5 py-1 rounded-lg bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-cyan-700 dark:text-cyan-300 border border-slate-300 dark:border-slate-700 text-xs font-bold cursor-pointer shadow-xs flex items-center gap-1"
                       >
                         <Volume2 className="w-3.5 h-3.5" />
                         <span>Call</span>
-                      </button>
+                      </button>)}
                     </div>
                   </div>
                 );
@@ -549,12 +554,12 @@ export const QueueBoardView: React.FC<QueueBoardViewProps> = ({ appointments, cl
                       <span className="text-xs font-bold opacity-80 block truncate max-w-[130px]">
                         {apt.roomNumber}
                       </span>
-                      <button
+                      {canCall && (<button
                         onClick={() => callPatient(apt)}
                         className="text-xs text-cyan-600 hover:text-cyan-500 dark:text-cyan-400 font-black uppercase flex items-center gap-1 mt-1 cursor-pointer ml-auto bg-cyan-50 dark:bg-cyan-950/60 px-2 py-0.5 rounded border border-cyan-200 dark:border-cyan-800"
                       >
                         <Volume2 className="w-3 h-3" /> Call
-                      </button>
+                      </button>)}
                     </div>
                   </div>
                 ))

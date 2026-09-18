@@ -21,6 +21,8 @@ class InventoryController extends BaseApiController
 {
     public function index(Request $request): JsonResponse
     {
+        $this->denyUnlessAny(['setting manage', 'inventory view', 'study acquire'], 'inventory view');
+
         $items = InventoryItem::forClinic($this->tenantId())->orderBy('name')->get();
         $transactions = InventoryTransaction::where('business_id', $this->tenantId())
             ->with('performer')

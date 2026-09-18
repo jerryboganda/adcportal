@@ -78,3 +78,84 @@ test('sign-out destroys the session and the login gate returns', async ({ page }
     await page.goto('/');
     await expect(page.getByPlaceholder('Work email')).toBeVisible();
 });
+
+const RADIOLOGIST_EMAIL = 'dr.shahzad@amaddiagnosticcentre.com.pk';
+
+test('reception booking captures full payment and lands paid in billing', async ({ page }) => {
+    await login(page);
+
+    // Open the booking modal from the dashboard cockpit module.
+    await page.getByRole('button', { name: 'Book Study' }).click();
+    await expect(page.getByText('Book Diagnostic Imaging Study')).toBeVisible({ timeout: 15000 });
+
+    // Walk-in registration.
+    await page.getByRole('button', { name: '+ New Walk-In' }).click();
+    await page.getByPlaceholder('e.g. Tariq Mehmood').fill('E2E Paid Walkin');
+    await page.getByLabel('Phone Number').fill('0300-1234567');
+    await page.getByLabel('Patient age').fill('34');
+
+    // The imaging-suite dropdown is honest when nothing is configured.
+    await expect(page.getByText(/No imaging suites are configured for this modality/)).toBeVisible();
+
+    // Tenant-configured procedure (server-seeded CT catalog).
+    await page.getByLabel('Modality').selectOption({ label: 'Computed Tomography (CT)' });
+    await page.getByLabel('Procedure Service').selectOption({ label: 'CT Brain Non-Contrast (NCCT) - Rs. 6,500' });
+
+    // Settle in full, in cash — from the tenant-configured method list.
+    await page.getByLabel('Payment Status').selectOption('paid');
+    await page.getByLabel('Payment Method').selectOption({ label: 'Cash (Counter Drawer)' });
+    await page.getByLabel('Amount Paid').fill('6500');
+
+    await page.getByRole('button', { name: 'Confirm & Generate Token' }).click();
+    await expect(page.getByText('Book Diagnostic Imaging Study')).toBeHidden({ timeout: 15000 });
+
+    // The paid invoice is real: persisted server-side and visible in Billing.
+    await page.getByRole('button', { name: 'Billing & POS' }).click();
+    await expect(page.getByText('Clinical Billing & Point of Sale (POS)')).toBeVisible({ timeout: 15000 });
+    await expect(page.locator('body')).toContainText('E2E Paid Walkin');
+    await expect(page.locator('body')).toContainText('PAID');
+});
+
+test('radiologist receives no booking privileges anywhere in the SPA', async ({ page }) => {
+    await page.goto('/');
+    await page.getByPlaceholder('Work email').fill(RADIOLOGIST_EMAIL);
+    await page.getByPlaceholder('Password').fill(PASSWORD);
+    await page.getByRole('button', { name: 'Sign In', exact: true }).click();
+    await expect(page.getByText('Total Studies Today')).toBeVisible({ timeout: 20000 });
+
+    // No "Book Diagnostic Study" module on the radiologist dashboard.
+    await expect(page.getByRole('button', { name: 'Book Study' })).toHaveCount(0);
+
+    // The global search offers no "+ New Booking" affordance either.
+    await page.getByPlaceholder('Search by Patient Name, MRN, Token (DX-01), ID...').click();
+    await page.getByPlaceholder('Search by Patient Name, MRN, Token (DX-01), ID...').fill('zzz-no-match-zzz');
+    await expect(page.getByText('No matching records found')).toBeVisible({ timeout: 15000 });
+    await expect(page.getByText('+ Book New Patient & Study')).toHaveCount(0);
+    await expect(page.getByText('+ New Booking')).toHaveCount(0);
+
+    // Reception Desk and Billing tabs are not part of the radiologist surface.
+    await expect(page.getByRole('button', { name: 'Reception Desk' })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'Billing & POS' })).toHaveCount(0);
+});
+
+test('tenant admin RBAC console lists roles, matrix and access preview', async ({ page }) => {
+    await login(page);
+
+    await page.getByRole('button', { name: 'Settings', exact: true }).click();
+    await expect(page.getByText('System Settings & Governance')).toBeVisible({ timeout: 15000 });
+
+    // The server-backed Roles & Permissions control center mounts in the
+    // default Users & RBAC section and lists the provisioned system roles.
+    await expect(page.getByText('Roles & Permissions')).toBeVisible({ timeout: 15000 });
+    await expect(page.locator('body')).toContainText('SYSTEM');
+    await expect(page.locator('body')).toContainText('Radiologist');
+
+    // The permission matrix renders catalog groups against all roles.
+    await page.getByRole('button', { name: 'Permission Matrix', exact: true }).click();
+    await expect(page.locator('body')).toContainText('Modules');
+
+    // Preview-as-role: a safe simulation of what the role will see.
+    await page.getByRole('button', { name: 'Roles', exact: true }).click();
+    await page.getByRole('button', { name: 'Preview as role' }).first().click();
+    await expect(page.getByText(/What .* sees/)).toBeVisible({ timeout: 10000 });
+});

@@ -24,11 +24,14 @@ import {
   Droplet
 } from 'lucide-react';
 import { Appointment, RadiologyReport, ReportTemplate, ClinicProfileSettings } from '../types';
+import { canAny } from '../services/permissions';
 import { generateRadiologyReportPdf } from '../utils/pdfGenerator';
 import { reportPdfUrl } from '../services/apiService';
 
 interface ReportingViewProps {
   currentUser: { name: string; role: string };
+  /** Server-issued effective permission set — drives action visibility. */
+  permissions: string[];
   clinicSettings?: ClinicProfileSettings;
   appointments: Appointment[];
   templates: ReportTemplate[];
@@ -42,6 +45,7 @@ interface ReportingViewProps {
 
 export const ReportingView: React.FC<ReportingViewProps> = ({
   currentUser,
+  permissions,
   clinicSettings,
   appointments,
   templates,
@@ -145,6 +149,13 @@ export const ReportingView: React.FC<ReportingViewProps> = ({
     });
 
   const isFinalized = apt?.workflowState === 'reported' || apt?.workflowState === 'delivered';
+
+  // Server-issued report permissions — the API enforces the same checks
+  // (report create/edit/sign/release/manage) and answers 403 regardless.
+  const canSignReport = canAny(permissions, ['report sign']);
+  const canEditReport = canAny(permissions, ['report edit', 'report create']);
+  const canReleaseReport = canAny(permissions, ['report release']);
+  const canDownloadReport = canAny(permissions, ['report manage']);
 
   // Apply template
   const handleApplyTemplate = (tpl: ReportTemplate) => {
@@ -1012,6 +1023,7 @@ export const ReportingView: React.FC<ReportingViewProps> = ({
                     </div>
 
                     <div className="flex flex-wrap items-center gap-2">
+                      {canSignReport && (
                       <button
                         onClick={() => setAddendumModalOpen(true)}
                         className="flex items-center space-x-1.5 px-3 py-1.5 rounded-xl bg-purple-50 hover:bg-purple-100 text-purple-800 text-xs font-bold border border-purple-300 cursor-pointer shadow-xs"
@@ -1019,24 +1031,25 @@ export const ReportingView: React.FC<ReportingViewProps> = ({
                         <Plus className="w-3.5 h-3.5" />
                         <span>Add Signed Addendum</span>
                       </button>
+                      )}
 
-                      <button
+                      {canReleaseReport && (<button
                         onClick={() => onReleaseReport(apt.id, 'portal')}
                         className="flex items-center space-x-1.5 px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-semibold border border-slate-300 cursor-pointer shadow-xs"
                       >
                         <Send className="w-3.5 h-3.5 text-cyan-600" />
                         <span>Publish to Portal</span>
-                      </button>
+                      </button>)}
 
-                      <button
+                      {canReleaseReport && (<button
                         onClick={() => onReleaseReport(apt.id, 'email')}
                         className="flex items-center space-x-1.5 px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-semibold border border-slate-300 cursor-pointer shadow-xs"
                       >
                         <Send className="w-3.5 h-3.5 text-purple-600" />
                         <span>Email to Doctor</span>
-                      </button>
+                      </button>)}
 
-                      {apt.referrer?.phone && (
+                      {canReleaseReport && apt.referrer?.phone && (
                         <a
                         href={`https://wa.me/${apt.referrer.phone.replace(/[^0-9]/g, '')}?text=${encodeURIComponent(`Dr. ${apt.referrer.name}, Radiology Report for patient ${apt.patient.name} (${apt.service?.name || 'Radiology Study'}, Token: ${apt.tokenNumber}) has been finalized and verified by ${clinicSettings?.name?.trim() || 'PolytronX - RIS'}. Review online: ${window.location.origin}/report/${apt.patient.mrn}`)}`}
                         target="_blank"
@@ -1049,7 +1062,7 @@ export const ReportingView: React.FC<ReportingViewProps> = ({
                       </a>
                       )}
 
-                      {apt.report && (
+                      {canDownloadReport && apt.report && (
                         <a
                           href={reportPdfUrl(apt.report.id)}
                           className="flex items-center space-x-1.5 px-3.5 py-1.5 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-bold shadow-md shadow-cyan-600/20 cursor-pointer"
@@ -1063,12 +1076,15 @@ export const ReportingView: React.FC<ReportingViewProps> = ({
                   </div>
                 ) : (
                   <div className="flex items-center justify-end w-full space-x-3">
+                    {canEditReport && (
                     <button
                       onClick={() => handleSave(false)}
                       className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-xs border border-slate-300 transition-all cursor-pointer shadow-xs"
                     >
                       Save Draft
                     </button>
+                    )}
+                    {canEditReport && canSignReport && (
                     <button
                       onClick={() => handleSave(true)}
                       className="flex items-center space-x-2 px-5 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs shadow-md shadow-purple-600/30 transition-all cursor-pointer"
@@ -1076,6 +1092,10 @@ export const ReportingView: React.FC<ReportingViewProps> = ({
                       <CheckCircle2 className="w-4 h-4" />
                       <span>Sign & Finalize Diagnostic Report</span>
                     </button>
+                    )}
+                    {!canEditReport && !canSignReport && (
+                      <span className="text-xs text-slate-400">Read-only — your role can view reports but not author or sign them.</span>
+                    )}
                   </div>
                 )}
               </div>

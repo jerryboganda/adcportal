@@ -5,6 +5,7 @@ namespace Database\Seeders;
 use App\Models\Business;
 use App\Models\InventoryItem;
 use App\Models\Modality;
+use App\Models\PaymentMethod;
 use App\Models\Permission;
 use App\Models\ReportTemplate;
 use App\Models\RisNotificationTemplate;
@@ -40,54 +41,14 @@ class TenantBootstrap extends Seeder
 
     // ==================== RBAC ====================
 
-    private function permissionNames(): array
-    {
-        return [
-            'clinic manage', 'clinic edit',
-            'modality manage', 'modality create', 'modality edit', 'modality delete',
-            'room manage', 'room create', 'room edit', 'room delete',
-            'service create', 'service edit', 'service delete',
-            'customer manage', 'customer create', 'customer edit', 'customer delete',
-            'referrer manage', 'referrer create', 'referrer edit', 'referrer delete',
-            'appointment manage', 'appointment create', 'appointment edit', 'appointment delete',
-            'study checkin', 'study screen', 'study acquire', 'study assign', 'study cancel',
-            'report manage', 'report create', 'report edit', 'report sign', 'report release',
-            'report template manage', 'report template create', 'report template edit', 'report template delete',
-            'invoice manage', 'invoice create', 'invoice edit', 'invoice delete', 'invoice payment',
-            'user manage', 'user create', 'user edit', 'user delete',
-            'setting manage',
-        ];
-    }
-
     private function seedRoles(User $admin): void
     {
-        // Permissions are global catalog entries; roles are per-tenant.
-        foreach ($this->permissionNames() as $name) {
-            Permission::firstOrCreate(['name' => $name], ['guard_name' => 'web', 'module' => 'General']);
-        }
+        // Permissions are global catalog entries; roles are per-tenant. The
+        // taxonomy AND the default role bundles live in the catalog so new
+        // tenants and the RBAC migration backfill stay byte-identical.
+        \App\Support\PermissionCatalog::sync();
 
-        $all = $this->permissionNames();
-
-        $bundles = [
-            'admin' => $all,
-            'receptionist' => [
-                'appointment manage', 'appointment create', 'appointment edit',
-                'study checkin', 'study screen', 'study cancel',
-                'customer manage', 'customer create', 'customer edit',
-                'referrer manage', 'referrer create', 'referrer edit',
-                'invoice create', 'invoice payment', 'report release',
-            ],
-            'technician' => [
-                'appointment manage', 'study checkin', 'study screen', 'study acquire', 'report manage',
-            ],
-            'radiologist' => [
-                'appointment manage', 'report manage', 'report create', 'report edit', 'report sign', 'report release',
-            ],
-            'billing' => [
-                'invoice manage', 'invoice create', 'invoice edit', 'invoice delete', 'invoice payment',
-                'customer manage', 'customer create', 'customer edit',
-            ],
-        ];
+        $bundles = \App\Support\PermissionCatalog::defaultBundles();
 
         foreach ($bundles as $roleName => $perms) {
             $role = Role::where('name', $roleName)
@@ -181,6 +142,32 @@ class TenantBootstrap extends Seeder
         $this->seedReportTemplates($business, $admin, $modalityIds);
         $this->seedNotificationTemplates($business, $admin);
         $this->seedInventoryCatalog($business, $admin);
+        $this->seedPaymentMethods($business, $admin);
+    }
+
+    /**
+     * Seed each tenant's payment-method configuration with the five legacy
+     * codes so existing invoice_payments.method values validate against the
+     * tenant's own catalog. Tenants rename/deactivate/add methods from the
+     * admin UI afterwards — nothing here is hard-coded at the edges.
+     */
+    private function seedPaymentMethods(Business $business, User $admin): void
+    {
+        $methods = [
+            ['code' => 'cash', 'name' => 'Cash (Counter Drawer)', 'sort_order' => 1],
+            ['code' => 'card', 'name' => 'Credit / Debit Card (POS)', 'sort_order' => 2],
+            ['code' => 'bank', 'name' => 'Bank Transfer / Raast QR', 'sort_order' => 3],
+            ['code' => 'mobile', 'name' => 'Mobile Wallet (Easypaisa / JazzCash)', 'sort_order' => 4],
+            ['code' => 'insurance', 'name' => 'Insurance / Corporate Panel', 'sort_order' => 5],
+        ];
+
+        foreach ($methods as $m) {
+            $method = PaymentMethod::withTrashed()->updateOrCreate(
+                ['code' => $m['code'], 'business_id' => $business->id],
+                [...$m, 'created_by' => $admin->id]
+            );
+            $method->restore();
+        }
     }
 
     private function defaultCategoryId(Business $business, User $admin): int

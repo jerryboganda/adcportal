@@ -17,9 +17,11 @@ import {
   InvoicePayment,
   Modality,
   Patient,
+  PaymentMethod,
   RadiologyReport,
   Referrer,
   ReportTemplate,
+  Room,
   ScreeningForm,
   Service,
   StaffUser,
@@ -57,7 +59,8 @@ import { SubscriptionGateView } from './components/SubscriptionGateView';
 
 import * as api from './services/apiService';
 import { SessionUser } from './services/apiService';
-import { onUnauthorized, onStepUpRequired, initCsrf } from './services/api';
+import { onUnauthorized, onPermissionDenied, onStepUpRequired, initCsrf } from './services/api';
+import { canAny } from './services/permissions';
 
 type BootStatus = 'loading' | 'unauthenticated' | 'ready' | 'platform' | 'gated';
 
@@ -82,7 +85,11 @@ export const App: React.FC = () => {
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [patients, setPatients] = useState<Patient[]>([]);
   const [modalities, setModalities] = useState<Modality[]>([]);
+  // Imaging suites (rooms) + tenant payment methods — tenant configuration,
+  // hydrated from the bootstrap payload, mirrored for UI gating only.
+  const [rooms, setRooms] = useState<Room[]>([]);
   const [services, setServices] = useState<Service[]>([]);
+  const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
   const [referrers, setReferrers] = useState<Referrer[]>([]);
   const [forms, setForms] = useState<ScreeningForm[]>([]);
   const [templates, setTemplates] = useState<ReportTemplate[]>([]);
@@ -154,7 +161,9 @@ export const App: React.FC = () => {
       setInvoices(payload.invoices);
       setPatients(payload.patients);
       setModalities(payload.modalities);
+      setRooms(payload.rooms);
       setServices(payload.services);
+      setPaymentMethods(payload.paymentMethods);
       setReferrers(payload.referrers);
       setForms(payload.screeningForms);
       setTemplates(payload.templates);
@@ -194,10 +203,29 @@ export const App: React.FC = () => {
     }
   }, []);
 
+  // Flash + error surfacing — declared early: the bootstrap effects below
+  // reference them (permission-denied re-hydration flashes to the user).
+  const showFlash = useCallback((kind: 'error' | 'success', message: string) => {
+    setFlash({ kind, message });
+    window.setTimeout(() => setFlash(null), 5000);
+  }, []);
+
+  const fail = useCallback((err: any, fallback: string) => {
+    showFlash('error', err?.message ?? fallback);
+  }, [showFlash]);
+
   useEffect(() => {
     onUnauthorized(() => {
       setUser(null);
       setBootStatus('unauthenticated');
+    });
+
+    // Structured 403 (`permission.denied`): the server-side permission set
+    // moved under an open session (tenant admin edited a role). Re-hydrate
+    // so navigation/actions adapt automatically — never retry the request.
+    onPermissionDenied(() => {
+      showFlash('error', 'Your access was updated by an administrator — refreshing your workspace.');
+      runBootstrap();
     });
 
     // Control-plane step-up: when a mutating platform action comes back 428,
@@ -209,7 +237,46 @@ export const App: React.FC = () => {
     }));
 
     runBootstrap();
-  }, [runBootstrap]);
+  }, [runBootstrap, showFlash]);
+
+  // ==================== permission auto-refresh ====================
+  // Polls the cheap /me endpoint (60s while visible + on window focus) and
+  // re-runs the full bootstrap only when the server-issued permission set
+  // moved (permissionsVersion counter). RBAC edits therefore reach open
+  // sessions with no reload and no developer intervention.
+  useEffect(() => {
+    if (bootStatus !== 'ready' || !user || user.isPlatformAdmin) {
+      return;
+    }
+    let cancelled = false;
+    const check = async () => {
+      if (document.visibilityState !== 'visible') {
+        return;
+      }
+      try {
+        const fresh = await api.me();
+        if (cancelled) {
+          return;
+        }
+        if (
+          fresh.permissionsVersion !== user.permissionsVersion ||
+          fresh.permissions.join('|') !== user.permissions.join('|')
+        ) {
+          await runBootstrap();
+        }
+      } catch {
+        // Transient failure — the next tick retries; never log the user out.
+      }
+    };
+    const interval = window.setInterval(check, 60_000);
+    const onFocus = () => { void check(); };
+    window.addEventListener('focus', onFocus);
+    return () => {
+      cancelled = true;
+      window.clearInterval(interval);
+      window.removeEventListener('focus', onFocus);
+    };
+  }, [bootStatus, user, runBootstrap]);
 
   const settleStepUp = useCallback((ok: boolean) => {
     setStepUpOpen(false);
@@ -221,15 +288,6 @@ export const App: React.FC = () => {
     setStepUpResolve(null);
     setStepUpReject(null);
   }, [stepUpResolve, stepUpReject]);
-
-  const showFlash = useCallback((kind: 'error' | 'success', message: string) => {
-    setFlash({ kind, message });
-    window.setTimeout(() => setFlash(null), 5000);
-  }, []);
-
-  const fail = useCallback((err: any, fallback: string) => {
-    showFlash('error', err?.message ?? fallback);
-  }, [showFlash]);
 
   const handleAuthenticated = useCallback((_user: SessionUser) => {
     setChallengeEmail(null);
@@ -530,17 +588,26 @@ export const App: React.FC = () => {
 
   // ==================== booking ====================
 
-  const handleCreateBooking = useCallback(async (newAptData: Partial<Appointment>, newPatientData?: Partial<Patient>) => {
+  // Server-issued permission set (mirrored for UI only — the API enforces
+  // the same checks and answers 403 regardless of what the SPA renders).
+  const permissions = user?.permissions ?? [];
+  const canBook = canAny(permissions, ['appointment create']);
+
+  // The single booking-modal opener: permission-checked so no entry point
+  // (search bar, dashboard module, reception walk-in) can bypass it.
+  const openBookingModal = useCallback(() => {
+    if (!canAny(user?.permissions ?? [], ['appointment create'])) {
+      showFlash('error', 'You do not have permission to create patient bookings.');
+      return;
+    }
+    setBookingModalOpen(true);
+  }, [user, showFlash]);
+
+  const handleCreateBooking = useCallback(async (input: api.BookingInput, newPatientData?: Partial<Patient>) => {
     try {
       const { study, invoice, notifications: incoming } = await api.createBooking({
-        patientId: newAptData.patientId,
+        ...input,
         newPatient: newPatientData,
-        serviceId: newAptData.serviceId!,
-        referrerId: newAptData.referrerId,
-        date: newAptData.date || new Date().toISOString().split('T')[0],
-        time: newAptData.time || '11:30 AM',
-        priority: newAptData.priority || 'routine',
-        notes: newAptData.notes,
       });
 
       setAppointments(prev => [study, ...prev]);
@@ -600,6 +667,48 @@ export const App: React.FC = () => {
       await api.deleteModality(String(modalityId));
       setModalities(prev => prev.filter(m => m.id !== modalityId));
     } catch (err: any) { fail(err, 'Could not delete the modality.'); }
+  }, [fail]);
+
+  const handleAddRoom = useCallback(async (newRoom: Omit<Room, 'id'>) => {
+    try {
+      const room = await api.createRoom(newRoom);
+      setRooms(prev => [...prev, room]);
+    } catch (err: any) { fail(err, 'Could not create the imaging suite.'); }
+  }, [fail]);
+
+  const handleUpdateRoom = useCallback(async (updatedRoom: Room) => {
+    try {
+      const room = await api.updateRoom(updatedRoom);
+      setRooms(prev => prev.map(r => (r.id === room.id ? room : r)));
+    } catch (err: any) { fail(err, 'Could not update the imaging suite.'); }
+  }, [fail]);
+
+  const handleDeleteRoom = useCallback(async (roomId: number) => {
+    try {
+      await api.deleteRoom(String(roomId));
+      setRooms(prev => prev.filter(r => r.id !== roomId));
+    } catch (err: any) { fail(err, 'Could not delete the imaging suite.'); }
+  }, [fail]);
+
+  const handleAddPaymentMethod = useCallback(async (input: { code: string; name: string; isActive?: boolean; sortOrder?: number }) => {
+    try {
+      const method = await api.createPaymentMethod(input);
+      setPaymentMethods(prev => [...prev, method]);
+    } catch (err: any) { fail(err, 'Could not create the payment method.'); }
+  }, [fail]);
+
+  const handleUpdatePaymentMethod = useCallback(async (method: { id: number; name: string; isActive?: boolean; sortOrder?: number }) => {
+    try {
+      const updated = await api.updatePaymentMethod(method);
+      setPaymentMethods(prev => prev.map(m => (m.id === updated.id ? updated : m)));
+    } catch (err: any) { fail(err, 'Could not update the payment method.'); }
+  }, [fail]);
+
+  const handleDeletePaymentMethod = useCallback(async (methodId: number) => {
+    try {
+      await api.deletePaymentMethod(String(methodId));
+      setPaymentMethods(prev => prev.filter(m => m.id !== methodId));
+    } catch (err: any) { fail(err, 'Could not delete the payment method.'); }
   }, [fail]);
 
   const handleAddReferrer = useCallback(async (newRef: Omit<Referrer, 'id'>) => {
@@ -1019,7 +1128,8 @@ export const App: React.FC = () => {
         entitlements={entitlements}
         brandName={branding?.appName ?? null}
         onSelectAppointment={(apt) => setSelectedAppointment(apt)}
-        onOpenBookingModal={() => setBookingModalOpen(true)}
+        onOpenBookingModal={openBookingModal}
+        canOpenBooking={canBook}
         notifications={notifications}
         onOpenNotifications={() => setNotificationCenterOpen(true)}
         staffUsers={staffUsers}
@@ -1036,9 +1146,11 @@ export const App: React.FC = () => {
             appointments={appointments}
             modalities={modalities}
             invoices={invoices}
+            permissions={permissions}
             setActiveTab={setActiveTab}
             onSelectAppointment={(apt) => setSelectedAppointment(apt)}
-            onOpenBookingModal={() => setBookingModalOpen(true)}
+            onOpenBookingModal={openBookingModal}
+            canOpenBooking={canBook}
           />
         )}
 
@@ -1046,10 +1158,13 @@ export const App: React.FC = () => {
           <CheckinBoardView
             appointments={appointments}
             invoices={invoices}
+            permissions={permissions}
             onCheckIn={handleCheckIn}
             onMarkNoShow={handleMarkNoShow}
             onCancelStudy={handleCancelStudy}
-            onOpenBookingModal={() => setBookingModalOpen(true)}
+            onOpenBookingModal={openBookingModal}
+            canOpenBooking={canBook}
+            paymentMethods={paymentMethods}
             onOpenScreeningModal={(apt) => setScreeningModalApt(apt)}
             onRecordPayment={handleRecordPayment}
             onUpdateAppointment={handleUpdateAppointment}
@@ -1061,6 +1176,7 @@ export const App: React.FC = () => {
           <TechnologistView
             appointments={appointments}
             modalities={modalities}
+            permissions={permissions}
             onStartPreparing={handleStartPreparing}
             onOpenScreeningModal={(apt) => setScreeningModalApt(apt)}
             onStartAcquisition={handleStartAcquisition}
@@ -1075,6 +1191,7 @@ export const App: React.FC = () => {
           <ReportingView
             appointments={appointments}
             templates={templates}
+            permissions={permissions}
             selectedAppointment={currentSelectedAppointment}
             currentUser={user}
             clinicSettings={clinicSettings}
@@ -1090,8 +1207,10 @@ export const App: React.FC = () => {
           <BillingView
             invoices={invoices}
             appointments={appointments}
+            permissions={permissions}
             patients={patients}
             clinicSettings={clinicSettings}
+            paymentMethods={paymentMethods}
             onRecordPayment={handleRecordPayment}
             onCreateInvoice={handleCreateInvoice}
             onAddInvoiceItem={handleAddInvoiceItem}
@@ -1103,6 +1222,7 @@ export const App: React.FC = () => {
           <QueueBoardView
             appointments={appointments}
             clinicName={clinicSettings.name}
+            permissions={permissions}
             onCallPatient={handleCallPatient}
           />
         )}
@@ -1111,6 +1231,7 @@ export const App: React.FC = () => {
           <InventoryView
             inventoryItems={inventoryItems}
             inventoryTransactions={inventoryTransactions}
+            permissions={permissions}
             adverseReactions={adverseReactions}
             onCreateItem={handleCreateInventoryItem}
             onStockMovement={handleStockMovement}
@@ -1123,7 +1244,10 @@ export const App: React.FC = () => {
         {activeTab === 'masters' && (
           <MasterDataView
             modalities={modalities}
+            rooms={rooms}
+            permissions={permissions}
             services={services}
+            paymentMethods={paymentMethods}
             referrers={referrers}
             forms={forms}
             templates={templates}
@@ -1133,6 +1257,12 @@ export const App: React.FC = () => {
             onAddModality={handleAddModality}
             onUpdateModality={handleUpdateModality}
             onDeleteModality={handleDeleteModality}
+            onAddRoom={handleAddRoom}
+            onUpdateRoom={handleUpdateRoom}
+            onDeleteRoom={handleDeleteRoom}
+            onAddPaymentMethod={handleAddPaymentMethod}
+            onUpdatePaymentMethod={handleUpdatePaymentMethod}
+            onDeletePaymentMethod={handleDeletePaymentMethod}
             onAddReferrer={handleAddReferrer}
             onUpdateReferrer={handleUpdateReferrer}
             onDeleteReferrer={handleDeleteReferrer}
@@ -1149,6 +1279,7 @@ export const App: React.FC = () => {
           <DoctorNetworkView
             referrers={referrers}
             appointments={appointments}
+            permissions={permissions}
             patients={patients}
             modalities={modalities}
             doctorDispatches={doctorDispatches}
@@ -1162,6 +1293,8 @@ export const App: React.FC = () => {
 
         {activeTab === 'settings' && (
           <SettingsView
+            currentUser={user}
+            permissions={permissions}
             staffUsers={staffUsers}
             onAddStaffUser={handleAddStaffUser}
             onUpdateStaffUser={handleUpdateStaffUser}
@@ -1206,8 +1339,13 @@ export const App: React.FC = () => {
         <NewBookingModal
           patients={patients}
           modalities={modalities}
+          rooms={rooms}
           services={services}
+          paymentMethods={paymentMethods}
           referrers={referrers}
+          canRecordPayment={canAny(permissions, ['invoice payment'])}
+          canApplyDiscount={canAny(permissions, ['invoice edit'])}
+          currencySymbol={clinicSettings?.currencySymbol ?? 'Rs.'}
           onCreateBooking={handleCreateBooking}
           onClose={() => setBookingModalOpen(false)}
         />

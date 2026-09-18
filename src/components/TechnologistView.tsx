@@ -29,6 +29,7 @@ import {
   User
 } from 'lucide-react';
 import { Appointment, Modality, DoseLog, WorkflowState } from '../types';
+import { canAny } from '../services/permissions';
 import { WorklistFilterToolbar } from './WorklistFilterToolbar';
 import { SortableColumnHeader } from './SortableColumnHeader';
 import { Barcode } from './Barcode';
@@ -42,6 +43,8 @@ import {
 
 interface TechnologistViewProps {
   appointments: Appointment[];
+  /** Server-issued effective permission set — drives action visibility. */
+  permissions: string[];
   modalities: Modality[];
   onStartPreparing: (aptId: string) => void;
   onOpenScreeningModal: (apt: Appointment) => void;
@@ -54,6 +57,7 @@ interface TechnologistViewProps {
 }
 
 export const TechnologistView: React.FC<TechnologistViewProps> = ({
+  permissions,
   appointments,
   modalities,
   onStartPreparing,
@@ -65,6 +69,11 @@ export const TechnologistView: React.FC<TechnologistViewProps> = ({
   onUpdateAppointment,
 }) => {
   // Advanced Filters & Multi-Column Sorting state
+  // Server-issued workflow permissions (API enforces the same checks).
+  const canAcquire = canAny(permissions, ['study acquire']);
+  const canScreen = canAny(permissions, ['study screen']);
+  const canCancelStudy = canAny(permissions, ['study cancel']);
+
   const [filters, setFilters] = useState<AdvancedFilterState>({
     ...defaultAdvancedFilters,
     dateRangeMode: 'all',
@@ -385,7 +394,7 @@ export const TechnologistView: React.FC<TechnologistViewProps> = ({
                           >
                             <Eye className="w-3.5 h-3.5" />
                           </button>
-                          {isCheckedIn && (
+                          {isCheckedIn && canAcquire && (
                             <button
                               onClick={() => onStartPreparing(apt.id)}
                               className="px-2.5 py-1 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-[11px] shadow-xs cursor-pointer"
@@ -393,7 +402,7 @@ export const TechnologistView: React.FC<TechnologistViewProps> = ({
                               Prep
                             </button>
                           )}
-                          {isPreparing && (
+                          {isPreparing && canAcquire && (
                             <button
                               onClick={() => onStartAcquisition(apt)}
                               className="px-2.5 py-1 rounded-lg bg-amber-600 hover:bg-amber-500 text-white font-bold text-[11px] shadow-xs cursor-pointer"
@@ -401,7 +410,7 @@ export const TechnologistView: React.FC<TechnologistViewProps> = ({
                               Scan
                             </button>
                           )}
-                          {isInProgress && (
+                          {isInProgress && canAcquire && (
                             <button
                               onClick={() => onOpenDoseModal(apt)}
                               className="px-2.5 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-[11px] shadow-xs cursor-pointer"

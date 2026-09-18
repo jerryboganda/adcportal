@@ -25,6 +25,7 @@ class Appointment extends Model
     protected $fillable = [
         'customer_id',
         'location_id',
+        'room_id',
         'service_id',
         'staff_id',
         'name',
@@ -136,6 +137,12 @@ class Appointment extends Model
     public function LocationData()
     {
         return $this->hasOne(Location::class, 'id', 'location_id');
+    }
+
+    /** Imaging suite (rooms table) the study is booked against. */
+    public function room()
+    {
+        return $this->belongsTo(Room::class, 'room_id');
     }
 
     public function ReferrerData()

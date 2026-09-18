@@ -25,23 +25,30 @@ import {
   HeartPulse
 } from 'lucide-react';
 import { Appointment, ActiveTab, Modality, Invoice } from '../types';
+import { canAny } from '../services/permissions';
 
 interface DashboardViewProps {
   appointments: Appointment[];
   modalities: Modality[];
   invoices: Invoice[];
+  /** Server-issued effective permission set — drives widget visibility. */
+  permissions: string[];
   setActiveTab: (tab: ActiveTab) => void;
   onSelectAppointment: (apt: Appointment) => void;
   onOpenBookingModal: () => void;
+  /** Server-issued `appointment create` — hides the booking module otherwise. */
+  canOpenBooking?: boolean;
 }
 
 export const DashboardView: React.FC<DashboardViewProps> = ({
   appointments,
   modalities,
   invoices,
+  permissions,
   setActiveTab,
   onSelectAppointment,
   onOpenBookingModal,
+  canOpenBooking = false,
 }) => {
   const [cockpitFilter, setCockpitFilter] = useState<'all' | 'clinical' | 'admin'>('all');
 
@@ -68,9 +75,11 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     { label: 'Reported', count: reportedStudies, color: 'bg-emerald-50 text-emerald-700 border border-emerald-200' },
   ];
 
-  // Operations Console Modules
+  // Operations Console Modules. The booking module renders only with the
+  // server-issued `appointment create` permission (radiologists/technologists
+  // never see it; the API enforces the same rule regardless).
   const cockpitModules = [
-    {
+    ...(canOpenBooking ? [{
       id: 'intake',
       title: 'Book Diagnostic Study',
       category: 'clinical',
@@ -85,8 +94,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       metricValue: `${totalStudies} Scheduled`,
       metricSub: 'Active slots today',
       borderHover: 'hover:border-cyan-400 hover:shadow-cyan-500/10'
-    },
-    {
+    }] : []),
+    ...(canAny(permissions, ['reception view', 'study checkin']) ? [{
       id: 'reception',
       title: 'Patient Check-In & Tokens',
       category: 'admin',
@@ -101,8 +110,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       metricValue: `${appointments.filter(a => a.workflowState === 'checked_in').length} Waiting`,
       metricSub: 'Ready for scanning',
       borderHover: 'hover:border-sky-400 hover:shadow-sky-500/10'
-    },
-    {
+    }] : []),
+    ...(canAny(permissions, ['study screen', 'reception view']) ? [{
       id: 'safety',
       title: 'Safety Screening Protocols',
       category: 'clinical',
@@ -117,8 +126,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       metricValue: `${appointments.filter(a => a.screeningCleared).length} Cleared`,
       metricSub: 'Pre-scan validated',
       borderHover: 'hover:border-amber-400 hover:shadow-amber-500/10'
-    },
-    {
+    }] : []),
+    ...(canAny(permissions, ['technologist view', 'study acquire']) ? [{
       id: 'technologist',
       title: 'Technologist Worklist',
       category: 'clinical',
@@ -133,8 +142,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       metricValue: `${readyToScanCount} In Queue`,
       metricSub: `${modalities.length} active modalities`,
       borderHover: 'hover:border-emerald-400 hover:shadow-emerald-500/10'
-    },
-    {
+    }] : []),
+    ...(canAny(permissions, ['reports view', 'report create']) ? [{
       id: 'reporting',
       title: 'Radiologist Reporting',
       category: 'clinical',
@@ -149,8 +158,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       metricValue: `${reportedStudies} Signed`,
       metricSub: 'Completed reports',
       borderHover: 'hover:border-purple-400 hover:shadow-purple-500/10'
-    },
-    {
+    }] : []),
+    ...(canAny(permissions, ['reports view', 'report manage']) ? [{
       id: 'stat',
       title: 'STAT Emergency Worklist',
       category: 'clinical',
@@ -165,8 +174,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       metricValue: `${statCount} Urgent`,
       metricSub: 'Priority attention',
       borderHover: 'hover:border-rose-400 hover:shadow-rose-500/10'
-    },
-    {
+    }] : []),
+    ...(canAny(permissions, ['billing view', 'invoice manage']) ? [{
       id: 'billing',
       title: 'Billing & Cash Counter',
       category: 'admin',
@@ -181,8 +190,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       metricValue: `Rs. ${totalPaid.toLocaleString()}`,
       metricSub: `Collected of Rs. ${totalBilled.toLocaleString()}`,
       borderHover: 'hover:border-teal-400 hover:shadow-teal-500/10'
-    },
-    {
+    }] : []),
+    ...(canAny(permissions, ['queue view']) ? [{
       id: 'queue',
       title: 'Waiting Area TV Display',
       category: 'admin',
@@ -197,8 +206,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       metricValue: `${appointments.filter(a => a.workflowState === 'in_progress').length} In Exam Rooms`,
       metricSub: 'Current active scans',
       borderHover: 'hover:border-indigo-400 hover:shadow-indigo-500/10'
-    },
-    {
+    }] : []),
+    ...(canAny(permissions, ['catalog view', 'setting manage']) ? [{
       id: 'masters',
       title: 'Procedure & Tariff Master',
       category: 'admin',
@@ -213,7 +222,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       metricValue: `${modalities.length} Modalities Configured`,
       metricSub: 'Templates & questionnaires',
       borderHover: 'hover:border-slate-400 hover:shadow-slate-500/10'
-    },
+    }] : []),
   ];
 
   const filteredModules = cockpitModules.filter(m => {
@@ -390,22 +399,25 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           </div>
         </div>
 
-        {/* Daily Revenue */}
-        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">Billing Collected</span>
-            <div className="w-9 h-9 rounded-xl bg-emerald-50 text-emerald-600 border border-emerald-200 flex items-center justify-center">
-              <DollarSign className="w-4.5 h-4.5" />
+        {/* Daily Revenue — billing data is permission-gated (never ships to
+            roles without billing access, server-side and client-side). */}
+        {canAny(permissions, ['billing view', 'invoice manage']) && (
+          <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">Billing Collected</span>
+              <div className="w-9 h-9 rounded-xl bg-emerald-50 text-emerald-600 border border-emerald-200 flex items-center justify-center">
+                <DollarSign className="w-4.5 h-4.5" />
+              </div>
+            </div>
+            <div className="mt-3 flex items-baseline justify-between">
+              <span className="text-2xl font-black text-emerald-600">Rs. {totalPaid.toLocaleString()}</span>
+              <span className="text-xs text-slate-500 font-mono">/ {totalBilled.toLocaleString()}</span>
+            </div>
+            <div className="mt-2 flex items-center text-[11px] text-slate-500">
+              <span>Outstanding balance: <strong className="text-slate-800">Rs. {totalDue.toLocaleString()}</strong></span>
             </div>
           </div>
-          <div className="mt-3 flex items-baseline justify-between">
-            <span className="text-2xl font-black text-emerald-600">Rs. {totalPaid.toLocaleString()}</span>
-            <span className="text-xs text-slate-500 font-mono">/ {totalBilled.toLocaleString()}</span>
-          </div>
-          <div className="mt-2 flex items-center text-[11px] text-slate-500">
-            <span>Outstanding balance: <strong className="text-slate-800">Rs. {totalDue.toLocaleString()}</strong></span>
-          </div>
-        </div>
+        )}
       </div>
 
       {/* Pipeline Visual Funnel */}

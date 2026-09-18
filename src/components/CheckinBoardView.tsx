@@ -31,7 +31,8 @@ import {
   Check,
   DollarSign
 } from 'lucide-react';
-import { Appointment, Invoice, ActiveTab, Priority, Patient, WorkflowState } from '../types';
+import { Appointment, Invoice, ActiveTab, Priority, Patient, PaymentMethod, WorkflowState } from '../types';
+import { canAny } from '../services/permissions';
 import { WorklistFilterToolbar } from './WorklistFilterToolbar';
 import { SortableColumnHeader } from './SortableColumnHeader';
 import { Barcode } from './Barcode';
@@ -46,15 +47,21 @@ import {
 interface CheckinBoardViewProps {
   appointments: Appointment[];
   invoices: Invoice[];
+  /** Server-issued effective permission set — drives action visibility. */
+  permissions: string[];
   onCheckIn: (aptId: string) => void;
   onMarkNoShow: (aptId: string) => void;
   onCancelStudy: (aptId: string, reason: string) => void;
   onOpenBookingModal: () => void;
+  /** Server-issued `appointment create` — hides the walk-in button otherwise. */
+  canOpenBooking?: boolean;
+  /** Tenant-configured payment methods (replaces the fixed method list). */
+  paymentMethods?: PaymentMethod[];
   onOpenScreeningModal: (apt: Appointment) => void;
   onRecordPayment: (
     invoiceId: string,
     amount: number,
-    method: 'cash' | 'card' | 'bank' | 'mobile' | 'insurance',
+    method: string,
     reference: string
   ) => void;
   onUpdateAppointment: (aptId: string, updates: Partial<Appointment>) => void;
@@ -62,12 +69,15 @@ interface CheckinBoardViewProps {
 }
 
 export const CheckinBoardView: React.FC<CheckinBoardViewProps> = ({
+  permissions,
   appointments,
   invoices,
   onCheckIn,
   onMarkNoShow,
   onCancelStudy,
   onOpenBookingModal,
+  canOpenBooking = false,
+  paymentMethods = [],
   onOpenScreeningModal,
   onRecordPayment,
   onUpdateAppointment,
@@ -91,13 +101,21 @@ export const CheckinBoardView: React.FC<CheckinBoardViewProps> = ({
   const [paymentError, setPaymentError] = useState<string | null>(null);
   const [editModalApt, setEditModalApt] = useState<Appointment | null>(null);
   const [cancelModalApt, setCancelModalApt] = useState<Appointment | null>(null);
+
+  // Server-issued workflow permissions (API enforces the same checks).
+  const canCheckIn = canAny(permissions, ['study checkin']);
+  const canScreen = canAny(permissions, ['study screen']);
+  const canCancelStudy = canAny(permissions, ['study cancel']);
   const [cancelReason, setCancelReason] = useState('');
   const [showManifestModal, setShowManifestModal] = useState(false);
 
-  // Quick Payment form state
+  // Quick Payment form state (method = code of a tenant-configured method)
   const [payAmount, setPayAmount] = useState<number>(0);
-  const [payMethod, setPayMethod] = useState<'cash' | 'card' | 'bank' | 'mobile' | 'insurance'>('cash');
+  const [payMethod, setPayMethod] = useState<string>('');
   const [payRef, setPayRef] = useState('');
+
+  // Only the tenant's ACTIVE payment methods are collectable.
+  const activePaymentMethods = useMemo(() => paymentMethods.filter(m => m.isActive), [paymentMethods]);
 
   // Edit / Reassignment form state
   const [editPriority, setEditPriority] = useState<Priority>('routine');
@@ -178,7 +196,7 @@ export const CheckinBoardView: React.FC<CheckinBoardViewProps> = ({
     const inv = getInvoiceForApt(apt);
     const balance = inv ? inv.balanceDue : apt.service.price;
     setPayAmount(balance);
-    setPayMethod('cash');
+    setPayMethod(activePaymentMethods[0]?.code ?? '');
     setPayRef(`RCP-${Date.now().toString().slice(-4)}`);
     setPaymentError(null);
     setPaymentModalApt(apt);
@@ -192,6 +210,10 @@ export const CheckinBoardView: React.FC<CheckinBoardViewProps> = ({
     if (!inv) {
       // No silent no-ops: without an invoice there is nothing to pay against.
       setPaymentError('This study has no invoice yet — every booking creates one. Reload the worklist or create the invoice in Billing first.');
+      return;
+    }
+    if (!payMethod) {
+      setPaymentError('Select a payment method.');
       return;
     }
     setPaymentError(null);
@@ -265,13 +287,15 @@ export const CheckinBoardView: React.FC<CheckinBoardViewProps> = ({
             <span>Daily Run-Sheet</span>
           </button>
 
-          <button
-            onClick={onOpenBookingModal}
-            className="flex items-center justify-center space-x-2 px-4 py-2 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white font-semibold text-xs shadow-md shadow-cyan-600/20 transition-all cursor-pointer"
-          >
-            <PlusCircle className="w-4 h-4" />
-            <span>Walk-In / New Booking</span>
-          </button>
+          {canOpenBooking && (
+            <button
+              onClick={onOpenBookingModal}
+              className="flex items-center justify-center space-x-2 px-4 py-2 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white font-semibold text-xs shadow-md shadow-cyan-600/20 transition-all cursor-pointer"
+            >
+              <PlusCircle className="w-4 h-4" />
+              <span>Walk-In / New Booking</span>
+            </button>
+          )}
         </div>
       </div>
 
@@ -568,7 +592,7 @@ export const CheckinBoardView: React.FC<CheckinBoardViewProps> = ({
                             </span>
                           ) : (
                             <button
-                              onClick={() => onOpenScreeningModal(apt)}
+                              onClick={() => canScreen && onOpenScreeningModal(apt)}
                               className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-300 transition-colors cursor-pointer shadow-2xs"
                               title="Click to perform patient screening"
                             >
@@ -622,7 +646,7 @@ export const CheckinBoardView: React.FC<CheckinBoardViewProps> = ({
                       <td className="py-2.5 px-3 text-right whitespace-nowrap">
                         <div className="flex items-center justify-end space-x-1">
                           {/* 1-Click Check-In */}
-                          {isBooked && (
+                          {isBooked && canCheckIn && (
                             <button
                               onClick={() => onCheckIn(apt.id)}
                               className="flex items-center space-x-1 px-2 py-1 rounded bg-sky-600 hover:bg-sky-500 text-white font-bold text-[11px] transition-all shadow-2xs cursor-pointer"
@@ -670,7 +694,7 @@ export const CheckinBoardView: React.FC<CheckinBoardViewProps> = ({
                           </button>
 
                           {/* Cancel / No-Show */}
-                          {isBooked && (
+                          {isBooked && canCancelStudy && (
                             <button
                               onClick={() => {
                                 setCancelModalApt(apt);
@@ -756,22 +780,29 @@ export const CheckinBoardView: React.FC<CheckinBoardViewProps> = ({
 
               <div>
                 <label className="block text-slate-700 font-semibold mb-1">Tender / Payment Method</label>
-                <div className="grid grid-cols-3 gap-2">
-                  {(['cash', 'card', 'mobile', 'bank', 'insurance'] as const).map((m) => (
-                    <button
-                      key={m}
-                      type="button"
-                      onClick={() => setPayMethod(m)}
-                      className={`py-1.5 px-2 rounded-lg border text-center font-semibold capitalize cursor-pointer transition-all ${
-                        payMethod === m
-                          ? 'bg-teal-600 text-white border-teal-600 shadow-2xs'
-                          : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
-                      }`}
-                    >
-                      {m === 'mobile' ? 'EasyPaisa/Jazz' : m}
-                    </button>
-                  ))}
-                </div>
+                {activePaymentMethods.length === 0 ? (
+                  <p className="text-[11px] text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-2.5 py-1.5">
+                    No payment methods are configured for this facility — ask your administrator to add them under Catalog &amp; Forms → Payment Methods.
+                  </p>
+                ) : (
+                  <div className="grid grid-cols-3 gap-2">
+                    {activePaymentMethods.map((m) => (
+                      <button
+                        key={m.id}
+                        type="button"
+                        onClick={() => setPayMethod(m.code)}
+                        className={`py-1.5 px-2 rounded-lg border text-center font-semibold cursor-pointer transition-all truncate ${
+                          payMethod === m.code
+                            ? 'bg-teal-600 text-white border-teal-600 shadow-2xs'
+                            : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
+                        }`}
+                        title={m.name}
+                      >
+                        {m.name}
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
 
               <div>

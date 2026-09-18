@@ -70,3 +70,4 @@ bun.lock
 # SPA build artifacts are delivered by the CI deploy job, not git
 public/index.html
 public/assets/
+.zcode/

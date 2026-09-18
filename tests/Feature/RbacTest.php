@@ -5,8 +5,7 @@ namespace Tests\Feature;
 use App\Models\Service;
 
 class RbacTest extends ApiTestCase
-{
-    private function bookStudy()
+{    private function bookStudy()
     {
         $svc = Service::where('code', 'DX-CHEST-PA')->where('business_id', $this->businessA->id)->firstOrFail();
         $receptionist = $this->makeStaff($this->businessA, $this->adminA, 'receptionist');
@@ -82,5 +81,86 @@ class RbacTest extends ApiTestCase
             ->getJson('/api/v1/staff')->assertOk();
 
         $this->assertNotContains($other->id, collect($listing->json('data.staff'))->pluck('id'));
+    }
+
+    // ==================== radiologists must not book ====================
+
+    public function test_radiologist_cannot_book_studies(): void
+    {
+        $svc = Service::where('code', 'DX-CHEST-PA')->where('business_id', $this->businessA->id)->firstOrFail();
+        $radiologist = $this->makeStaff($this->businessA, $this->adminA, 'radiologist');
+
+        $this->actingAs($radiologist)->postJson('/api/v1/studies', [
+            'newPatient' => ['name' => 'Should Not Exist', 'gender' => 'male'],
+            'serviceId' => $svc->id,
+            'date' => now()->toDateString(),
+            'time' => '11:00 AM',
+            'priority' => 'routine',
+        ])->assertForbidden();
+
+        // No study may exist for that patient — the 403 is a hard stop.
+        $this->assertDatabaseMissing('customers', ['name' => 'Should Not Exist']);
+    }
+
+    public function test_radiologist_cannot_book_with_crafted_cross_tenant_payload(): void
+    {
+        // A malicious radiologist cannot bypass the wall with another
+        // tenant's ids: the permission check fires before any resolution.
+        $foreignService = Service::where('code', 'DX-CHEST-PA')->where('business_id', $this->businessB->id)->firstOrFail();
+        $radiologist = $this->makeStaff($this->businessA, $this->adminA, 'radiologist');
+
+        $this->actingAs($radiologist)->postJson('/api/v1/studies', [
+            'newPatient' => ['name' => 'Crafted Payload'],
+            'serviceId' => $foreignService->id,
+            'roomId' => 999999,
+            'date' => now()->toDateString(),
+            'time' => '11:00 AM',
+            'priority' => 'stat',
+        ])->assertForbidden();
+    }
+
+    public function test_radiologist_cannot_manage_booking_configuration(): void
+    {
+        $radiologist = $this->makeStaff($this->businessA, $this->adminA, 'radiologist');
+
+        // Imaging suites.
+        $this->actingAs($radiologist)->postJson('/api/v1/rooms', [
+            'name' => 'Rogue Suite',
+            'modalityId' => \App\Models\Modality::where('code', 'CT')->where('business_id', $this->businessA->id)->firstOrFail()->id,
+        ])->assertForbidden();
+
+        // Payment methods.
+        $this->actingAs($radiologist)->postJson('/api/v1/payment-methods', [
+            'code' => 'rogue', 'name' => 'Rogue Method',
+        ])->assertForbidden();
+
+        // Booking-time money capture is also `invoice payment`-gated.
+        $svc = Service::where('code', 'DX-CHEST-PA')->where('business_id', $this->businessA->id)->firstOrFail();
+        $this->actingAs($radiologist)->postJson('/api/v1/studies', [
+            'newPatient' => ['name' => 'Radiologist Payment Bypass'],
+            'serviceId' => $svc->id,
+            'date' => now()->toDateString(),
+            'time' => '11:00 AM',
+            'priority' => 'routine',
+            'payment' => [
+                'status' => 'paid',
+                'amountPaid' => 10,
+                'method' => '1',
+            ],
+        ])->assertForbidden();
+    }
+
+    public function test_admin_can_book_studies(): void
+    {
+        // The tenant admin is an authorized booking actor, same as reception.
+        $svc = Service::where('code', 'DX-CHEST-PA')->where('business_id', $this->businessA->id)->firstOrFail();
+
+        $this->actingAs($this->adminA)->postJson('/api/v1/studies', [
+            'newPatient' => ['name' => 'Admin Booked Patient', 'gender' => 'female'],
+            'serviceId' => $svc->id,
+            'date' => now()->toDateString(),
+            'time' => '2:00 PM',
+            'priority' => 'urgent',
+        ])->assertCreated();
     }
 }

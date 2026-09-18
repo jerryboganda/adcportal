@@ -14,11 +14,14 @@ use App\Models\InventoryTransaction;
 use App\Models\AdverseReaction;
 use App\Models\Invoice;
 use App\Models\Modality;
+use App\Models\PaymentMethod;
 use App\Models\RisNotificationTemplate;
 use App\Models\Referrer;
 use App\Models\ReportRelease;
 use App\Models\ReportTemplate;
 use App\Models\RadiologyReport;
+use App\Models\Role;
+use App\Models\Room;
 use App\Models\ScreeningForm;
 use App\Models\ScreeningQuestion;
 use App\Models\Service;
@@ -29,6 +32,8 @@ use App\Models\TenantMembership;
 use App\Models\User;
 use App\Models\DoseLog;
 use App\Models\Plan;
+use App\Services\TenantAuthorizer;
+use App\Support\PermissionCatalog;
 use Carbon\Carbon;
 
 /**
@@ -88,6 +93,32 @@ class ApiShape
             'preparationInstructions' => (string) ($s->preparation_instructions ?? ''),
             'requiresScreening' => (bool) $s->requires_screening,
             'requiresContrast' => $s->contrast_type !== 'none',
+        ];
+    }
+
+    /** Imaging suite (room) — tenant-configured, modality-scoped. */
+    public static function room(Room $r): array
+    {
+        return [
+            'id' => self::id($r->id),
+            'name' => $r->name,
+            'modalityId' => (int) $r->modality_id,
+            'locationId' => $r->location_id !== null ? (int) $r->location_id : null,
+            'capacityPerSlot' => (int) $r->capacity_per_slot,
+            'description' => (string) ($r->description ?? ''),
+            'isActive' => (bool) $r->is_active,
+        ];
+    }
+
+    /** Tenant-configured payment method (code = wire format on payments). */
+    public static function paymentMethod(PaymentMethod $m): array
+    {
+        return [
+            'id' => self::id($m->id),
+            'code' => $m->code,
+            'name' => $m->name,
+            'isActive' => (bool) $m->is_active,
+            'sortOrder' => (int) $m->sort_order,
         ];
     }
 
@@ -260,6 +291,7 @@ class ApiShape
             'service' => $service ? self::service($service) : null,
             'modalityId' => (int) ($modality?->id ?? 0),
             'modality' => $modality ? self::modality($modality) : null,
+            'roomId' => $a->room_id !== null ? (int) $a->room_id : null,
             'referrerId' => $a->referrer_id !== null ? (int) $a->referrer_id : null,
             'referrer' => ($a->relationLoaded('referrer') && $a->referrer) ? self::referrer($a->referrer) : null,
             'date' => $a->date_sort ? substr((string) $a->date_sort, 0, 10) : (string) $a->date,
@@ -395,11 +427,68 @@ class ApiShape
             'businessName' => $business?->name ?? $u->name,
             // White-label brand of the active tenant (null = account name is the brand).
             'businessBrandName' => $business?->branding?->app_name,
+            // Server-issued tenant permission names — the SPA mirrors these for
+            // UI gating only; the server remains the only enforcement point.
+            'permissions' => TenantAuthorizer::permissionsFor($u, (int) getActiveBusiness($u->id)),
+            // Bumped on every RBAC mutation (role/permission/override change):
+            // the SPA polls /me and re-hydrates when this counter moves.
+            'permissionsVersion' => (int) (Business::query()
+                ->whereKey((int) getActiveBusiness($u->id))
+                ->value('permissions_version') ?? 1),
             'subscriptionStatus' => $business?->subscription_status ?? 'active',
             'isPlatformAdmin' => $u->isPlatformAdmin(),
             'platformRole' => $u->type === 'super_admin' ? 'super_admin' : $u->platform_role,
             'memberships' => $memberships,
             'supportSession' => $supportSession,
+        ];
+    }
+
+    public static function permissionCatalog(): array
+    {
+        $grouped = array_fill_keys(PermissionCatalog::GROUP_ORDER, []);
+
+        foreach (PermissionCatalog::definitions() as $name => $meta) {
+            $grouped[$meta['group']][] = [
+                'name' => $name,
+                'label' => $meta['label'],
+                'dangerous' => $meta['dangerous'],
+                'implies' => $meta['implies'],
+            ];
+        }
+
+        return array_map(
+            fn (string $group, array $permissions) => ['group' => $group, 'permissions' => $permissions],
+            array_keys($grouped),
+            array_values($grouped)
+        );
+    }
+
+    public static function accessRole(Role $role, int $userCount = 0): array
+    {
+        return [
+            'id' => self::id($role->id),
+            'name' => $role->name,
+            'displayName' => (string) ($role->display_name ?: $role->name),
+            'description' => (string) ($role->description ?? ''),
+            'system' => in_array($role->name, PermissionCatalog::SYSTEM_ROLES, true),
+            'undeletable' => in_array($role->name, PermissionCatalog::UNDELETABLE_ROLES, true),
+            'users' => $userCount,
+            'permissions' => $role->permissions->pluck('name')->values()->all(),
+        ];
+    }
+
+    /** Effective permission set + provenance for one staff member. */
+    public static function effectiveAccess(User $u): array
+    {
+        $sources = TenantAuthorizer::effectiveWithSources($u, (int) getActiveBusiness($u->id));
+
+        return [
+            'userId' => self::id($u->id),
+            'role' => $u->portalRole(),
+            'permissions' => $sources['permissions'],
+            'rolePermissions' => $sources['role'],
+            'allowedOverrides' => $sources['allowed'],
+            'deniedOverrides' => $sources['denied'],
         ];
     }
 
@@ -613,6 +702,13 @@ class ApiShape
         'user_created' => ['RBAC & Access Control', 'Create Staff User Account', 'success'],
         'user_updated' => ['RBAC & Access Control', 'Update Staff User Permissions', 'success'],
         'user_deleted' => ['RBAC & Access Control', 'Revoke Staff User Account', 'warning'],
+        'user_role_assigned' => ['RBAC & Access Control', 'Staff Role Assigned', 'success'],
+        'user_permissions_overridden' => ['RBAC & Access Control', 'User Permission Overrides Changed', 'warning'],
+        'role_created' => ['RBAC & Access Control', 'Role Created', 'success'],
+        'role_updated' => ['RBAC & Access Control', 'Role Updated', 'success'],
+        'role_duplicated' => ['RBAC & Access Control', 'Role Duplicated', 'success'],
+        'role_deleted' => ['RBAC & Access Control', 'Role Deleted', 'warning'],
+        'role_permissions_updated' => ['RBAC & Access Control', 'Role Permissions Changed', 'warning'],
         'clinic_profile_updated' => ['System Settings', 'Update Clinic Master Profile', 'success'],
         'dicom_node_created' => ['PACS / DICOM Networking', 'Register DICOM Modality Node', 'success'],
         'dicom_node_updated' => ['PACS / DICOM Networking', 'Update DICOM Node Configuration', 'success'],
@@ -682,7 +778,9 @@ class ApiShape
         $changes = $log->changes ?? [];
         $details = $changes['summary'] ?? collect($changes)
             ->reject(fn ($v, $k) => in_array($k, ['summary']))
-            ->map(fn ($v, $k) => "{$k}: {$v}")
+            ->map(fn ($v, $k) => is_array($v)
+                ? "{$k}: ".implode(', ', $v)
+                : "{$k}: {$v}")
             ->implode('; ');
 
         $to = $changes['to'] ?? null;

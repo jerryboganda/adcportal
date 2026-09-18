@@ -45,9 +45,12 @@ import {
   AdverseOutcome,
   Appointment
 } from '../types';
+import { canAny } from '../services/permissions';
 
 interface InventoryViewProps {
   inventoryItems: InventoryItem[];
+  /** Server-issued effective permission set — drives action visibility. */
+  permissions: string[];
   onCreateItem: (item: Omit<InventoryItem, 'id'>) => Promise<void> | void;
   inventoryTransactions: InventoryTransaction[];
   onStockMovement: (input: {
@@ -70,6 +73,7 @@ interface InventoryViewProps {
 type SubTab = 'contrast' | 'syringes' | 'emergency' | 'all_items' | 'movements' | 'adverse';
 
 export const InventoryView: React.FC<InventoryViewProps> = ({
+  permissions,
   inventoryItems,
   onCreateItem,
   inventoryTransactions,
@@ -90,6 +94,13 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
   const [isAdjustModalOpen, setIsAdjustModalOpen] = useState(false);
   const [isNewItemModalOpen, setIsNewItemModalOpen] = useState(false);
   const [isAdverseModalOpen, setIsAdverseModalOpen] = useState(false);
+
+  // Server-issued inventory permissions (API enforces the same checks:
+  // reads need inventory view / setting manage / study acquire; writes need
+  // setting manage or study acquire for movements; screen for reactions).
+  const canManageItems = canAny(permissions, ['setting manage']);
+  const canMoveStock = canAny(permissions, ['setting manage', 'study acquire']);
+  const canReportReaction = canAny(permissions, ['setting manage', 'study screen']);
   const [selectedItemForAction, setSelectedItemForAction] = useState<InventoryItem | null>(null);
 
   // Form states for Stock In
@@ -383,7 +394,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
         {/* Top Header Quick Action Buttons */}
         <div className="flex flex-wrap items-center gap-2">
           <button
-            onClick={() => setIsAdverseModalOpen(true)}
+            onClick={() => canReportReaction && setIsAdverseModalOpen(true)}
             className="flex items-center space-x-2 px-3.5 py-2 bg-rose-600/90 hover:bg-rose-600 text-white rounded-xl text-xs font-bold transition shadow-xs border border-rose-400/40 cursor-pointer"
           >
             <ShieldAlert className="w-4 h-4" />
@@ -391,7 +402,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
           </button>
 
           <button
-            onClick={() => setIsNewItemModalOpen(true)}
+            onClick={() => canManageItems && setIsNewItemModalOpen(true)}
             className="flex items-center space-x-2 px-3.5 py-2 bg-cyan-600 hover:bg-cyan-500 text-white rounded-xl text-xs font-bold transition shadow-xs border border-cyan-400/40 cursor-pointer"
           >
             <Plus className="w-4 h-4" />
@@ -905,7 +916,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
               </div>
             </div>
             <button
-              onClick={() => setIsAdverseModalOpen(true)}
+              onClick={() => canReportReaction && setIsAdverseModalOpen(true)}
               className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold rounded-xl transition shadow-xs cursor-pointer flex items-center space-x-1.5 shrink-0 self-start sm:self-auto"
             >
               <Plus className="w-4 h-4" />

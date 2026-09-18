@@ -8,17 +8,29 @@ use App\Models\AppointmentProcedure;
 use App\Models\Invoice;
 use App\Models\InvoiceItem;
 use App\Models\InvoicePayment;
+use App\Models\PaymentMethod;
+use App\Services\InvoicePaymentService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\Rule;
 
 /**
  * Billing: study-derived invoicing, extra line items, POS payments and voiding.
- * All money math is server-authoritative.
+ * All money math is server-authoritative. Payment methods validate against the
+ * tenant's OWN configured methods (payment_methods table) — never a fixed list.
  */
 class BillingController extends BaseApiController
 {
+    /** Active method codes of the active tenant (the only acceptable wire values). */
+    private function tenantMethodCodes(): array
+    {
+        return PaymentMethod::forClinic($this->tenantId())
+            ->where('is_active', true)
+            ->pluck('code')
+            ->all();
+    }
     public function index(Request $request): JsonResponse
     {
         $this->denyUnless('invoice manage');
@@ -51,7 +63,7 @@ class BillingController extends BaseApiController
             'items.*.discount' => ['nullable', 'numeric', 'min:0'],
             'initialPayment' => ['nullable', 'array'],
             'initialPayment.amount' => ['required_with:initialPayment', 'numeric', 'min:0.01'],
-            'initialPayment.method' => ['required_with:initialPayment', 'in:cash,card,bank,mobile,insurance'],
+            'initialPayment.method' => ['required_with:initialPayment', 'string', Rule::in($this->tenantMethodCodes())],
             'initialPayment.reference' => ['nullable', 'string', 'max:255'],
             'issueNow' => ['sometimes', 'boolean'],
         ]);
@@ -151,7 +163,7 @@ class BillingController extends BaseApiController
 
         $validated = $request->validate([
             'amount' => ['required', 'numeric', 'min:0.01'],
-            'method' => ['required', 'in:cash,card,bank,mobile,insurance'],
+            'method' => ['required', 'string', Rule::in($this->tenantMethodCodes())],
             'reference' => ['nullable', 'string', 'max:255'],
         ]);
 
@@ -253,19 +265,12 @@ class BillingController extends BaseApiController
 
     private function recordPayment(Invoice $invoice, array $payment): InvoicePayment
     {
-        $model = InvoicePayment::create([
-            'invoice_id' => $invoice->id,
-            'amount' => (float) $payment['amount'],
-            'method' => $payment['method'],
-            'reference' => $payment['reference'] ?? null,
-            'paid_at' => now(),
-            'received_by' => Auth::id(),
-            'business_id' => $this->tenantId(),
-            'created_by' => Auth::id(),
-        ]);
-
-        $invoice->recalculateFromPayments();
-
-        return $model;
+        return app(InvoicePaymentService::class)->record(
+            $invoice,
+            (float) $payment['amount'],
+            $payment['method'],
+            $payment['reference'] ?? null,
+            Auth::id(),
+        );
     }
 }

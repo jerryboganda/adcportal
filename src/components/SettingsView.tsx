@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   Shield,
   UserCheck,
@@ -38,8 +38,14 @@ import {
   AuditLogEntry,
   TenantBrandingView
 } from '../types';
+import { SessionUser } from '../services/apiService';
+import { allowedSettingsSections, canAny } from '../services/permissions';
+import { AccessManager } from './access/AccessManager';
 
 interface SettingsViewProps {
+  currentUser: SessionUser;
+  /** Server-issued effective permission set — drives section visibility. */
+  permissions: string[];
   staffUsers: StaffUser[];
   onAddStaffUser: (user: Omit<StaffUser, 'id'> & { password: string }) => void;
   onUpdateStaffUser: (user: StaffUser) => void;
@@ -158,6 +164,8 @@ const BrandingPanel: React.FC<{ view: TenantBrandingView | null }> = ({ view }) 
 };
 
 export const SettingsView: React.FC<SettingsViewProps> = ({
+  currentUser,
+  permissions,
   staffUsers,
   onAddStaffUser,
   onUpdateStaffUser,
@@ -179,6 +187,18 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
 }) => {
   const [activeSection, setActiveSection] = useState<SettingsSection>('users');
   const [brandingLoaded, setBrandingLoaded] = useState(false);
+
+  const allowedSections = allowedSettingsSections(permissions);
+  const canManageUsers = canAny(permissions, ['user manage']);
+  const canManageRoles = canAny(permissions, ['role manage']);
+
+  // Permission changes (server-side) must never leave an unauthorized
+  // section open: snap the active section back into the allowed set.
+  useEffect(() => {
+    if (!allowedSections.includes(activeSection)) {
+      setActiveSection(allowedSections[0] ?? 'users');
+    }
+  }, [allowedSections, activeSection]);
 
   // User form modal state
   const [userModalOpen, setUserModalOpen] = useState(false);
@@ -436,14 +456,14 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
         {/* Navigation Tabs */}
         <div className="flex space-x-1.5 mt-6 border-t border-slate-700/60 pt-4 overflow-x-auto scrollbar-none">
           {[
-            { id: 'users', label: 'Users & RBAC Access', icon: Shield, count: staffUsers.length },
-            { id: 'clinic', label: 'Clinic & Branch Setup', icon: Building2 },
-            { id: 'branding', label: 'Branding (view only)', icon: Paintbrush },
-            { id: 'dicom', label: 'PACS & DICOM Nodes', icon: Server, count: dicomNodes.length },
-            { id: 'notifications', label: 'SMS & WhatsApp Gateway', icon: Bell, count: notificationTemplates.length },
-            { id: 'audit', label: 'System Audit Logs', icon: History, count: auditLogs.length },
-            { id: 'database', label: 'Data & Maintenance', icon: Database },
-          ].map(tab => {
+            { id: 'users', label: 'Users & RBAC Access', icon: Shield, count: staffUsers.length, module: ['user manage', 'role view'] },
+            { id: 'clinic', label: 'Clinic & Branch Setup', icon: Building2, module: ['setting manage'] },
+            { id: 'branding', label: 'Branding (view only)', icon: Paintbrush, module: ['setting manage'] },
+            { id: 'dicom', label: 'PACS & DICOM Nodes', icon: Server, count: dicomNodes.length, module: ['setting manage'] },
+            { id: 'notifications', label: 'SMS & WhatsApp Gateway', icon: Bell, count: notificationTemplates.length, module: ['setting manage'] },
+            { id: 'audit', label: 'System Audit Logs', icon: History, count: auditLogs.length, module: ['user logs history'] },
+            { id: 'database', label: 'Data & Maintenance', icon: Database, module: ['setting manage'] },
+          ].filter(tab => allowedSections.includes(tab.id as SettingsSection)).map(tab => {
             const Icon = tab.icon;
             const isActive = activeSection === tab.id;
             return (
@@ -500,6 +520,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                 </select>
               </div>
             </div>
+            {canAny(permissions, ['user create']) && (
             <button
               onClick={() => handleOpenUserModal()}
               className="flex items-center space-x-1.5 px-4 py-2 rounded-lg bg-cyan-600 hover:bg-cyan-700 text-white text-xs font-bold transition-all shadow-xs cursor-pointer shrink-0"
@@ -507,6 +528,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
               <Plus className="w-4 h-4" />
               <span>Add Staff User</span>
             </button>
+            )}
           </div>
 
           {/* User Cards Grid */}
@@ -587,6 +609,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                       <CheckCircle2 className="w-3.5 h-3.5" />
                       <span>Active Staff</span>
                     </span>
+                    {canManageUsers && (
                     <div className="flex items-center space-x-2">
                       <button
                         onClick={() => handleOpenUserModal(user)}
@@ -595,6 +618,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                         <Edit2 className="w-3.5 h-3.5" />
                         <span>Edit</span>
                       </button>
+                      {canAny(permissions, ['user delete']) && (
                       <button
                         onClick={() => {
                           if (confirm(`Are you sure you want to remove user account for ${user.name}?`)) {
@@ -605,88 +629,20 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                       >
                         <Trash2 className="w-3.5 h-3.5" />
                       </button>
+                      )}
                     </div>
+                    )}
                   </div>
                 </div>
               );
             })}
           </div>
 
-          {/* RBAC Permission Matrix Reference */}
-          <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-xs">
-            <h3 className="font-bold text-slate-900 text-sm mb-2 flex items-center space-x-2">
-              <Shield className="w-4 h-4 text-cyan-600" />
-              <span>Role-Based Access Control (RBAC) Permission Matrix</span>
-            </h3>
-            <p className="text-xs text-slate-500 mb-4">
-              Overview of default capability authorizations enforced across the PolytronX - RIS Portal.
-            </p>
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs border-collapse">
-                <thead>
-                  <tr className="bg-slate-50 border-b border-slate-200 text-slate-600 font-semibold">
-                    <th className="p-2.5">System Capability</th>
-                    <th className="p-2.5 text-center">Admin</th>
-                    <th className="p-2.5 text-center">Radiologist</th>
-                    <th className="p-2.5 text-center">Technologist</th>
-                    <th className="p-2.5 text-center">Receptionist</th>
-                    <th className="p-2.5 text-center">Billing Officer</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100 text-slate-700">
-                  <tr>
-                    <td className="p-2.5 font-medium">Patient Check-in & Intake</td>
-                    <td className="p-2.5 text-center text-emerald-600 font-bold">✓</td>
-                    <td className="p-2.5 text-center text-slate-300">—</td>
-                    <td className="p-2.5 text-center text-slate-300">—</td>
-                    <td className="p-2.5 text-center text-emerald-600 font-bold">✓</td>
-                    <td className="p-2.5 text-center text-slate-300">—</td>
-                  </tr>
-                  <tr>
-                    <td className="p-2.5 font-medium">Image Acquisition & Dose Logging</td>
-                    <td className="p-2.5 text-center text-emerald-600 font-bold">✓</td>
-                    <td className="p-2.5 text-center text-slate-300">—</td>
-                    <td className="p-2.5 text-center text-emerald-600 font-bold">✓</td>
-                    <td className="p-2.5 text-center text-slate-300">—</td>
-                    <td className="p-2.5 text-center text-slate-300">—</td>
-                  </tr>
-                  <tr>
-                    <td className="p-2.5 font-medium">Radiological Findings & Sign-Off</td>
-                    <td className="p-2.5 text-center text-emerald-600 font-bold">✓</td>
-                    <td className="p-2.5 text-center text-emerald-600 font-bold">✓</td>
-                    <td className="p-2.5 text-center text-slate-300">—</td>
-                    <td className="p-2.5 text-center text-slate-300">—</td>
-                    <td className="p-2.5 text-center text-slate-300">—</td>
-                  </tr>
-                  <tr>
-                    <td className="p-2.5 font-medium">Cash POS & Invoice Issuance</td>
-                    <td className="p-2.5 text-center text-emerald-600 font-bold">✓</td>
-                    <td className="p-2.5 text-center text-slate-300">—</td>
-                    <td className="p-2.5 text-center text-slate-300">—</td>
-                    <td className="p-2.5 text-center text-emerald-600 font-bold">✓</td>
-                    <td className="p-2.5 text-center text-emerald-600 font-bold">✓</td>
-                  </tr>
-                  <tr>
-                    <td className="p-2.5 font-medium">Override Screening Risk Flags</td>
-                    <td className="p-2.5 text-center text-emerald-600 font-bold">✓</td>
-                    <td className="p-2.5 text-center text-emerald-600 font-bold">✓</td>
-                    <td className="p-2.5 text-center text-slate-300">—</td>
-                    <td className="p-2.5 text-center text-slate-300">—</td>
-                    <td className="p-2.5 text-center text-slate-300">—</td>
-                  </tr>
-                  <tr>
-                    <td className="p-2.5 font-medium">DICOM Node & Master Catalog Edit</td>
-                    <td className="p-2.5 text-center text-emerald-600 font-bold">✓</td>
-                    <td className="p-2.5 text-center text-slate-300">—</td>
-                    <td className="p-2.5 text-center text-slate-300">—</td>
-                    <td className="p-2.5 text-center text-slate-300">—</td>
-                    <td className="p-2.5 text-center text-slate-300">—</td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </div>
+          {/* Tenant RBAC control center — server-backed roles & permissions */}
+          {canAny(permissions, ['role view']) && (
+            <AccessManager permissions={permissions} staffUsers={staffUsers} />
+          )}
+                </div>
       )}
 
       {/* SECTION 2: CLINIC PROFILE & BRANCH SETUP */}

@@ -26,11 +26,35 @@ abstract class BaseApiController extends Controller
      */
     protected function denyUnless(string $permission): void
     {
-        $user = auth()->user();
+        $this->denyUnlessAny([$permission], $permission);
+    }
 
-        if (! $user || ! TenantAuthorizer::allows($user, $permission, $this->tenantId())) {
-            abort(403, 'Permission denied.');
+    /** Grants access when the user holds ANY of the listed permissions. */
+    protected function denyUnlessAny(array $permissions, ?string $label = null): void
+    {
+        $user = auth()->user();
+        $tenantId = $this->tenantId();
+
+        foreach ($permissions as $permission) {
+            if ($user && TenantAuthorizer::allows($user, $permission, $tenantId)) {
+                return;
+            }
         }
+
+        // Supportability trail ("why can't I access this?") — internal log
+        // only; the client never learns more than the denied permission key.
+        \Illuminate\Support\Facades\Log::warning('Access denied', [
+            'permission' => $label ?? implode('|', $permissions),
+            'user_id' => $user?->id,
+            'tenant' => $tenantId,
+            'route' => request()->path(),
+        ]);
+
+        abort(response()->json([
+            'message' => 'Permission denied.',
+            'error' => 'permission.denied',
+            'permission' => $label ?? $permissions[0],
+        ], 403));
     }
 
     protected function audit(string $action, $subject, array $changes = []): void

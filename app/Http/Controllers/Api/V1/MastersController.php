@@ -3,7 +3,10 @@
 namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Resources\ApiShape;
+use App\Models\Appointment;
+use App\Models\InvoicePayment;
 use App\Models\Modality;
+use App\Models\PaymentMethod;
 use App\Models\Referrer;
 use App\Models\ReportTemplate;
 use App\Models\Room;
@@ -422,6 +425,172 @@ class MastersController extends BaseApiController
         $template->delete();
 
         return $this->ok(['deleted' => true]);
+    }
+
+    // ==================== rooms (imaging suites) ====================
+
+    public function storeRoom(Request $request): JsonResponse
+    {
+        $this->denyUnless('room create');
+
+        $validated = $this->validateRoom($request);
+
+        $room = Room::create([
+            'name' => $validated['name'],
+            'modality_id' => $validated['modalityId'],
+            'location_id' => $validated['locationId'] ?? null,
+            'capacity_per_slot' => (int) ($validated['capacityPerSlot'] ?? 1),
+            'description' => $validated['description'] ?? null,
+            'is_active' => (bool) ($validated['isActive'] ?? true),
+            'business_id' => $this->tenantId(),
+            'created_by' => auth()->id(),
+        ]);
+
+        return response()->json(['data' => ['room' => ApiShape::room($room->fresh('modality'))]], 201);
+    }
+
+    public function updateRoom(Request $request, Room $room): JsonResponse
+    {
+        $this->denyUnless('room edit');
+
+        if ($room->business_id !== $this->tenantId()) {
+            abort(404);
+        }
+
+        $validated = $this->validateRoom($request);
+
+        $room->update([
+            'name' => $validated['name'],
+            'modality_id' => $validated['modalityId'],
+            'location_id' => $validated['locationId'] ?? null,
+            'capacity_per_slot' => (int) ($validated['capacityPerSlot'] ?? $room->capacity_per_slot),
+            'description' => $validated['description'] ?? $room->description,
+            'is_active' => (bool) ($validated['isActive'] ?? $room->is_active),
+        ]);
+
+        return $this->ok(['room' => ApiShape::room($room->fresh('modality'))]);
+    }
+
+    public function destroyRoom(Room $room): JsonResponse
+    {
+        $this->denyUnless('room delete');
+
+        if ($room->business_id !== $this->tenantId()) {
+            abort(404);
+        }
+
+        // Studies booked against this suite must keep rendering their room —
+        // deactivate instead of deleting the anchor out of history.
+        if (Appointment::where('room_id', $room->id)->exists()) {
+            abort(422, 'Cannot delete a suite that has studies booked against it. Deactivate it instead.');
+        }
+
+        $room->delete();
+
+        return $this->ok(['deleted' => true]);
+    }
+
+    private function validateRoom(Request $request): array
+    {
+        return $request->validate([
+            'name' => ['required', 'string', 'max:80'],
+            'modalityId' => $this->modalityRule(),
+            'locationId' => ['nullable', 'integer'],
+            'capacityPerSlot' => ['nullable', 'integer', 'min:1', 'max:20'],
+            'description' => ['nullable', 'string', 'max:2000'],
+            'isActive' => ['nullable', 'boolean'],
+        ]);
+    }
+
+    // ==================== payment methods ====================
+
+    public function storePaymentMethod(Request $request): JsonResponse
+    {
+        $this->denyUnless('payment method create');
+
+        $validated = $this->validatePaymentMethod($request);
+        $code = strtolower($validated['code']);
+
+        // The (business_id, code) unique index spans soft-deleted rows, so a
+        // recreate of a deleted code restores the original row instead of
+        // colliding with it (same semantics as the modality seeder).
+        $method = PaymentMethod::withTrashed()
+            ->where('business_id', $this->tenantId())
+            ->where('code', $code)
+            ->first();
+
+        if ($method) {
+            $method->restore();
+            $method->update([
+                'name' => $validated['name'],
+                'is_active' => (bool) ($validated['isActive'] ?? true),
+                'sort_order' => (int) ($validated['sortOrder'] ?? $method->sort_order),
+            ]);
+
+            return response()->json(['data' => ['paymentMethod' => ApiShape::paymentMethod($method->fresh())]], 201);
+        }
+
+        $method = PaymentMethod::create([
+            'code' => $code,
+            'name' => $validated['name'],
+            'is_active' => (bool) ($validated['isActive'] ?? true),
+            'sort_order' => (int) ($validated['sortOrder'] ?? 0),
+            'business_id' => $this->tenantId(),
+            'created_by' => auth()->id(),
+        ]);
+
+        return response()->json(['data' => ['paymentMethod' => ApiShape::paymentMethod($method)]], 201);
+    }
+
+    public function updatePaymentMethod(Request $request, PaymentMethod $paymentMethod): JsonResponse
+    {
+        $this->denyUnless('payment method edit');
+
+        if ($paymentMethod->business_id !== $this->tenantId()) {
+            abort(404);
+        }
+
+        $validated = $request->validate([
+            'name' => ['required', 'string', 'max:80'],
+            'isActive' => ['nullable', 'boolean'],
+            'sortOrder' => ['nullable', 'integer', 'min:0', 'max:999'],
+        ]);
+
+        // `code` is intentionally immutable: recorded payments reference it.
+        $paymentMethod->update([
+            'name' => $validated['name'],
+            'is_active' => (bool) ($validated['isActive'] ?? $paymentMethod->is_active),
+            'sort_order' => (int) ($validated['sortOrder'] ?? $paymentMethod->sort_order),
+        ]);
+
+        return $this->ok(['paymentMethod' => ApiShape::paymentMethod($paymentMethod->fresh())]);
+    }
+
+    public function destroyPaymentMethod(PaymentMethod $paymentMethod): JsonResponse
+    {
+        $this->denyUnless('payment method delete');
+
+        if ($paymentMethod->business_id !== $this->tenantId()) {
+            abort(404);
+        }
+
+        if (InvoicePayment::where('business_id', $this->tenantId())->where('method', $paymentMethod->code)->exists()) {
+            abort(422, 'Cannot delete a payment method that has payments recorded. Deactivate it instead.');
+        }
+
+        $paymentMethod->delete();
+
+        return $this->ok(['deleted' => true]);
+    }
+
+    private function validatePaymentMethod(Request $request): array
+    {
+        return $request->validate([
+            'code' => ['required', 'string', 'max:20', 'regex:/^[a-z0-9_-]+$/i'],
+            'name' => ['required', 'string', 'max:80'],
+            'isActive' => ['nullable', 'boolean'],
+            'sortOrder' => ['nullable', 'integer', 'min:0', 'max:999'],
+        ]);
     }
 
     private function validateReportTemplate(Request $request): array
