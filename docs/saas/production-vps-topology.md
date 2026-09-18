@@ -1,6 +1,6 @@
 # Production topology — VPS shared infrastructure (ris.polytronx.com)
 
-> Status: **live**. This is the authoritative production record. Hostinger
+> Status: **live**. This is the authoritative production record. The legacy
 > remains the documented target for the plain-PHP deploy runbook only; the
 > shared-VPS flow below is what actually serves https://ris.polytronx.com.
 

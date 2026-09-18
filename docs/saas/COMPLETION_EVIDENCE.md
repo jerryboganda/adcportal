@@ -43,7 +43,7 @@ Customer→User relation is named `customer()`), #121/#122 were frontend type/lo
 sync fixes (jsbarcode lock entry added by hand from registry metadata — no local npm
 execution). **Final: run #123 on `b7d4414`, all four jobs ✅ (backend feature suite
 incl. the 12 new `IntegrityRepairTest` suites, SPA typecheck+build, Playwright E2E,
-Deliver to Hostinger ✅ — production ran `git pull`, `composer install --no-dev`,
+Production delivery ✅ — production ran `git pull`, `composer install --no-dev`,
 `migrate --force` (the expand-only column migration), `config:cache`).**
 
 ## 2026-09-15 — localhost deployment rehearsal (and the defect it exposed)
@@ -125,7 +125,7 @@ end-to-end. Gap-matrix rows **16–21**.
   `PlatformOperationsTest`, `RouteIntegrityTest`, `PlatformTenantManageTest`; SPA
   `tsc --noEmit` + production build; Playwright real-browser journey.
 - **Result**: **all four jobs ✅ success** — Backend — PHP feature tests ✅, Frontend —
-  typecheck & production build ✅, E2E — real browser journey ✅, Deliver to Hostinger ✅.
+  typecheck & production build ✅, E2E — real browser journey ✅, production delivery ✅.
 - **Failures found (and fixed) during this stretch** — each one found *because* the previous
   run's diagnostics were improved, never by guessing:
   | Run | Commit | Failure | Root cause | Fix |
@@ -137,7 +137,7 @@ end-to-end. Gap-matrix rows **16–21**.
   | #117 | `1a40040` | (caught locally before push, not in CI) | `fmtBytes` declared **twice** in `PlatformConsole.tsx` — a duplicate function implementation; plus `Section` never gained `'operations'` and no nav item was added | Removed the duplicate (reusing the existing helper, handling `null` at the call site); widened the union; added the nav entry |
 - **Final result**: run #117 green on all four jobs. Remaining annotations are two
   environment warnings/notices only — a Node 20 deprecation warning, and
-  `Hostinger SSH secrets not configured — skipping deploy step.`
+  `VPS SSH secrets not configured — skipping deploy step.`
 
 ## 2026-09-15 re-audit + final hardening
 
@@ -152,7 +152,7 @@ end-to-end. Gap-matrix rows **16–21**.
 - New test: `TenantRateLimitTest` — 429 isolation across tenants, aggregate budget
   shared by all users of one tenant, switched-member keying follows the operated clinic.
 - **CI run `34892267671` (commit `67c34b7`): all 4 jobs ✅** — Backend PHP feature
-  tests, Frontend typecheck+build, E2E real-browser journey, **Deliver to Hostinger ✅**
+  tests, Frontend typecheck+build, E2E real-browser journey, **production delivery ✅**
   (production is running `67c34b7`: `git pull`, `composer install --no-dev`,
   `migrate --force`, `config:cache` executed on the host by the gated job).
 
@@ -160,7 +160,7 @@ end-to-end. Gap-matrix rows **16–21**.
 
 Following operator feedback that the Tenant 360 view was read-only ("very initial"), full
 tenant administration shipped on `51d6e0c` (CI run `34895682011`, all 4 jobs ✅ incl.
-Hostinger delivery): tenant rename + subscription editing, tenant user administration
+production delivery): tenant rename + subscription editing, tenant user administration
 (create/edit/role change/password rotation/login revoke with last-admin protection and
 session revocation), and facility CRUD with a study-reference delete guard
 (`appointments.location_id` FK cascades — deletion is refused while referenced).
@@ -176,7 +176,7 @@ cross-tenant 404s, facility delete guard).
 
 ## CI evidence (GitHub Actions — the only compute path)
 
-| Run | Commit | Backend — PHP feature tests | Frontend — tsc + build | E2E — Playwright | Deliver to Hostinger |
+| Run | Commit | Backend — PHP feature tests | Frontend — tsc + build | E2E — Playwright | Production delivery |
 |---|---|---|---|---|---|
 | #99 | `9a51273` | ✅ success | ✅ success | ✅ success | ✅ success |
 | #100 | `75cb8ef` | ✅ success | ✅ success | ✅ success | ✅ success |
@@ -208,15 +208,15 @@ From `SaaSAcceptanceScenarioTest` (Alpha/Beta, plus Tenant C exercised in `Tenan
 
 ## Deployment status (corrected 2026-09-15)
 
-- Runs **#99/#100** completed the gated `Deliver to Hostinger` job ✅ (`git pull`, SPA bundle
+- Runs **#99/#100** completed the gated production delivery job ✅ (`git pull`, SPA bundle
   swap, `composer install --no-dev`, `php artisan migrate --force` applying the expand-only
   control-plane migration, `php artisan config:cache`), so production was running `75cb8ef`.
 - **From run #116 onward the delivery step is skipped**, and the job says so explicitly:
-  `notice | Hostinger SSH secrets not configured — skipping deploy step.` The job still
+  `notice | VPS SSH secrets not configured — skipping deploy step.` The job still
   reports ✅ because skipping is the designed behaviour when the secrets are absent — it
   never silently pretends to have deployed.
 - **Consequence, stated plainly: `1a40040` is verified by CI but is NOT on the production
-  host.** Bringing it live requires the `HOSTINGER_*` SSH secrets to be (re)configured for
+  server.** Bringing it live requires the `VPS_*` SSH secrets to be (re)configured for
   the repository; the job then performs the same `git pull` / `migrate --force` /
   `config:cache` sequence with no manual steps. This is an operator/environment
   prerequisite, not a code gap, and it is the one item standing between "green" and "live".
@@ -232,7 +232,7 @@ functional.
 
 External dependencies that live outside the repository and are *not* code gaps:
 
-1. **Hostinger SSH secrets** — not configured for the repository, so the gated delivery step
+1. **VPS SSH secrets** — not configured for the repository, so the gated delivery step
    skips (see above). The code path is proven by runs #99/#100; only the credential is missing.
 2. **Payment gateway credentials** — activation stays manual by design. No fake billing exists
    and none was added.

@@ -7,8 +7,8 @@ use Illuminate\Support\Facades\Route;
 | Web Routes — SPA host
 |--------------------------------------------------------------------------
 |
-| The React SPA is the product UI and is served from `public/app` by Apache
-| (Hostinger) with this catch-all only receiving real application routes
+| The React SPA is the product UI and is served from `public/` by the Apache
+| container with this catch-all only receiving real application routes
 | (deep links that miss a static file). The JSON API lives in routes/api.php.
 */
 

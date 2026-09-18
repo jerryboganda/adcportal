@@ -38,9 +38,9 @@
 
 ## Deploy
 
-CI (`GitHub Actions`) is the only compute path: tests → SPA build → gated Hostinger delivery (`git pull`, `composer install --no-dev`, `migrate --force`, `config:cache`). See `DEPLOYMENT_GUIDE.md` + AGENTS.md compute rule.
+CI (`GitHub Actions`) is the only compute path: tests → SPA build → gated production delivery (`git pull`, `composer install --no-dev`, `migrate --force`, `config:cache`). See `DEPLOYMENT_GUIDE.md` + AGENTS.md compute rule.
 
-The gated delivery step is **skipped with an explicit notice** when the Hostinger SSH secrets are not configured for the repository (`notice | Hostinger SSH secrets not configured — skipping deploy step.`) — it never silently pretends to have deployed.
+The gated delivery step is **skipped with an explicit notice** when the VPS SSH secrets are not configured for the repository (`notice | VPS SSH secrets not configured — skipping deploy step.`) — it never silently pretends to have deployed.
 
 ## Rate-limit posture (noisy-neighbor guard)
 
@@ -56,4 +56,4 @@ The `tenant` limiter keys on the server-resolved active business (`getActiveBusi
 
 ## Deploy
 
-CI (`GitHub Actions`) is the only compute path: tests → SPA build → gated Hostinger delivery (`git pull`, `composer install --no-dev`, `migrate --force`, `config:cache`). See `DEPLOYMENT_GUIDE.md` + AGENTS.md compute rule.
+CI (`GitHub Actions`) is the only compute path: tests → SPA build → gated production delivery (`git pull`, `composer install --no-dev`, `migrate --force`, `config:cache`). See `DEPLOYMENT_GUIDE.md` + AGENTS.md compute rule.

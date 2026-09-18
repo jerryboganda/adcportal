@@ -12,7 +12,7 @@ use Illuminate\Queue\SerializesModels;
  * Patient-facing appointment reminder.
  *
  * Deliberately sent SYNCHRONOUSLY (no ShouldQueue): the production topology
- * (Hostinger Business, cron `schedule:run`, no queue worker) cannot drain a
+ * (single VPS container, `schedule:work`, no queue worker) cannot drain a
  * database queue, so queueing these would silently strand them in `jobs`.
  * Volume is one mail per upcoming study per clinic — safe to send inline.
  */

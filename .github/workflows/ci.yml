@@ -221,68 +221,51 @@ jobs:
           path: playwright-report/
 
   deploy:
-    name: Deliver to Hostinger (transfer + light commands only)
+    name: Deploy to production VPS (ris.polytronx.com)
     runs-on: ubuntu-latest
     needs: [api-tests, spa-build, e2e]
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     steps:
-      - uses: actions/checkout@v4
-
-      - name: Download SPA bundle
-        uses: actions/download-artifact@v4
-        with:
-          name: spa-dist
-          path: dist/
-
       - name: Check deploy secrets present
         id: secrets
         env:
-          HOST: ${{ secrets.HOSTINGER_SSH_HOST }}
-          USER: ${{ secrets.HOSTINGER_SSH_USER }}
-          KEY: ${{ secrets.HOSTINGER_SSH_KEY }}
+          HOST: ${{ secrets.VPS_SSH_HOST }}
+          USER: ${{ secrets.VPS_SSH_USER }}
+          KEY: ${{ secrets.VPS_SSH_KEY }}
         run: |
           if [ -n "$HOST" ] && [ -n "$USER" ] && [ -n "$KEY" ]; then
             echo "ready=true" >> "$GITHUB_OUTPUT"
           else
             echo "ready=false" >> "$GITHUB_OUTPUT"
-            echo "::notice::Hostinger SSH secrets not configured — skipping deploy step."
+            echo "::notice::VPS SSH secrets not configured - skipping deploy step."
           fi
 
-      - name: Deploy SPA bundle + run lightweight release commands
+      - name: Pull the freshly published image and restart the stack
         if: steps.secrets.outputs.ready == 'true'
         env:
-          HOST: ${{ secrets.HOSTINGER_SSH_HOST }}
-          USER: ${{ secrets.HOSTINGER_SSH_USER }}
-          PORT: ${{ secrets.HOSTINGER_SSH_PORT }}
-          KEY: ${{ secrets.HOSTINGER_SSH_KEY }}
-          APP_PATH: ${{ secrets.HOSTINGER_APP_PATH }}
+          HOST: ${{ secrets.VPS_SSH_HOST }}
+          USER: ${{ secrets.VPS_SSH_USER }}
+          PORT: ${{ secrets.VPS_SSH_PORT }}
+          KEY: ${{ secrets.VPS_SSH_KEY }}
+          APP_PATH: ${{ secrets.VPS_APP_PATH }}
         run: |
           mkdir -p ~/.ssh
           printf '%s\n' "$KEY" > ~/.ssh/id_ed25519
           chmod 600 ~/.ssh/id_ed25519
           SSH_OPTS=(-o StrictHostKeyChecking=accept-new -o UserKnownHostsFile=/dev/null -p "${PORT:-22}")
 
-          # Upload the compiled SPA into public/ (index.html + assets/)
-          tar -C dist -czf /tmp/spa.tar.gz .
-          scp "${SSH_OPTS[@]}" /tmp/spa.tar.gz "$USER@$HOST:/tmp/polytronx-ris-spa.tar.gz"
-
-          # NOTE: default server path stays ~/adcportal until the GitHub repo is
-          # renamed to polytronx-ris and the server re-cloned — then update here.
           ssh "${SSH_OPTS[@]}" "$USER@$HOST" "
             set -e
-            cd \"\${APP_PATH:-\$HOME/adcportal}\"
+            cd "${APP_PATH:-/opt/docker/adc-portal}"
 
-            git pull --ff-only origin main
+            # The GHCR 'latest' image for this commit was published by the
+            # publish workflow; pull it, recreate the app container and let
+            # the entrypoint apply pending migrations + refresh caches.
+            docker compose pull app
+            docker compose up -d app
 
-            # Replace the SPA bundle atomically
-            rm -rf public/assets.bak
-            [ -d public/assets ] && mv public/assets public/assets.bak || true
-            tar -xzf /tmp/polytronx-ris-spa.tar.gz -C public/
-            rm -f /tmp/polytronx-ris-spa.tar.gz
-            [ -d public/assets.bak ] && rm -rf public/assets.bak || true
-
-            composer install --no-dev --optimize-autoloader --no-interaction
-            php artisan migrate --force
-            php artisan config:cache
+            sleep 20
+            docker logs adc-portal-app --since 2m 2>&1 | grep -iE 'migrat|error' | tail -8 || true
+            curl -fsS http://127.0.0.1:8090/api/v1/health || true
             echo DEPLOY_DONE
           "

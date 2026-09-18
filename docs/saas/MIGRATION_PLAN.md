@@ -12,7 +12,7 @@ Migration `2026_09_14_000100_create_saas_control_plane.php` is **additive only**
    - **Usage baseline**: current-month `studies`/`reports` counters seeded from real persisted rows so quota enforcement never retro-penalizes existing volume.
 4. **Rollback**: `down()` drops the new tables/columns; because nothing pre-existing was mutated, rollback is clean.
 
-## Production rollout (Hostinger)
+## Production rollout (production VPS)
 
 Deploy runs `php artisan migrate --force` (already in the CI deploy job). After migration:
 
