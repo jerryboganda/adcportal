@@ -110,7 +110,9 @@ class StudyBookingPaymentTest extends ApiTestCase
         $svc = $this->ctService();
         $method = $this->cashMethod($this->businessA->id);
 
-        $invoice = $this->book($this->receptionist(), $svc, [
+        // Discounting needs `invoice edit` — an admin-level approval (the
+        // receptionist variant is covered by the 403 test below).
+        $invoice = $this->book($this->adminA, $svc, [
             'status' => 'paid',
             'amountPaid' => (float) $svc->price - 500,
             'method' => (string) $method->id,

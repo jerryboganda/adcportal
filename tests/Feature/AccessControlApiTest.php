@@ -78,7 +78,7 @@ class AccessControlApiTest extends ApiTestCase
         $this->actingAs($this->adminA)->postJson('/api/v1/staff', [
             'name' => 'Junior Doc',
             'email' => 'junior.'.uniqid().'@test.local',
-            'password' => 'Secret#123',
+            'password' => 'S3cret#Passw0rd!x',
             'roleId' => (int) $created['id'],
         ])->assertCreated();
 
@@ -282,7 +282,7 @@ class AccessControlApiTest extends ApiTestCase
         $this->actingAs($radiologist)
             ->postJson('/api/v1/staff', [
                 'name' => 'Self', 'email' => 'self.'.uniqid().'@test.local',
-                'password' => 'Secret#123', 'roleId' => (int) $adminRoleId,
+                'password' => 'S3cret#Passw0rd!x', 'roleId' => (int) $adminRoleId,
             ])->assertForbidden();
     }
 

@@ -57,6 +57,7 @@ class MastersConfigTest extends ApiTestCase
             'amount' => 10,
             'method' => $method->code,
             'business_id' => $this->businessA->id,
+            'paid_at' => now(),
         ]);
 
         $this->actingAs($this->adminA)
@@ -148,10 +149,10 @@ class MastersConfigTest extends ApiTestCase
         ]);
 
         $aRooms = collect($this->actingAs($this->adminA)->getJson('/api/v1/bootstrap')->assertOk()->json('data.rooms'))->pluck('id');
-        $this->assertContains($room->id, $aRooms);
+        $this->assertContains((string) $room->id, $aRooms);
 
         $bRooms = collect($this->actingAs($this->adminB)->getJson('/api/v1/bootstrap')->assertOk()->json('data.rooms'))->pluck('id');
-        $this->assertNotContains($room->id, $bRooms);
+        $this->assertNotContains((string) $room->id, $bRooms);
 
         $aMethods = collect($this->actingAs($this->adminA)->getJson('/api/v1/bootstrap')->assertOk()->json('data.paymentMethods'))->pluck('code');
         $this->assertContains('cash', $aMethods);

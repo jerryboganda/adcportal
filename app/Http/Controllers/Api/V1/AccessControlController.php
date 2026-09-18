@@ -52,9 +52,7 @@ class AccessControlController extends BaseApiController
             ->values();
 
         $counts = DB::table('role_user')
-            ->join('users', 'users.id', '=', 'role_user.user_id')
             ->whereIn('role_id', $roles->pluck('id'))
-            ->whereNull('users.deleted_at')
             ->selectRaw('role_id, COUNT(DISTINCT user_id) as users')
             ->groupBy('role_id')
             ->pluck('users', 'role_id');
@@ -395,10 +393,10 @@ class AccessControlController extends BaseApiController
 
     private function userCount(Role $role): int
     {
+        // Users are hard-deleted in this schema (no soft deletes) — the
+        // role_user pivot is the single source for assignment counts.
         return (int) DB::table('role_user')
-            ->join('users', 'users.id', '=', 'role_user.user_id')
             ->where('role_id', $role->id)
-            ->whereNull('users.deleted_at')
             ->distinct()
             ->count('role_user.user_id');
     }
