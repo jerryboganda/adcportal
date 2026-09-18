@@ -221,7 +221,7 @@ final class PermissionCatalog
     public static function sync(): void
     {
         foreach (self::definitions() as $name => $meta) {
-            $permission = Permission::withTrashed()->where('name', $name)->first();
+            $permission = Permission::query()->where('name', $name)->first();
 
             if (! $permission) {
                 Permission::create([
@@ -232,10 +232,6 @@ final class PermissionCatalog
                 ]);
 
                 continue;
-            }
-
-            if ($permission->trashed()) {
-                $permission->restore();
             }
 
             if ($permission->display_name !== $meta['label'] || $permission->module !== $meta['group']) {
