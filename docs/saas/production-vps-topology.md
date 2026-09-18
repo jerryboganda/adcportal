@@ -76,6 +76,13 @@ data in realtime; there is no copy or lag.
   Deliberate override: `ALLOW_PROD_DESTRUCTIVE=true php artisan db:seed`.
   Tests are unaffected (phpunit uses sqlite :memory:).
 - Local PHP needs the pgsql extensions enabled (done: php.ini pdo_pgsql/pgsql).
+- **Storage sync**: `bash scripts/dev-storage-sync.sh start` mirrors `uploads/`
+  + `storage/app/` to `/opt/adc-portal-data` every ~2s (tar-over-ssh).
+  New files propagate in both directions within seconds; for a same-file
+  edit, prod is canonical locally (use the `push` command to force a local
+  edit of an existing file up). Uses path+size manifests — immune to the
+  laptop/VPS clock skew that breaks mtime-based deltas. `full` re-seeds,
+  `stop` halts the loop; deletions are not propagated (remove both sides).
 
 ## Housekeeping facts
 
