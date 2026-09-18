@@ -254,9 +254,9 @@ jobs:
           chmod 600 ~/.ssh/id_ed25519
           SSH_OPTS=(-o StrictHostKeyChecking=accept-new -o UserKnownHostsFile=/dev/null -p "${PORT:-22}")
 
-          ssh "${SSH_OPTS[@]}" "$USER@$HOST" "
+          ssh "${SSH_OPTS[@]}" "$USER@$HOST" "APP_PATH=${APP_PATH:-/opt/docker/adc-portal}" 'bash -se' <<'REMOTE'
             set -e
-            cd "${APP_PATH:-/opt/docker/adc-portal}"
+            cd "${APP_PATH}"
 
             # The GHCR 'latest' image for this commit was published by the
             # publish workflow; pull it, recreate the app container and let
@@ -268,4 +268,4 @@ jobs:
             docker logs adc-portal-app --since 2m 2>&1 | grep -iE 'migrat|error' | tail -8 || true
             curl -fsS http://127.0.0.1:8090/api/v1/health || true
             echo DEPLOY_DONE
-          "
+REMOTE
