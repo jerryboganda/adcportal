@@ -268,4 +268,4 @@ jobs:
             docker logs adc-portal-app --since 2m 2>&1 | grep -iE 'migrat|error' | tail -8 || true
             curl -fsS http://127.0.0.1:8090/api/v1/health || true
             echo DEPLOY_DONE
-REMOTE
+          REMOTE
