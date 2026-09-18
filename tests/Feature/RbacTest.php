@@ -145,7 +145,7 @@ class RbacTest extends ApiTestCase
             'payment' => [
                 'status' => 'paid',
                 'amountPaid' => 10,
-                'method' => '1',
+                'method' => 1,
             ],
         ])->assertForbidden();
     }

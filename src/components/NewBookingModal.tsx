@@ -170,7 +170,7 @@ export const NewBookingModal: React.FC<NewBookingModalProps> = ({
         ? {
             status: paymentStatus,
             amountPaid: paymentStatus === 'unpaid' ? undefined : Number(amountPaid),
-            methodId: paymentStatus === 'unpaid' || paymentMethodId === '' ? undefined : Number(paymentMethodId),
+            method: paymentStatus === 'unpaid' || paymentMethodId === '' ? undefined : Number(paymentMethodId),
             reference: paymentReference.trim() || undefined,
           }
         : { status: 'unpaid' },

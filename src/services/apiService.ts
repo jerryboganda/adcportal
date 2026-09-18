@@ -151,6 +151,23 @@ function normalizeInvoice(raw: any): Invoice {
   };
 }
 
+/**
+ * The API serializes master-data ids as strings while the SPA contract types
+ * them as numbers. Coerce at the client boundary — otherwise `find(s => s.id
+ * === selectedId)` silently misses (5 !== "5") and dependent UI (e.g. the
+ * booking financial section) fails to render.
+ */
+const normalizeModality = (m: any): Modality => ({ ...m, id: Number(m.id) });
+const normalizeRoom = (r: any): Room => ({
+  ...r,
+  id: Number(r.id),
+  modalityId: Number(r.modalityId),
+  locationId: r.locationId == null ? null : Number(r.locationId),
+});
+const normalizeService = (s: any): Service => ({ ...s, id: Number(s.id), modalityId: Number(s.modalityId) });
+const normalizePaymentMethod = (m: any): PaymentMethod => ({ ...m, id: Number(m.id) });
+const normalizeReferrer = (r: any): Referrer => ({ ...r, id: Number(r.id) });
+
 // ==================== auth ====================
 
 export type LoginResult =
@@ -247,8 +264,11 @@ export async function bootstrap(): Promise<BootstrapPayload> {
     dicomNodes: data.data.dicomNodes ?? [],
     notificationTemplates: data.data.notificationTemplates ?? [],
     staff: data.data.staff ?? [],
-    rooms: data.data.rooms ?? [],
-    paymentMethods: data.data.paymentMethods ?? [],
+    rooms: (data.data.rooms ?? []).map(normalizeRoom),
+    paymentMethods: (data.data.paymentMethods ?? []).map(normalizePaymentMethod),
+    modalities: (data.data.modalities ?? []).map(normalizeModality),
+    services: (data.data.services ?? []).map(normalizeService),
+    referrers: (data.data.referrers ?? []).map(normalizeReferrer),
   };
 }
 
@@ -273,8 +293,8 @@ export interface BookingInput {
   payment?: {
     status: PaymentStatus;
     amountPaid?: number;
-    /** Id of a tenant-configured, active PaymentMethod. */
-    methodId?: number;
+    /** Id of a tenant-configured, active PaymentMethod (server field name: `method`). */
+    method?: number;
     reference?: string;
   };
 }
@@ -466,12 +486,12 @@ export async function voidInvoice(invoiceId: string, reason: string): Promise<In
 
 export async function createModality(input: Omit<Modality, 'id'>): Promise<Modality> {
   const { data } = await http.post('/modalities', input);
-  return data.data.modality;
+  return normalizeModality(data.data.modality);
 }
 
 export async function updateModality(modality: Modality): Promise<Modality> {
   const { data } = await http.put(`/modalities/${modality.id}`, modality);
-  return data.data.modality;
+  return normalizeModality(data.data.modality);
 }
 
 export async function deleteModality(id: string): Promise<void> {
@@ -482,12 +502,12 @@ export async function deleteModality(id: string): Promise<void> {
 
 export async function createRoom(input: Omit<Room, 'id'>): Promise<Room> {
   const { data } = await http.post('/rooms', input);
-  return data.data.room;
+  return normalizeRoom(data.data.room);
 }
 
 export async function updateRoom(room: Room): Promise<Room> {
   const { data } = await http.put(`/rooms/${room.id}`, room);
-  return data.data.room;
+  return normalizeRoom(data.data.room);
 }
 
 export async function deleteRoom(id: string): Promise<void> {
@@ -498,7 +518,7 @@ export async function deleteRoom(id: string): Promise<void> {
 
 export async function createPaymentMethod(input: { code: string; name: string; isActive?: boolean; sortOrder?: number }): Promise<PaymentMethod> {
   const { data } = await http.post('/payment-methods', input);
-  return data.data.paymentMethod;
+  return normalizePaymentMethod(data.data.paymentMethod);
 }
 
 export async function updatePaymentMethod(method: Pick<PaymentMethod, 'id'> & { name: string; isActive?: boolean; sortOrder?: number }): Promise<PaymentMethod> {
@@ -507,7 +527,7 @@ export async function updatePaymentMethod(method: Pick<PaymentMethod, 'id'> & { 
     isActive: method.isActive,
     sortOrder: method.sortOrder,
   });
-  return data.data.paymentMethod;
+  return normalizePaymentMethod(data.data.paymentMethod);
 }
 
 export async function deletePaymentMethod(id: string): Promise<void> {
@@ -516,12 +536,12 @@ export async function deletePaymentMethod(id: string): Promise<void> {
 
 export async function createService(input: Omit<Service, 'id'>): Promise<Service> {
   const { data } = await http.post('/services', input);
-  return data.data.service;
+  return normalizeService(data.data.service);
 }
 
 export async function updateService(service: Service): Promise<Service> {
   const { data } = await http.put(`/services/${service.id}`, service);
-  return data.data.service;
+  return normalizeService(data.data.service);
 }
 
 export async function deleteService(id: string): Promise<void> {
@@ -530,12 +550,12 @@ export async function deleteService(id: string): Promise<void> {
 
 export async function createReferrer(input: Omit<Referrer, 'id'>): Promise<Referrer> {
   const { data } = await http.post('/referrers', input);
-  return data.data.referrer;
+  return normalizeReferrer(data.data.referrer);
 }
 
 export async function updateReferrer(referrer: Referrer): Promise<Referrer> {
   const { data } = await http.put(`/referrers/${referrer.id}`, referrer);
-  return data.data.referrer;
+  return normalizeReferrer(data.data.referrer);
 }
 
 export async function deleteReferrer(id: string): Promise<void> {

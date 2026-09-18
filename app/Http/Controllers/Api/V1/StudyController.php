@@ -89,7 +89,7 @@ class StudyController extends BaseApiController
             'payment' => ['nullable', 'array'],
             'payment.status' => ['required_with:payment', 'in:unpaid,partial,paid'],
             'payment.amountPaid' => ['nullable', 'numeric', 'min:0'],
-            'payment.method' => ['nullable', 'string', 'max:20'],
+            'payment.method' => ['nullable', 'integer', 'min:1'],
             'payment.reference' => ['nullable', 'string', 'max:255'],
         ]);
 

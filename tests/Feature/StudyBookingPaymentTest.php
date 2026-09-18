@@ -70,7 +70,7 @@ class StudyBookingPaymentTest extends ApiTestCase
         $res = $this->book($this->receptionist(), $svc, [
             'status' => 'paid',
             'amountPaid' => (float) $svc->price,
-            'method' => (string) $method->id,
+            'method' => $method->id,
             'reference' => 'RCP-E2E-1',
         ])->assertCreated();
 
@@ -97,7 +97,7 @@ class StudyBookingPaymentTest extends ApiTestCase
         $invoice = $this->book($this->receptionist(), $svc, [
             'status' => 'partial',
             'amountPaid' => 3000,
-            'method' => (string) $method->id,
+            'method' => $method->id,
         ])->assertCreated()->json('data.invoice');
 
         $this->assertSame('partial', $invoice['status']);
@@ -115,7 +115,7 @@ class StudyBookingPaymentTest extends ApiTestCase
         $invoice = $this->book($this->adminA, $svc, [
             'status' => 'paid',
             'amountPaid' => (float) $svc->price - 500,
-            'method' => (string) $method->id,
+            'method' => $method->id,
         ], 500)->assertCreated()->json('data.invoice');
 
         $this->assertEquals(500.0, $invoice['manualDiscount']);
@@ -170,7 +170,7 @@ class StudyBookingPaymentTest extends ApiTestCase
         $this->book($user, $this->ctService(), [
             'status' => 'paid',
             'amountPaid' => (float) $this->ctService()->price,
-            'method' => (string) $method->id,
+            'method' => $method->id,
         ])->assertForbidden();
     }
 
@@ -190,7 +190,7 @@ class StudyBookingPaymentTest extends ApiTestCase
         $this->book($this->receptionist(), $svc, [
             'status' => 'partial',
             'amountPaid' => (float) $svc->price,
-            'method' => (string) $method->id,
+            'method' => $method->id,
         ])->assertStatus(422);
     }
 
@@ -202,13 +202,13 @@ class StudyBookingPaymentTest extends ApiTestCase
         $this->book($this->receptionist(), $svc, [
             'status' => 'paid',
             'amountPaid' => (float) $svc->price - 1000,
-            'method' => (string) $method->id,
+            'method' => $method->id,
         ])->assertStatus(422);
 
         $this->book($this->receptionist(), $svc, [
             'status' => 'paid',
             'amountPaid' => (float) $svc->price + 500,
-            'method' => (string) $method->id,
+            'method' => $method->id,
         ])->assertStatus(422);
     }
 
@@ -219,7 +219,7 @@ class StudyBookingPaymentTest extends ApiTestCase
         $this->book($this->receptionist(), $this->ctService(), [
             'status' => 'partial',
             'amountPaid' => -5,
-            'method' => (string) $method->id,
+            'method' => $method->id,
         ])->assertStatus(422);
     }
 
@@ -240,7 +240,7 @@ class StudyBookingPaymentTest extends ApiTestCase
         $this->book($this->receptionist(), $svc, [
             'status' => 'paid',
             'amountPaid' => (float) $svc->price,
-            'method' => (string) $method->id,
+            'method' => $method->id,
         ])->assertStatus(422);
     }
 
@@ -266,7 +266,7 @@ class StudyBookingPaymentTest extends ApiTestCase
         $res = $this->book($this->receptionist(), $svc, [
             'status' => 'paid',
             'amountPaid' => (float) $svc->price,
-            'method' => (string) $method->id,
+            'method' => $method->id,
         ])->assertCreated();
 
         $invoiceId = $res->json('data.invoice.id');
