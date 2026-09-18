@@ -45,9 +45,13 @@ class RouteServiceProvider extends ServiceProvider
         });
 
         RateLimiter::for('login', function (Request $request) {
+            // Production keeps the strict brute-force budget; local dev and
+            // the E2E runner (APP_ENV=local) exercise the login form heavily.
+            $production = app()->environment('production');
+
             return [
-                Limit::perMinute(5)->by($request->input('email', '').'|'.$request->ip()),
-                Limit::perHour(30)->by($request->input('email', '').'|'.$request->ip()),
+                Limit::perMinute($production ? 5 : 60)->by($request->input('email', '').'|'.$request->ip()),
+                Limit::perHour($production ? 30 : 600)->by($request->input('email', '').'|'.$request->ip()),
             ];
         });
 

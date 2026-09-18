@@ -98,7 +98,7 @@ test('reception booking captures full payment and lands paid in billing', async 
     await expect(page.getByText(/No imaging suites are configured for this modality/)).toBeVisible();
 
     // Tenant-configured procedure (server-seeded CT catalog).
-    await page.getByLabel('Modality').selectOption({ label: 'Computed Tomography (CT)' });
+    await page.getByLabel('Modality', { exact: true }).selectOption({ label: 'Computed Tomography (CT)' });
     await page.getByLabel('Procedure Service').selectOption({ label: 'CT Brain Non-Contrast (NCCT) - Rs. 6,500' });
 
     // Settle in full, in cash — from the tenant-configured method list.

@@ -707,6 +707,7 @@ export const GlobalSearchBar: React.FC<GlobalSearchBarProps> = ({
           <div className="p-2.5 bg-slate-50 border-t border-slate-200 flex items-center justify-between text-xs">
             <div className="flex items-center space-x-2 text-slate-500 text-[11px]">
               <span>Quick jump:</span>
+              {allowedTabs(permissions).includes('checkin') && (
               <button
                 onClick={() => {
                   setActiveTab('checkin');
@@ -716,7 +717,9 @@ export const GlobalSearchBar: React.FC<GlobalSearchBarProps> = ({
               >
                 Reception Desk
               </button>
-              <span>•</span>
+              )}
+              {allowedTabs(permissions).includes('checkin') && <span>•</span>}
+              {allowedTabs(permissions).includes('reporting') && (
               <button
                 onClick={() => {
                   setActiveTab('reporting');
@@ -726,7 +729,9 @@ export const GlobalSearchBar: React.FC<GlobalSearchBarProps> = ({
               >
                 Reporting Workstation
               </button>
-              <span>•</span>
+              )}
+              {allowedTabs(permissions).includes('reporting') && <span>•</span>}
+              {allowedTabs(permissions).includes('billing') && (
               <button
                 onClick={() => {
                   setActiveTab('billing');
@@ -736,6 +741,7 @@ export const GlobalSearchBar: React.FC<GlobalSearchBarProps> = ({
               >
                 Invoices & POS
               </button>
+              )}
             </div>
 
             {onOpenBookingModal && canOpenBooking && (
