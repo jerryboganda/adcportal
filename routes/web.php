@@ -17,7 +17,7 @@ $serveSpa = function () {
     $spa = public_path('index.html');
 
     if (! is_file($spa)) {
-        return response('<h1>PolytronX - RIS</h1><p>Frontend build missing. Deploy the compiled SPA into <code>public/</code>.</p>', 503)
+        return response('<h1>PolytronX - Enterprise PACS &amp; RIS</h1><p>Frontend build missing. Deploy the compiled SPA into <code>public/</code>.</p>', 503)
             ->header('Content-Type', 'text/html');
     }
 

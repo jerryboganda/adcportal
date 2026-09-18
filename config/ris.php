@@ -207,7 +207,7 @@ return [
     */
 
     'platform_brand' => [
-        'app_name' => env('RIS_PLATFORM_APP_NAME', 'PolytronX - RIS'),
+        'app_name' => env('RIS_PLATFORM_APP_NAME', 'PolytronX - Enterprise PACS & RIS'),
         'primary_color' => '#0e7490',
         'accent_color' => '#06b6d4',
         'logo_url' => null,

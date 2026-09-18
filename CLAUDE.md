@@ -1,4 +1,4 @@
-# CLAUDE.md — PolytronX - RIS
+# CLAUDE.md — PolytronX - Enterprise PACS & RIS
 
 See `AGENTS.md` for the full project guide. The critical, HARD ENFORCED rule:
 

@@ -1,4 +1,4 @@
-# CURRENT_STATE_AUDIT — PolytronX - RIS (pre/post SaaS re-engineering)
+# CURRENT_STATE_AUDIT — PolytronX - Enterprise PACS & RIS (pre/post SaaS re-engineering)
 
 ## What the system was (evidence-backed)
 

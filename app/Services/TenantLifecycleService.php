@@ -308,7 +308,7 @@ class TenantLifecycleService
 
         $payload = [
             'exportedAt' => now()->toIso8601String(),
-            'system' => 'PolytronX - RIS Portal',
+            'system' => 'PolytronX - Enterprise PACS & RIS Portal',
             'tenant' => ApiShape::tenant($tenant),
             'data' => [
                 'patients' => Customer::where('business_id', $tenantId)->get()->map(fn ($c) => ApiShape::patient($c))->all(),

@@ -260,7 +260,7 @@ class SettingsController extends BaseApiController
 
         return $this->ok([
             'exportedAt' => now()->toIso8601String(),
-            'system' => 'PolytronX - RIS Portal',
+            'system' => 'PolytronX - Enterprise PACS & RIS Portal',
             'version' => '3.0.0',
             'data' => [
                 'patients' => \App\Models\Customer::where('business_id', $tenantId)->get()

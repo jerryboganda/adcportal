@@ -1051,7 +1051,7 @@ export const ReportingView: React.FC<ReportingViewProps> = ({
 
                       {canReleaseReport && apt.referrer?.phone && (
                         <a
-                        href={`https://wa.me/${apt.referrer.phone.replace(/[^0-9]/g, '')}?text=${encodeURIComponent(`Dr. ${apt.referrer.name}, Radiology Report for patient ${apt.patient.name} (${apt.service?.name || 'Radiology Study'}, Token: ${apt.tokenNumber}) has been finalized and verified by ${clinicSettings?.name?.trim() || 'PolytronX - RIS'}. Review online: ${window.location.origin}/report/${apt.patient.mrn}`)}`}
+                        href={`https://wa.me/${apt.referrer.phone.replace(/[^0-9]/g, '')}?text=${encodeURIComponent(`Dr. ${apt.referrer.name}, Radiology Report for patient ${apt.patient.name} (${apt.service?.name || 'Radiology Study'}, Token: ${apt.tokenNumber}) has been finalized and verified by ${clinicSettings?.name?.trim() || 'PolytronX - Enterprise PACS & RIS'}. Review online: ${window.location.origin}/report/${apt.patient.mrn}`)}`}
                         target="_blank"
                         rel="noreferrer"
                         className="flex items-center space-x-1.5 px-3 py-1.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-800 text-xs font-bold border border-emerald-300 cursor-pointer shadow-xs"
@@ -1440,7 +1440,7 @@ export const ReportingView: React.FC<ReportingViewProps> = ({
                     <div className="font-black text-sm tracking-wide">POLYTRONX - RIS</div>
                     <div className="text-[10px] text-slate-300">Radiology & Advanced Imaging Information System | ISO 9001:2015</div>
                     <div className="text-[9px] text-slate-400">
-                      {[[clinicSettings?.address?.trim(), clinicSettings?.city?.trim()].filter(Boolean).join(', '), clinicSettings?.phone?.trim()].filter(Boolean).join(' • ') || (clinicSettings?.name?.trim() || 'PolytronX - RIS')}
+                      {[[clinicSettings?.address?.trim(), clinicSettings?.city?.trim()].filter(Boolean).join(', '), clinicSettings?.phone?.trim()].filter(Boolean).join(' • ') || (clinicSettings?.name?.trim() || 'PolytronX - Enterprise PACS & RIS')}
                     </div>
                   </div>
                   <div className="text-right font-mono text-[10px]">

@@ -88,7 +88,7 @@ export const PrintableInvoiceModal: React.FC<PrintableInvoiceModalProps> = ({ in
                 </div>
                 <div>
                   <h1 className="text-lg font-black text-slate-900 tracking-tight leading-none uppercase">
-                    {clinic?.name?.trim() || 'PolytronX - RIS'}
+                    {clinic?.name?.trim() || 'PolytronX - Enterprise PACS & RIS'}
                   </h1>
                   <p className="text-[11px] text-slate-600 font-semibold tracking-wide mt-0.5">
                     {clinic?.headerTagline?.trim() || 'Radiology & Advanced Diagnostic Imaging'}
@@ -264,7 +264,7 @@ export const PrintableInvoiceModal: React.FC<PrintableInvoiceModalProps> = ({ in
               <div className="pt-3 flex items-center space-x-3 text-slate-600">
                 <Barcode value={invoice.invoiceNumber} height={36} width={1} />
                 <div className="text-[10px] text-slate-500">
-                  <span>Authorized by PolytronX - RIS Electronic Health Records System</span>
+                  <span>Authorized by PolytronX - Enterprise PACS & RIS Electronic Health Records System</span>
                 </div>
               </div>
             </div>
@@ -318,7 +318,7 @@ export const PrintableInvoiceModal: React.FC<PrintableInvoiceModalProps> = ({ in
               <div className="flex flex-col justify-end items-end text-right">
                 <div className="w-48 border-b border-slate-400 pb-1 mb-1"></div>
                 <p className="font-bold text-slate-800 text-xs">Accounts Officer / Cashier</p>
-                <p className="text-[10px] text-slate-400">{clinic?.name?.trim() || 'PolytronX - RIS'}{clinicAddress ? `, ${clinicAddress}` : ''}</p>
+                <p className="text-[10px] text-slate-400">{clinic?.name?.trim() || 'PolytronX - Enterprise PACS & RIS'}{clinicAddress ? `, ${clinicAddress}` : ''}</p>
               </div>
             </div>
           </div>

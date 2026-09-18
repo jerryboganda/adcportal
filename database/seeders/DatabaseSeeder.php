@@ -97,7 +97,7 @@ class DatabaseSeeder extends Seeder
                 $business = Business::firstOrCreate(
                     ['tenant_code' => $demoCode],
                     [
-                        'name' => 'PolytronX - RIS',
+                        'name' => 'PolytronX - Enterprise PACS & RIS',
                         'form_type' => 'form-layout',
                         'layouts' => 'Formlayout11',
                         'theme_color' => 'color1-Formlayout11',

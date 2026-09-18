@@ -728,7 +728,7 @@ export const CheckinBoardView: React.FC<CheckinBoardViewProps> = ({
                 </div>
                 <div>
                   <h3 className="font-bold text-slate-900 text-sm">Front Desk POS Payment Collection</h3>
-                  <p className="text-[11px] text-slate-500">PolytronX - RIS Cashier Counter</p>
+                  <p className="text-[11px] text-slate-500">PolytronX - Enterprise PACS & RIS Cashier Counter</p>
                 </div>
               </div>
               <button
@@ -1098,7 +1098,7 @@ export const CheckinBoardView: React.FC<CheckinBoardViewProps> = ({
         <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
           <div className="bg-white border border-slate-200 rounded-2xl max-w-sm w-full p-6 shadow-2xl space-y-4">
             <div className="text-center border-b border-slate-200 pb-3">
-              <h3 className="font-black text-slate-900 text-base tracking-tight">PolytronX - RIS</h3>
+              <h3 className="font-black text-slate-900 text-base tracking-tight">PolytronX - Enterprise PACS & RIS</h3>
               <p className="text-[11px] text-slate-500">Radiology Reception Queue Slip</p>
             </div>
 
@@ -1219,7 +1219,7 @@ export const CheckinBoardView: React.FC<CheckinBoardViewProps> = ({
           <div className="bg-white border border-slate-200 rounded-2xl max-w-4xl w-full p-6 shadow-2xl space-y-4 max-h-[90vh] flex flex-col">
             <div className="flex items-center justify-between pb-3 border-b border-slate-200">
               <div>
-                <h3 className="font-bold text-slate-900 text-base">PolytronX - RIS — Daily Front Desk Manifest</h3>
+                <h3 className="font-bold text-slate-900 text-base">PolytronX - Enterprise PACS & RIS — Daily Front Desk Manifest</h3>
                 <p className="text-xs text-slate-500">Date: {filters.dateRangeMode !== 'all' && filters.startDate ? `${filters.startDate} to ${filters.endDate || filters.startDate}` : 'All Dates'} • Total Registered: {filteredAppointments.length}</p>
               </div>
               <div className="flex items-center space-x-2">

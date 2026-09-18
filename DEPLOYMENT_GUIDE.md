@@ -1,4 +1,4 @@
-# DEPLOYMENT GUIDE — PolytronX - RIS (SaaS) on the production VPS
+# DEPLOYMENT GUIDE — PolytronX - Enterprise PACS & RIS (SaaS) on the production VPS
 
 Architecture: **Laravel 11 (PHP 8.4) + PostgreSQL 17 + React/Vite SPA**, shipped
 as a single Docker image (`ghcr.io/jerryboganda/adcportal:latest`) running on

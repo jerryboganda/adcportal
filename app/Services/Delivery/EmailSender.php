@@ -26,7 +26,7 @@ class EmailSender implements ChannelSender
         $encryption = strtolower((string) ($config['encryption'] ?? 'tls'));
 
         $to = (string) ($payload['to'] ?? '');
-        $subject = (string) ($payload['subject'] ?? "PolytronX RIS notification ({$event})");
+        $subject = (string) ($payload['subject'] ?? "PolytronX Enterprise PACS & RIS notification ({$event})");
         $body = (string) ($payload['message'] ?? '');
 
         if ($to === '' || $body === '') {

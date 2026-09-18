@@ -39,7 +39,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onAuthenticated, onTwoFact
     return () => { cancelled = true; };
   }, []);
 
-  const brandName = branding?.appName ?? 'PolytronX - RIS';
+  const brandName = branding?.appName ?? 'PolytronX - Enterprise PACS & RIS';
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -91,7 +91,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onAuthenticated, onTwoFact
             <Activity className="w-6 h-6 text-cyan-400" />
           </div>
           <div>
-            <p className="font-bold text-lg leading-tight">PolytronX - RIS</p>
+            <p className="font-bold text-lg leading-tight">PolytronX - Enterprise PACS & RIS</p>
             <p className="text-xs text-cyan-300/80">Radiology Information System</p>
           </div>
         </div>

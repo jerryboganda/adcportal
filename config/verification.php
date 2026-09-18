@@ -1,6 +1,6 @@
 <?php
 
 return [
-    'system' => 'PolytronX - RIS',
+    'system' => 'PolytronX - Enterprise PACS & RIS',
     'system_version' => '5.6',
 ];

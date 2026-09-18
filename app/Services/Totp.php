@@ -69,7 +69,7 @@ class Totp
     }
 
     /** otpauth:// URI for authenticator-app enrollment (QR-ready). */
-    public static function otpauthUri(string $secret, string $email, string $issuer = 'PolytronX RIS'): string
+    public static function otpauthUri(string $secret, string $email, string $issuer = 'PolytronX Enterprise PACS & RIS'): string
     {
         return 'otpauth://totp/'.rawurlencode($issuer).':'.rawurlencode($email)
             .'?secret='.$secret

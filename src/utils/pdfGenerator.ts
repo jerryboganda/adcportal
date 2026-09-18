@@ -4,7 +4,7 @@ import { Appointment, Invoice, RadiologyReport, ClinicProfileSettings } from '..
 /** Clinic identity printed on PDF documents — sourced from clinic settings. */
 export type ClinicIdentity = Pick<ClinicProfileSettings, 'name' | 'address' | 'city' | 'phone' | 'email' | 'taxId'>;
 
-const clinicName = (clinic?: ClinicIdentity) => clinic?.name?.trim() || 'PolytronX - RIS';
+const clinicName = (clinic?: ClinicIdentity) => clinic?.name?.trim() || 'PolytronX - Enterprise PACS & RIS';
 
 const clinicContactLine = (clinic?: ClinicIdentity) =>
   [
@@ -187,7 +187,7 @@ export function generateRadiologyReportPdf(appointment: Appointment, report: Rad
   doc.text(`Report Ref: ${report.id} | Page 1 of 1 | ${report.signedBy ? `Digitally signed via ${clinicName(clinic)}` : 'Preview generated locally — not an official document'}`, margin, y + 6);
 
   // Save / Trigger Download
-  const filename = `PolytronX-RIS-Report-${appointment.tokenNumber}-${appointment.patient.mrn}.pdf`;
+  const filename = `PolytronX-Enterprise-PACS-RIS-Report-${appointment.tokenNumber}-${appointment.patient.mrn}.pdf`;
   doc.save(filename);
 }
 
@@ -556,6 +556,6 @@ export function generateShiftClosingPdf(data: ShiftClosingData, clinic?: ClinicI
   doc.text(`Shift Cashier Handover: ${data.cashierName}`, sigCol1, y);
   doc.text(`Shift Supervisor Sign-off: ${data.supervisorName || 'Accounts Incharge'}`, sigCol2, y);
 
-  const filename = `PolytronX-RIS-Shift-Closing-${data.shiftDate}-${data.shiftName.replace(/\s+/g, '-')}.pdf`;
+  const filename = `PolytronX-Enterprise-PACS-RIS-Shift-Closing-${data.shiftDate}-${data.shiftName.replace(/\s+/g, '-')}.pdf`;
   doc.save(filename);
 }

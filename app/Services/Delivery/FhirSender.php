@@ -87,7 +87,7 @@ class FhirSender implements ChannelSender
                             'coding' => [[
                                 'system' => 'http://polytronx.local/fhir/CodeSystem/events',
                                 'code' => $event,
-                                'display' => 'PolytronX RIS '.$event,
+                                'display' => 'PolytronX Enterprise PACS & RIS '.$event,
                             ]],
                         ],
                         'authoredOn' => now()->toIso8601String(),

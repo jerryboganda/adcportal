@@ -24,7 +24,7 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 
 /**
- * Demo tenant dataset (PolytronX - RIS). Mirrors the SPA's former
+ * Demo tenant dataset (PolytronX - Enterprise PACS & RIS). Mirrors the SPA's former
  * mock dataset so a fresh install demonstrates every workflow state with
  * REAL persisted rows. Only attached to the tenant whose tenant_code matches
  * RIS_DEMO_TENANT_CODE.

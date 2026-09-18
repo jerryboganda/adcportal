@@ -126,18 +126,18 @@ class TenantIntegrationService
         return match ($i->type) {
             'webhook' => [
                 'url' => (string) ($config['url'] ?? ''),
-                'message' => 'PolytronX RIS test event — verifying webhook delivery.',
+                'message' => 'PolytronX Enterprise PACS & RIS test event — verifying webhook delivery.',
                 'test' => true,
             ],
             'whatsapp', 'sms' => [
                 'to' => (string) ($config['testRecipient'] ?? ''),
-                'message' => 'PolytronX RIS test message — your '.self::typeLabel($i->type).' integration is working.',
+                'message' => 'PolytronX Enterprise PACS & RIS test message — your '.self::typeLabel($i->type).' integration is working.',
                 'test' => true,
             ],
             'email' => [
                 'to' => (string) ($config['testRecipient'] ?? ($i->secrets['username'] ?? '')),
-                'subject' => 'PolytronX RIS — SMTP integration test',
-                'message' => 'This is a test delivery from your PolytronX RIS SMTP integration. If you received this, tenant SMTP works.',
+                'subject' => 'PolytronX Enterprise PACS & RIS — SMTP integration test',
+                'message' => 'This is a test delivery from your PolytronX Enterprise PACS & RIS SMTP integration. If you received this, tenant SMTP works.',
                 'test' => true,
             ],
             'hl7' => [
@@ -146,7 +146,7 @@ class TenantIntegrationService
             ],
             'fhir' => [
                 'baseUrl' => (string) ($config['baseUrl'] ?? ''),
-                'message' => 'PolytronX RIS test event — verifying FHIR connectivity.',
+                'message' => 'PolytronX Enterprise PACS & RIS test event — verifying FHIR connectivity.',
                 'test' => true,
             ],
             default => ['test' => true],

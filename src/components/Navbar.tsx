@@ -120,7 +120,7 @@ export const Navbar: React.FC<NavbarProps> = ({
               PX
             </div>
             <div className="hidden sm:block">
-              <span className="font-bold text-base sm:text-lg text-slate-900 tracking-tight block leading-tight">{brandName?.trim() || 'PolytronX - RIS'}</span>
+              <span className="font-bold text-base sm:text-lg text-slate-900 tracking-tight block leading-tight">{brandName?.trim() || 'PolytronX - Enterprise PACS & RIS'}</span>
               <p className="text-[11px] text-slate-500 font-medium">Radiology Information System</p>
             </div>
           </div>

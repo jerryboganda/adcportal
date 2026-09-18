@@ -167,8 +167,8 @@ class DefultSetting extends Seeder
             "defult_currancy_symbol" => "₨",
             "defult_language" => "en",
             "defult_timezone" => "Asia/Kolkata",
-            "title_text" => !empty(env('APP_NAME')) ? env('APP_NAME') : 'PolytronX - RIS',
-            "footer_text" => "Copyright © " . (!empty(env('APP_NAME')) ? env('APP_NAME') : 'PolytronX - RIS') . " | Powered By PolytronX - Business Digitalized",
+            "title_text" => !empty(env('APP_NAME')) ? env('APP_NAME') : 'PolytronX - Enterprise PACS & RIS',
+            "footer_text" => "Copyright © " . (!empty(env('APP_NAME')) ? env('APP_NAME') : 'PolytronX - Enterprise PACS & RIS') . " | Powered By PolytronX - Business Digitalized",
             "landing_page" => "off",
             "site_rtl" => "off",
             "cust_darklayout" => "off",
@@ -177,7 +177,7 @@ class DefultSetting extends Seeder
             "color" => "theme-1",
 
             //seo
-            "meta_title" => !empty(env('APP_NAME')) ? env('APP_NAME') : 'PolytronX - RIS',
+            "meta_title" => !empty(env('APP_NAME')) ? env('APP_NAME') : 'PolytronX - Enterprise PACS & RIS',
             "meta_keywords" => "clinic,appointments,patient management,scheduling",
             "meta_description" => "Single-clinic appointment booking and patient management system.",
 

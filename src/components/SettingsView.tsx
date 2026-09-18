@@ -898,7 +898,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
           <div className="flex items-center justify-between bg-white p-4 rounded-xl border border-slate-200 shadow-xs">
             <div>
               <h3 className="font-bold text-slate-900 text-sm">DICOM Application Entities & PACS Topology</h3>
-              <p className="text-xs text-slate-500">Configured Modality Worklist (MWL) and Storage SCP nodes across the PolytronX - RIS radiology network.</p>
+              <p className="text-xs text-slate-500">Configured Modality Worklist (MWL) and Storage SCP nodes across the PolytronX - Enterprise PACS & RIS radiology network.</p>
             </div>
             <button
               onClick={() => handleOpenNodeModal()}

@@ -13,7 +13,7 @@ return [
     |
     */
 
-    'name' => env('APP_NAME', 'PolytronX - RIS'),
+    'name' => env('APP_NAME', 'PolytronX - Enterprise PACS & RIS'),
 
     /*
     |--------------------------------------------------------------------------

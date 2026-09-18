@@ -41,7 +41,7 @@ export const SubscriptionGateView: React.FC<{
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-cyan-400 to-cyan-600 flex items-center justify-center text-[13px] font-black text-white">PX</div>
           <div>
-            <p className="text-sm font-bold text-slate-900">PolytronX — RIS</p>
+            <p className="text-sm font-bold text-slate-900">PolytronX — Enterprise PACS & RIS</p>
             <p className="text-xs text-slate-500">{user.businessName}</p>
             {user.businessBrandName && user.businessBrandName !== user.businessName && (
               <p className="text-[11px] text-cyan-700">{user.businessBrandName}</p>

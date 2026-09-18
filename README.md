@@ -1,4 +1,4 @@
-# PolytronX - RIS
+# PolytronX - Enterprise PACS & RIS
 
 A multi-tenant **Radiology Information System (RIS)** — radiology study workflow,
 patient management, MRI/contrast safety screening, dose tracking, radiologist

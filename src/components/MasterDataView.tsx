@@ -200,7 +200,7 @@ export const MasterDataView: React.FC<MasterDataViewProps> = ({
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement('a');
     link.setAttribute('href', encodedUri);
-    link.setAttribute('download', `PolytronX_RIS_Fee_Schedule_${new Date().toISOString().split('T')[0]}.csv`);
+    link.setAttribute('download', `PolytronX_Enterprise_PACS_RIS_Fee_Schedule_${new Date().toISOString().split('T')[0]}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -1611,7 +1611,7 @@ export const MasterDataView: React.FC<MasterDataViewProps> = ({
               </div>
 
               <div className="text-center pt-4 border-t border-slate-200 text-[10px] text-slate-500">
-                PolytronX - RIS • All fees are in PKR (Pakistani Rupees)
+                PolytronX - Enterprise PACS & RIS • All fees are in PKR (Pakistani Rupees)
               </div>
             </div>
           </div>

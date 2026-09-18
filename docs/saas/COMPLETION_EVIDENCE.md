@@ -170,7 +170,7 @@ cross-tenant 404s, facility delete guard).
 
 ## Platform
 
-- Repo: `jerryboganda/adcportal` (PolytronX - RIS), branch `main`.
+- Repo: `jerryboganda/adcportal` (PolytronX - Enterprise PACS & RIS), branch `main`.
 - Implementation commit: `9a51273` — *feat(saas): full multi-tenant control plane, entitlements, lifecycle, isolation* (74 files, +6,169/−187).
 - Follow-up commit: `75cb8ef` — login-gate ordering + assertion fix.
 

@@ -387,7 +387,7 @@ export const DoctorNetworkView: React.FC<DoctorNetworkViewProps> = ({
                       </a>
                       {doctor.email && (
                         <a
-                          href={`mailto:${doctor.email}?subject=Patient%20Referral%20Updates%20-%20PolytronX%20-%20RIS`}
+                          href={`mailto:${doctor.email}?subject=Patient%20Referral%20Updates%20-%20PolytronX%20Enterprise%20PACS%20%26%20RIS`}
                           className="py-1.5 px-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-[11px] font-semibold border border-slate-200 flex items-center justify-center transition-colors"
                           title="Send Email"
                         >
@@ -918,7 +918,7 @@ export const DoctorNetworkView: React.FC<DoctorNetworkViewProps> = ({
               <div className="p-3 bg-sky-50/60 rounded-xl border border-sky-100 text-slate-700 space-y-1 font-mono text-[11px]">
                 <span className="text-slate-400 block font-sans font-semibold">Message Preview:</span>
                 <p>
-                  "Dr. {dispatchApt.referrer?.name || 'Doctor'}, the official Radiology Report for your patient {dispatchApt.patient.name} ({dispatchApt.service?.name || 'Radiology Study'}) has been finalized and verified by PolytronX - RIS. The report is available for collection or secure portal access."
+                  "Dr. {dispatchApt.referrer?.name || 'Doctor'}, the official Radiology Report for your patient {dispatchApt.patient.name} ({dispatchApt.service?.name || 'Radiology Study'}) has been finalized and verified by PolytronX - Enterprise PACS & RIS. The report is available for collection or secure portal access."
                 </p>
               </div>
 
@@ -950,7 +950,7 @@ export const DoctorNetworkView: React.FC<DoctorNetworkViewProps> = ({
             <div className="flex items-center justify-between pb-3 border-b border-slate-200">
               <div>
                 <h3 className="font-bold text-slate-900 text-base">Doctor Referral Settlement Sheet</h3>
-                <p className="text-xs text-slate-500">PolytronX - RIS • Referral Accounting Department</p>
+                <p className="text-xs text-slate-500">PolytronX - Enterprise PACS & RIS • Referral Accounting Department</p>
               </div>
               <div className="flex items-center space-x-2">
                 <button
@@ -1013,7 +1013,7 @@ export const DoctorNetworkView: React.FC<DoctorNetworkViewProps> = ({
             </div>
 
             <div className="pt-3 border-t border-slate-200 flex justify-between items-center text-xs">
-              <span className="text-slate-500">Authorized by PolytronX - RIS Accounts Division</span>
+              <span className="text-slate-500">Authorized by PolytronX - Enterprise PACS & RIS Accounts Division</span>
               <button
                 onClick={() => setSettlementDoctor(null)}
                 className="px-4 py-2 bg-slate-200 text-slate-800 rounded-lg font-bold hover:bg-slate-300 cursor-pointer"
