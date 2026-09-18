@@ -314,6 +314,7 @@ class AccessControlController extends BaseApiController
             }
         });
 
+        TenantAuthorizer::flushUser($user->id);
         $this->bumpPermissionsVersion();
         $this->audit('user_permissions_overridden', $user, [
             'summary' => "Changed permission overrides for {$user->name}",

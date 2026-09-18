@@ -89,8 +89,20 @@ class AccessControlApiTest extends ApiTestCase
         $this->actingAs($junior)->getJson('/api/v1/staff')->assertOk();
         // …and see audit logs (user logs history — previously never granted).
         $this->actingAs($junior)->getJson('/api/v1/audit-logs')->assertOk();
-        // …but cannot sign reports (never granted).
-        $this->actingAs($junior)->postJson('/api/v1/studies/1/reports', [
+
+        // …but cannot author reports (never granted). A real study is used so
+        // the denial is the permission gate (403), not route binding (404).
+        $svc = \App\Models\Service::where('code', 'DX-CHEST-PA')
+            ->where('business_id', $this->businessA->id)->firstOrFail();
+        $studyId = $this->actingAs($this->adminA)->postJson('/api/v1/studies', [
+            'newPatient' => ['name' => 'Junior Probe', 'gender' => 'male'],
+            'serviceId' => $svc->id,
+            'date' => now()->toDateString(),
+            'time' => '3:00 PM',
+            'priority' => 'routine',
+        ])->assertCreated()->json('data.study.id');
+
+        $this->actingAs($junior)->postJson("/api/v1/studies/{$studyId}/reports", [
             'findings' => 'x', 'impression' => 'y',
         ])->assertForbidden();
     }
