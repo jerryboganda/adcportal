@@ -179,8 +179,11 @@ class QueueDisplayTest extends ApiTestCase
         $key = $this->generateKey($this->businessA);
 
         // Yesterday's lingering check-in must never reach the board.
+        // NOTE: created_by MUST be a real user — the column defaults to 0 and
+        // carries a FK to users (customer_id itself has no FK constraint).
         Appointment::create([
-            'customer_id' => (int) $study['patientId'],
+            'customer_id' => 0,
+            'created_by' => $this->adminA->id,
             'name' => 'Yesterday Patient',
             'service_id' => $this->service()->id,
             'date' => Carbon::yesterday()->toDateString(),
