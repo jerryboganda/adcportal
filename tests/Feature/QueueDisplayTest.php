@@ -180,7 +180,7 @@ class QueueDisplayTest extends ApiTestCase
 
         // Yesterday's lingering check-in must never reach the board.
         Appointment::create([
-            'customer_id' => 0,
+            'customer_id' => (int) $study['patientId'],
             'name' => 'Yesterday Patient',
             'service_id' => $this->service()->id,
             'date' => Carbon::yesterday()->toDateString(),
@@ -214,6 +214,8 @@ class QueueDisplayTest extends ApiTestCase
 
     public function test_public_display_is_tenant_isolated(): void
     {
+        // Token numbers are per-tenant DAILY sequences — both tenants start
+        // at 1 today — so isolation must be asserted on unique patient names.
         $studyA = $this->book([], $this->businessA);
         $studyB = $this->book([], $this->businessB);
         $keyA = $this->generateKey($this->businessA);
@@ -222,9 +224,9 @@ class QueueDisplayTest extends ApiTestCase
             ->assertOk()
             ->json('data');
 
-        $tokens = collect($payload['upNext'])->pluck('token');
-        $this->assertTrue($tokens->contains($studyA['tokenNumber']));
-        $this->assertFalse($tokens->contains($studyB['tokenNumber']));
+        $names = collect($payload['upNext'])->pluck('patientName');
+        $this->assertTrue($names->contains($studyA['patient']['name']));
+        $this->assertFalse($names->contains($studyB['patient']['name']));
     }
 
     public function test_public_display_goes_dark_when_the_tenant_is_not_subscribable(): void
