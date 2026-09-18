@@ -77,8 +77,17 @@ class QueueDisplayController extends BaseApiController
 
         $tenantId = $this->tenantId();
 
+        // Auto-provision on first view so the admin always has a copyable
+        // link immediately (setting manage holders only; PUT regenerates).
+        $key = company_setting(self::KEY_SETTING);
+        if (empty($key)) {
+            $key = 'tv_'.Str::random(24);
+            $this->storeSetting(self::KEY_SETTING, $key, $tenantId);
+            comapnySettingCacheForget($tenantId);
+        }
+
         return $this->ok([
-            'displayKey' => (string) (company_setting(self::KEY_SETTING) ?? ''),
+            'displayKey' => (string) $key,
             'announcement' => $this->announcementFor($tenantId),
         ]);
     }
