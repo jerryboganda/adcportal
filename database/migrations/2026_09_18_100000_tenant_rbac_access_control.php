@@ -43,6 +43,12 @@ return new class extends Migration
             });
         }
 
+        if (! Schema::hasColumn('permissions', 'deleted_at')) {
+            Schema::table('permissions', function (Blueprint $table) {
+                $table->softDeletes();
+            });
+        }
+
         PermissionCatalog::sync();
 
         $bundles = PermissionCatalog::defaultBundles();
