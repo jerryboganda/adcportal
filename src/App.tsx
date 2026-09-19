@@ -36,14 +36,8 @@ import {
 import { Navbar } from './components/Navbar';
 import { DashboardView } from './components/DashboardView';
 import { CheckinBoardView } from './components/CheckinBoardView';
-import { TechnologistView } from './components/TechnologistView';
-import { ReportingView } from './components/ReportingView';
-import { BillingView } from './components/BillingView';
-import { QueueBoardView } from './components/QueueBoardView';
-import { InventoryView } from './components/InventoryView';
-import { MasterDataView } from './components/MasterDataView';
 import { DoctorNetworkView } from './components/DoctorNetworkView';
-import { SettingsView } from './components/SettingsView';
+import { QueueBoardView } from './components/QueueBoardView';
 import { LoginView } from './components/LoginView';
 import { TwoFactorChallengeView } from './components/TwoFactorChallengeView';
 
@@ -53,7 +47,6 @@ import { NewBookingModal } from './components/NewBookingModal';
 import { NotificationCenter } from './components/NotificationCenter';
 import { TerminalLockModal } from './components/TerminalLockModal';
 import { StepUpModal } from './components/StepUpModal';
-import { PlatformConsole } from './components/PlatformConsole';
 import { SubscriptionGateView } from './components/SubscriptionGateView';
 
 import * as api from './services/apiService';
@@ -61,10 +54,58 @@ import { SessionUser } from './services/apiService';
 import { onUnauthorized, onPermissionDenied, onStepUpRequired, initCsrf } from './services/api';
 import { canAny } from './services/permissions';
 
+/**
+ * Module tabs are loaded on demand.
+ *
+ * They are the largest part of the application (the platform console alone is
+ * some 2,900 lines) and a signed-in clinician sees exactly one of them at a
+ * time — most often the dashboard. Shipping all of them in the entry chunk made
+ * every login, on every workstation, pay for the ones it would never open.
+ *
+ * Each import is mapped to its named export because these are named-export
+ * components, not default ones.
+ */
+const ReportingView = React.lazy(() =>
+  import('./components/ReportingView').then(module => ({ default: module.ReportingView }))
+);
+const BillingView = React.lazy(() =>
+  import('./components/BillingView').then(module => ({ default: module.BillingView }))
+);
+const InventoryView = React.lazy(() =>
+  import('./components/InventoryView').then(module => ({ default: module.InventoryView }))
+);
+const MasterDataView = React.lazy(() =>
+  import('./components/MasterDataView').then(module => ({ default: module.MasterDataView }))
+);
+const SettingsView = React.lazy(() =>
+  import('./components/SettingsView').then(module => ({ default: module.SettingsView }))
+);
+const PlatformConsole = React.lazy(() =>
+  import('./components/PlatformConsole').then(module => ({ default: module.PlatformConsole }))
+);
+const TechnologistView = React.lazy(() =>
+  import('./components/TechnologistView').then(module => ({ default: module.TechnologistView }))
+);
+
 type BootStatus = 'loading' | 'unauthenticated' | 'ready' | 'platform' | 'gated';
 
 const ACTIVE_TAB_KEY = 'polytronx_ris_active_tab_v2';
 const TERMINAL_LOCK_KEY = 'polytronx_ris_terminal_locked';
+
+/**
+ * Shown while a module chunk loads. It is a status region rather than a
+ * bare spinner so a screen reader announces the wait.
+ */
+const ModuleLoading: React.FC<{ label?: string }> = ({ label }) => (
+  <div
+    role="status"
+    aria-live="polite"
+    className="flex items-center justify-center gap-2 py-16 text-xs text-slate-500"
+  >
+    <span className="w-3.5 h-3.5 rounded-full border-2 border-slate-300 border-t-cyan-600 animate-spin" />
+    Loading {label ?? 'module'}…
+  </div>
+);
 
 export const App: React.FC = () => {
   const [bootStatus, setBootStatus] = useState<BootStatus>('loading');
@@ -1141,6 +1182,9 @@ export const App: React.FC = () => {
       />
 
       <main className="flex-1 w-full max-w-[1680px] mx-auto px-3 sm:px-4 lg:px-6 py-5">
+        {/* One boundary for every module tab: a chunk that fails to load shows
+            the error through the app's existing error surface, not a blank page. */}
+        <React.Suspense fallback={<ModuleLoading label={activeTab} />}>
         {activeTab === 'dashboard' && (
           <DashboardView
             appointments={appointments}
@@ -1318,6 +1362,7 @@ export const App: React.FC = () => {
             onLoadBrandingView={handleOpenBrandingSettings}
           />
         )}
+        </React.Suspense>
       </main>
 
       {screeningModalApt && (
