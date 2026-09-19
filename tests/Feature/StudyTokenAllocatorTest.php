@@ -28,7 +28,11 @@ class StudyTokenAllocatorTest extends ApiTestCase
             'screening_cleared' => true,
             'room_number' => 'Room 1',
             'business_id' => $businessId,
-            'created_by' => 1,
+            // A REAL user id: appointments.created_by is an enforced foreign
+            // key on PostgreSQL, and Postgres sequences are not rolled back
+            // with the test transaction, so a hardcoded `1` only exists in the
+            // first test of a run (SQLite restarts its autoincrement).
+            'created_by' => $customerUserId,
         ]);
     }
 

@@ -155,11 +155,21 @@ jobs:
           # proven dialect-clean.
           php artisan test --filter='WalkInBookingFinancialsTest|StudyBookingPaymentTest|StudyBookingTokenTest|StudyTokenAllocatorTest|StudyTokenConcurrencyTest|StudyFactAtomicityTest|StudyWorkflowTest|BookingRoomTest|BillingTest|TenantIsolationTest' 2>&1 | tee /tmp/phpunit-pg.log
 
-      - name: Failure detail — PostgreSQL suite
+      # GitHub publishes at most ~10 `::error::` annotations PER STEP, so the
+      # summary and every failing test name get their own step (fresh budget)
+      # BEFORE the error detail — a single fat grep silently hides all but the
+      # first ten lines, which is exactly how the SQLSTATE below stayed
+      # undiagnosed on the first run of this job.
+      - name: Failure detail — PostgreSQL suite results
         if: failure()
         run: |
-          grep -aE "FAILED |ERRORS |SQLSTATE|Tests: |Failed asserting" /tmp/phpunit-pg.log | head -14 | cut -c1-500 | sed 's/^/::error::pg /' || true
-          grep -aE "\.ERROR:" storage/logs/laravel.log 2>/dev/null | head -6 | cut -c1-700 | sed 's/^::error::pg-log /' || true
+          grep -aE "^  Tests: |FAILED " /tmp/phpunit-pg.log | head -9 | cut -c1-380 | sed 's/^/::error::pg-result /' || true
+
+      - name: Failure detail — PostgreSQL suite errors
+        if: failure()
+        run: |
+          grep -aE "SQLSTATE|Failed asserting|Exception:" /tmp/phpunit-pg.log | head -7 | cut -c1-380 | sed 's/^/::error::pg-error /' || true
+          grep -aE "\.ERROR:" storage/logs/laravel.log 2>/dev/null | head -2 | cut -c1-500 | sed 's/^::error::pg-log /' || true
           exit 1
 
   spa-build:
