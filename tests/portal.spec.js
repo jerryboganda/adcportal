@@ -320,6 +320,40 @@ async function openReporting(page) {
     await expect(page.getByText('Radiologist Reading & Reporting Suite')).toBeVisible({ timeout: 20000 });
 }
 
+/**
+ * Search the reading queue for one patient.
+ *
+ * "All reports" is addressed deliberately: the default "Unreported" tab only
+ * holds a study until it is signed, so a finalized report can only be found
+ * from a tab with no state constraint.
+ */
+async function searchQueue(page, term) {
+    await page.getByRole('button', { name: /^All reports/ }).click();
+    await page.getByLabel('Search reading worklist').fill(term);
+}
+
+/**
+ * A queue row, or an error that says WHY it is missing. A bare Playwright
+ * "element(s) not found" cannot distinguish an empty queue from a failed
+ * fetch, a wrong tab or a wrong patient name — all of which look identical in
+ * CI. The thrown message reaches the log and becomes an annotation.
+ */
+async function expectQueueRow(page, row, patientName, stage) {
+    try {
+        await expect(row).toBeVisible({ timeout: 20000 });
+    } catch {
+        const rendered = await page.getByTestId('worklist-row').count();
+        const queue = await page
+            .getByTestId('reporting-worklist')
+            .innerText()
+            .catch(() => '<queue not on screen>');
+        throw new Error(
+            `[${stage}] no queue row for "${patientName}" (rows rendered: ${rendered}). ` +
+                `Queue says: ${queue.replace(/\s+/g, ' ').slice(0, 400)}`
+        );
+    }
+}
+
 test('radiologist reporting suite renders the server worklist with filters', async ({ page }) => {
     await loginAsRadiologist(page);
     await openReporting(page);
@@ -403,9 +437,9 @@ test('radiologist creates, autosaves, signs and prints an external report', asyn
 
     await page.reload();
     await openReporting(page);
-    await page.getByLabel('Search reading worklist').fill('E2E External');
+    await searchQueue(page, 'E2E External');
     const row = page.getByTestId('worklist-row').filter({ hasText: patientName }).first();
-    await expect(row).toBeVisible({ timeout: 20000 });
+    await expectQueueRow(page, row, patientName, 'after saving a draft');
     await row.click();
 
     await expect(page.getByTestId('report-workspace')).toBeVisible({ timeout: 20000 });
@@ -432,10 +466,11 @@ test('radiologist creates, autosaves, signs and prints an external report', asyn
     await expect(page.getByRole('button', { name: 'Add signed addendum' })).toBeVisible();
 
     // Reload: the finalized report is still present, identical and signed.
+    // (A signed study has left "Unreported" — hence the searchQueue helper.)
     await page.reload();
     await openReporting(page);
-    await page.getByLabel('Search reading worklist').fill('E2E External');
-    await expect(row).toBeVisible({ timeout: 20000 });
+    await searchQueue(page, 'E2E External');
+    await expectQueueRow(page, row, patientName, 'after finalizing');
     await row.click();
     await expect(page.getByTestId('report-immutable')).toBeVisible({ timeout: 20000 });
     await expect(page.getByTestId('report-impression')).toHaveValue(/E2E IMPRESSION/);

@@ -59,6 +59,46 @@ class ReportManualCreationTest extends ApiTestCase
         $this->assertContains((string) $study->id, collect($worklist)->pluck('id')->all());
     }
 
+    /**
+     * The browser journey creates an external study, saves a draft, reloads and
+     * then FINDS IT AGAIN by searching the patient name. That last step is the
+     * one that decides whether a radiologist can get back to their own work, so
+     * it is asserted here rather than trusted to the browser.
+     */
+    public function test_a_newly_registered_external_patient_is_findable_by_name(): void
+    {
+        $radiologist = $this->makeStaff($this->businessA, $this->adminA, 'radiologist');
+        $service = $this->tenantService($this->businessA, 'US-ABD-PEL');
+        $name = 'E2E External 1789848166197';
+
+        $created = $this->actingAs($radiologist)->postJson('/api/v1/reporting/reports/manual', [
+            'newPatient' => ['name' => $name, 'age' => 52, 'gender' => 'other'],
+            'serviceId' => (int) $service->id,
+            'date' => now()->toDateString(),
+            'priority' => 'routine',
+            'indication' => 'E2E external referral, headache.',
+            'findings' => 'Drafted findings.',
+            'impression' => 'Drafted impression.',
+        ])->assertCreated();
+
+        $studyId = (string) $created->json('data.study.id');
+
+        $studies = $this->actingAs($radiologist)
+            ->getJson('/api/v1/reporting/worklist?tab=unreported&q='.urlencode('E2E External'))
+            ->assertOk()
+            ->json('data.studies');
+
+        $this->assertContains(
+            $studyId,
+            collect($studies)->pluck('id')->all(),
+            'a newly registered external patient must be findable on the reading queue by name',
+        );
+        $this->assertSame(
+            $name,
+            collect($studies)->firstWhere('id', $studyId)['patientName'] ?? null,
+        );
+    }
+
     public function test_a_patient_must_be_chosen_or_registered(): void
     {
         $radiologist = $this->makeStaff($this->businessA, $this->adminA, 'radiologist');
