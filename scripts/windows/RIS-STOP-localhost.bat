@@ -5,7 +5,8 @@ cd /d "%~dp0..\.."
 echo ==========================================================
 echo   PolytronX RIS - stopping localhost stack
 echo ==========================================================
-echo.
+echo [1/2] Stopping storage sync + SSH tunnel...
+"C:\Program Files\Git\bin\bash.exe" -c "bash scripts/dev-storage-sync.sh stop; bash scripts/dev-tunnel.sh stop"
 
 echo [2/2] Stopping API + Vite (by window, then by port as fallback)...
 C:\Windows\System32\taskkill.exe /fi "WINDOWTITLE eq RIS api*" /t /f >nul 2>&1
