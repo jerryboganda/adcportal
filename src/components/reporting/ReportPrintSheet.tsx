@@ -1,4 +1,5 @@
 import React, { useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import { AlertTriangle, Printer, X } from 'lucide-react';
 import {
   Appointment,
@@ -61,8 +62,17 @@ export const ReportPrintSheet: React.FC<{
     { label: 'Recommendations', body: draft.recommendations },
   ].filter(section => section.body && section.body.trim() !== '');
 
-  return (
-    <div className="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-xs flex items-start justify-center p-4 overflow-y-auto">
+  /*
+   * Rendered into <body>, not into the workspace.
+   *
+   * A printed document must be able to BREAK ACROSS PAGES. When the sheet lived
+   * inside the workspace it was nested in a scrolling, fixed-position container,
+   * so the browser clipped it after the first page and silently truncated a long
+   * report. From <body> the print stylesheet can hide everything except the
+   * document and let it flow in normal page order.
+   */
+  return createPortal(
+    <div className="print-overlay fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-xs flex items-start justify-center p-4 overflow-y-auto">
       <div className="bg-white border border-slate-200 rounded-3xl max-w-3xl w-full shadow-2xl">
         <div className="no-print flex items-center justify-between p-4 border-b border-slate-200">
           <div>
@@ -167,7 +177,7 @@ export const ReportPrintSheet: React.FC<{
             {/* Structured observations */}
             {structuredRows.length > 0 && (
               <div className="mt-4">
-                <div className="text-[10px] font-black uppercase tracking-widest text-slate-700 border-b border-slate-300 pb-0.5">
+                <div className="print-keep-next text-[10px] font-black uppercase tracking-widest text-slate-700 border-b border-slate-300 pb-0.5">
                   Observations
                 </div>
                 <table className="w-full text-[11px] border-collapse mt-1">
@@ -187,7 +197,7 @@ export const ReportPrintSheet: React.FC<{
             {sections.map(section => (
               <div key={section.label} className="mt-4">
                 <div
-                  className={`text-[10px] font-black uppercase tracking-widest border-b pb-0.5 ${
+                  className={`print-keep-next text-[10px] font-black uppercase tracking-widest border-b pb-0.5 ${
                     section.label === 'Impression' ? 'text-purple-900 border-purple-300' : 'text-slate-700 border-slate-300'
                   }`}
                 >
@@ -200,7 +210,7 @@ export const ReportPrintSheet: React.FC<{
             ))}
 
             {draft.criticalFlag && (
-              <div className="mt-4 border border-rose-600 text-rose-800 p-2 text-[10px] font-bold">
+              <div className="print-whole mt-4 border border-rose-600 text-rose-800 p-2 text-[10px] font-bold">
                 CRITICAL FINDING — documented communication protocol applies to this study.
               </div>
             )}
@@ -212,7 +222,7 @@ export const ReportPrintSheet: React.FC<{
             )}
 
             {/* Signature block */}
-            <div className="mt-8 flex justify-between items-end text-[11px]">
+            <div className="print-whole mt-8 flex justify-between items-end text-[11px]">
               <div>
                 {report?.signedBy && (
                   <>
@@ -237,6 +247,7 @@ export const ReportPrintSheet: React.FC<{
           </div>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };

@@ -66,22 +66,86 @@
     max-width: 100% !important;
   }
 
-  /* A printed report replaces the whole screen: the reporting workspace keeps
-     its chrome on screen (.no-print) and only the document is laid out. */
+  /*
+   * The report document is the only thing on the paper, and it may run to
+   * several pages.
+   *
+   * The sheet is portalled to <body>, so every other top-level element can
+   * simply be dropped — and crucially the document is returned to NORMAL FLOW.
+   * A fixed- or absolutely-positioned sheet cannot paginate: Chromium prints
+   * the first page and silently discards the rest, which truncates a long
+   * report without any error.
+   */
+  body > *:not(.print-overlay) {
+    display: none !important;
+  }
+
+  .print-overlay {
+    position: static !important;
+    inset: auto !important;
+    display: block !important;
+    overflow: visible !important;
+    max-height: none !important;
+    padding: 0 !important;
+    background: transparent !important;
+    backdrop-filter: none !important;
+  }
+
+  .print-overlay > * {
+    overflow: visible !important;
+    max-width: none !important;
+    max-height: none !important;
+    border: none !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+  }
+
   .print-report-page {
-    position: fixed !important;
-    top: 0 !important;
-    left: 0 !important;
+    position: static !important;
     width: 100% !important;
     height: auto !important;
     margin: 0 !important;
     padding: 0 !important;
     background: #ffffff !important;
-    z-index: 99999 !important;
   }
 
   .print-report-page .line-clamp-2 {
     display: block !important;
+  }
+
+  /*
+   * Break control.
+   *
+   * Deliberately conservative: a section is NOT forced onto one page, because a
+   * long Findings section legitimately spans pages and `break-inside: avoid`
+   * there would either overflow or produce a blank page. Only small, indivisible
+   * blocks are kept whole, and a heading is never left stranded at the foot of a
+   * page away from its text.
+   */
+  .print-whole {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  .print-keep-next {
+    break-after: avoid;
+    page-break-after: avoid;
+  }
+
+  .print-report-page tr,
+  .print-report-page td {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  /* A table split over pages repeats its header row rather than losing it. */
+  .print-report-page thead {
+    display: table-header-group;
+  }
+
+  .print-report-page p {
+    orphans: 3;
+    widows: 3;
   }
 
   .print-invoice-page {
