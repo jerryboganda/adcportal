@@ -7,13 +7,17 @@ import {
   Appointment,
   AuditLogEntry,
   CriticalFindingLog,
+  DictationCapability,
   PriorExam,
   Priority,
   RadiologistSummary,
   ReportMacro,
   ReportSearchRow,
   ReportStatusFilter,
+  ReportingPreferences,
+  ReportingSavedView,
   ReportingTab,
+  ReportingViewFilters,
   ReportingWorklistResult,
   StructuredValues,
   StudyState,
@@ -579,6 +583,79 @@ export async function fetchReportingWorklist(query: WorklistQuery = {}): Promise
   const { data } = await http.get('/reporting/worklist', {
     params: queryParams(query as Record<string, unknown>),
   });
+  return data.data;
+}
+
+/**
+ * The signed-in radiologist's reporting setup for this clinic.
+ *
+ * Server-backed so it follows the person rather than one workstation; the
+ * caller keeps a localStorage copy purely so the first paint is instant.
+ */
+export async function fetchReportingPreferences(): Promise<{
+  preferences: ReportingPreferences;
+  views: ReportingSavedView[];
+  languages: string[];
+  tabs: string[];
+}> {
+  const { data } = await http.get('/reporting/preferences');
+  return data.data;
+}
+
+export async function saveReportingPreferences(
+  changes: Partial<ReportingPreferences>
+): Promise<ReportingPreferences> {
+  const { data } = await http.put('/reporting/preferences', changes);
+  return data.data.preferences;
+}
+
+export async function saveReportingView(
+  name: string,
+  filters: ReportingViewFilters
+): Promise<ReportingSavedView[]> {
+  const { data } = await http.post('/reporting/views', { name, filters });
+  return data.data.views;
+}
+
+export async function renameReportingView(
+  id: string,
+  name: string,
+  filters: ReportingViewFilters
+): Promise<ReportingSavedView[]> {
+  const { data } = await http.put(`/reporting/views/${id}`, { name, filters });
+  return data.data.views;
+}
+
+export async function deleteReportingView(id: string): Promise<ReportingSavedView[]> {
+  const { data } = await http.delete(`/reporting/views/${id}`);
+  return data.data.views;
+}
+
+/** Does this clinic dictate through its own speech-to-text service? */
+export async function fetchDictationCapability(): Promise<DictationCapability> {
+  const { data } = await http.get('/reporting/dictation');
+  return data.data;
+}
+
+/**
+ * Transcribe one recorded chunk through the clinic's own engine.
+ *
+ * The audio is posted as a file and is never stored server-side; the returned
+ * text is inserted into the field the radiologist is editing and still has to
+ * be reviewed before the report is signed.
+ */
+export async function transcribeDictation(
+  audio: Blob,
+  language: string,
+  appointmentId?: string | null
+): Promise<{ text: string; provider: string; latencyMs: number }> {
+  const body = new FormData();
+  body.append('audio', audio, 'dictation.webm');
+  body.append('language', language);
+  // Lets the audit trail record which study a dictation session belonged to.
+  if (appointmentId) body.append('appointmentId', appointmentId);
+
+  const { data } = await http.post('/reporting/dictation/transcribe', body);
   return data.data;
 }
 

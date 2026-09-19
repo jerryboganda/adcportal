@@ -10,9 +10,16 @@ import { test, expect } from '@playwright/test';
 const EMAIL = process.env.E2E_EMAIL ?? 'admin@polytronx-e2e.test';
 const PASSWORD = process.env.E2E_PASSWORD ?? 'E2eDemo#2026';
 
-// window.confirm() guards the sign-out action — accept it.
+// window.confirm() guards destructive actions and window.prompt() names a saved
+// worklist view. Dialogs are auto-accepted; a prompt is answered with a name so
+// the saved-view journey is actually exercised instead of being cancelled (an
+// empty prompt answer would make the save a no-op).
+const PROMPT_ANSWER = 'E2E view';
+
 test.beforeEach(async ({ page }) => {
-    page.on('dialog', dialog => dialog.accept());
+    page.on('dialog', dialog =>
+        dialog.type() === 'prompt' ? dialog.accept(PROMPT_ANSWER) : dialog.accept()
+    );
 });
 
 async function login(page) {
@@ -378,6 +385,16 @@ test('radiologist reporting suite renders the server worklist with filters', asy
     // A radiologist's surface stays clinical: no reception or billing modules.
     await expect(page.getByRole('button', { name: 'Reception Desk' })).toHaveCount(0);
     await expect(page.getByRole('button', { name: 'Billing & POS' })).toHaveCount(0);
+
+    // ---- saved views belong to the radiologist's account ----------------
+    // Saving one is a server write, so it must outlive a reload: that is the
+    // whole point of moving it off this browser's storage.
+    await page.getByTestId('worklist-save-view').click();
+    await page.reload();
+    await openReporting(page);
+    await expect(page.getByTestId('worklist-view').filter({ hasText: PROMPT_ANSWER })).toBeVisible({
+        timeout: 20000,
+    });
 
     // Report search and the governed template library are reachable.
     await page.getByRole('button', { name: 'Find a report' }).click();

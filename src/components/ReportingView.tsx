@@ -13,13 +13,17 @@ import {
 import {
   Appointment,
   ClinicProfileSettings,
+  DictationCapability,
   Modality,
   Patient,
   RadiologistSummary,
   RadiologyReport,
   Referrer,
   ReportSearchRow,
+  ReportingPreferences,
+  ReportingSavedView,
   ReportingTab,
+  ReportingViewFilters,
   Service,
   StaffUser,
   WorklistCounts,
@@ -29,7 +33,9 @@ import {
 import * as api from '../services/apiService';
 import { canAny } from '../services/permissions';
 import {
+  LEGACY_SAVED_VIEWS_KEY,
   ReportWorklist,
+  SavedWorklistView,
   WorklistFilters,
   emptyWorklistFilters,
 } from './reporting/ReportWorklist';
@@ -66,6 +72,102 @@ export interface ReportingViewProps {
   onRejectToTech: (appointmentId: string, reason: string) => Promise<void>;
   onReleaseReport: (appointmentId: string, channel: 'hand' | 'email' | 'portal') => void;
   flash: (kind: 'success' | 'error', message: string) => void;
+}
+
+const DEFAULT_PREFERENCES: ReportingPreferences = {
+  dictationLanguage: 'en-US',
+  dictationProvider: 'browser',
+  templateAutoload: true,
+  defaultTab: 'unreported',
+};
+
+const PREFERENCES_CACHE_KEY = 'polytronx_ris_reporting_preferences';
+const VIEWS_CACHE_KEY = 'polytronx_ris_worklist_views_cache';
+
+/**
+ * The account is the source of truth for a radiologist's setup; localStorage is
+ * only a CACHE, so the queue paints instantly on a workstation the user has
+ * used before and still works if the preferences request fails. Anything read
+ * from here is replaced by the server's answer on the next successful load.
+ */
+function readCache<T>(key: string, fallback: T): T {
+  try {
+    const raw = localStorage.getItem(key);
+    return raw ? (JSON.parse(raw) as T) : fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+function writeCache(key: string, value: unknown): void {
+  try {
+    localStorage.setItem(key, JSON.stringify(value));
+  } catch {
+    /* storage unavailable (private mode) — the server copy is still correct */
+  }
+}
+
+/**
+ * Views saved by the OLD build, which kept them in this browser only. Read once
+ * so the upgrade carries them onto the account instead of losing them.
+ */
+function readLegacyViews(): SavedWorklistView[] {
+  const parsed = readCache<SavedWorklistView[]>(LEGACY_SAVED_VIEWS_KEY, []);
+  return Array.isArray(parsed) ? parsed.filter(view => view?.name) : [];
+}
+
+function clearLegacyViews(): void {
+  try {
+    localStorage.removeItem(LEGACY_SAVED_VIEWS_KEY);
+  } catch {
+    /* nothing to clear */
+  }
+}
+
+/** Every report status the queue can filter on. */
+const REPORT_STATUS_FILTERS: readonly string[] = ['not_started', 'draft', 'preliminary', 'final', 'addendum'];
+
+/**
+ * A server row → the complete filter set the worklist component expects.
+ *
+ * Values are re-validated rather than trusted: a stored view was written by an
+ * older build, or by hand. Anything the queue cannot express degrades to "any"
+ * so a stale view can never silently hide studies.
+ */
+function toWorklistView(view: ReportingSavedView): SavedWorklistView {
+  const filters = view.filters ?? {};
+
+  return {
+    id: view.id,
+    name: view.name,
+    tab: filters.tab ?? 'unreported',
+    filters: {
+      q: filters.q ?? '',
+      priority:
+        filters.priority === 'routine' || filters.priority === 'urgent' || filters.priority === 'stat'
+          ? filters.priority
+          : 'all',
+      modalityId: typeof filters.modalityId === 'number' ? filters.modalityId : null,
+      reportStatus: REPORT_STATUS_FILTERS.includes(filters.reportStatus ?? '')
+        ? (filters.reportStatus as WorklistFilters['reportStatus'])
+        : null,
+      assignee: filters.assignee === 'me' || filters.assignee === 'unassigned' ? filters.assignee : 'all',
+      sort: filters.sort === 'oldest' || filters.sort === 'newest' ? filters.sort : 'priority',
+    },
+  };
+}
+
+/** The worklist's complete filter set → the partial set the API stores. */
+function toServerFilters(tab: ReportingTab, filters: WorklistFilters): ReportingViewFilters {
+  return {
+    tab,
+    q: filters.q || undefined,
+    priority: filters.priority,
+    modalityId: filters.modalityId,
+    reportStatus: filters.reportStatus,
+    assignee: filters.assignee,
+    sort: filters.sort,
+  };
 }
 
 const EMPTY_COUNTS: WorklistCounts = {
@@ -118,6 +220,16 @@ export const ReportingView: React.FC<ReportingViewProps> = ({
   const [libraryOpen, setLibraryOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [refreshToken, setRefreshToken] = useState(0);
+
+  // The radiologist's own setup: server-held (per user, per clinic), cached
+  // locally so the first paint is instant and an offline load still works.
+  const [preferences, setPreferences] = useState<ReportingPreferences | null>(
+    () => readCache<ReportingPreferences | null>(PREFERENCES_CACHE_KEY, null)
+  );
+  const [dictation, setDictation] = useState<DictationCapability | null>(null);
+  const [savedViews, setSavedViews] = useState<SavedWorklistView[]>(() =>
+    readCache<ReportingSavedView[]>(VIEWS_CACHE_KEY, []).map(toWorklistView)
+  );
 
   const controllerRef = useRef<WorkspaceController | null>(null);
   /** Studies we created/saved here, so the workspace has its full context. */
@@ -176,6 +288,124 @@ export const ReportingView: React.FC<ReportingViewProps> = ({
       .then(setRadiologists)
       .catch(() => setRadiologists([]));
   }, []);
+
+  // ---- the radiologist's own setup --------------------------------------
+  // Loading it is not allowed to break the module: a failure leaves the cached
+  // copy in place and reporting continues with sensible defaults.
+  useEffect(() => {
+    let cancelled = false;
+
+    api
+      .fetchReportingPreferences()
+      .then(result => {
+        if (cancelled) return;
+
+        setPreferences(result.preferences);
+        writeCache(PREFERENCES_CACHE_KEY, result.preferences);
+        setTab(result.preferences.defaultTab);
+
+        const views = result.views.map(toWorklistView);
+        setSavedViews(views);
+        writeCache(VIEWS_CACHE_KEY, result.views);
+
+        return adoptLegacyViews(result.views);
+      })
+      .catch(() => {
+        /* cached setup stays in use; the next load reconciles */
+      });
+
+    api
+      .fetchDictationCapability()
+      .then(capability => {
+        if (!cancelled) setDictation(capability);
+      })
+      .catch(() => {
+        if (!cancelled) setDictation(null);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  /**
+   * One-time move of views the previous build kept in this browser onto the
+   * radiologist's account. Only names the account does not already hold are
+   * imported, and the local copy is kept until every write succeeds — an
+   * upgrade must never be the reason someone's standing filter list disappears.
+   */
+  const adoptLegacyViews = useCallback(async (serverViews: ReportingSavedView[]) => {
+    const legacy = readLegacyViews();
+    if (legacy.length === 0) return;
+
+    const known = new Set(serverViews.map(view => view.name.toLowerCase()));
+    const pending = legacy.filter(view => !known.has(view.name.trim().toLowerCase())).slice(0, 20);
+
+    if (pending.length === 0) {
+      clearLegacyViews();
+      return;
+    }
+
+    let views = serverViews;
+
+    for (const view of pending) {
+      try {
+        views = await api.saveReportingView(view.name, toServerFilters(view.tab, view.filters));
+      } catch {
+        return; // kept locally: the next load tries again
+      }
+    }
+
+    clearLegacyViews();
+    setSavedViews(views.map(toWorklistView));
+    writeCache(VIEWS_CACHE_KEY, views);
+    flash('success', 'Your saved worklist views were moved to your account.');
+  }, [flash]);
+
+  const saveView = useCallback(async (name: string, viewTab: ReportingTab, viewFilters: WorklistFilters) => {
+    try {
+      const views = await api.saveReportingView(name, toServerFilters(viewTab, viewFilters));
+      setSavedViews(views.map(toWorklistView));
+      writeCache(VIEWS_CACHE_KEY, views);
+      flash('success', `Saved view “${name}”.`);
+    } catch (error: any) {
+      flash('error', error?.message ?? 'That view could not be saved.');
+    }
+  }, [flash]);
+
+  const deleteView = useCallback(async (view: SavedWorklistView) => {
+    try {
+      const views = await api.deleteReportingView(view.id);
+      setSavedViews(views.map(toWorklistView));
+      writeCache(VIEWS_CACHE_KEY, views);
+    } catch (error: any) {
+      flash('error', error?.message ?? 'That view could not be removed.');
+    }
+  }, [flash]);
+
+  /**
+   * Change one preference. Applied instantly (a radiologist toggling a setting
+   * should not wait on a round trip) and rolled back if the server refuses it,
+   * so the UI never claims a setting that was not stored.
+   */
+  const changePreference = useCallback(async (changes: Partial<ReportingPreferences>) => {
+    const previous = preferences;
+    const optimistic = { ...(preferences ?? DEFAULT_PREFERENCES), ...changes };
+
+    setPreferences(optimistic);
+    writeCache(PREFERENCES_CACHE_KEY, optimistic);
+
+    try {
+      const saved = await api.saveReportingPreferences(changes);
+      setPreferences(saved);
+      writeCache(PREFERENCES_CACHE_KEY, saved);
+    } catch (error: any) {
+      setPreferences(previous);
+      if (previous) writeCache(PREFERENCES_CACHE_KEY, previous);
+      flash('error', error?.message ?? 'That preference could not be saved.');
+    }
+  }, [preferences, flash]);
 
   const refresh = useCallback(() => setRefreshToken(token => token + 1), []);
 
@@ -451,6 +681,9 @@ export const ReportingView: React.FC<ReportingViewProps> = ({
             onSelect={openStudy}
             onRefresh={refresh}
             onAssign={assign}
+            savedViews={savedViews}
+            onSaveView={saveView}
+            onDeleteView={deleteView}
           />
         </div>
 
@@ -465,6 +698,9 @@ export const ReportingView: React.FC<ReportingViewProps> = ({
             controllerRef={controllerRef}
             onStudyUpdated={handleStudyUpdated}
             onToast={(message, tone) => flash(tone === 'error' ? 'error' : 'success', message)}
+            preferences={preferences ?? DEFAULT_PREFERENCES}
+            dictation={dictation}
+            onPreferenceChange={changePreference}
             onRejectToTech={async (appointmentId, reason) => {
               await onRejectToTech(appointmentId, reason);
               refresh();

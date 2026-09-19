@@ -14,6 +14,8 @@ use App\Models\ReportTemplate;
 use App\Models\Service;
 use App\Models\UsageCounter;
 use App\Models\User;
+use App\Services\Dictation\TranscriptionException;
+use App\Services\Dictation\TranscriptionService;
 use App\Services\EntitlementService;
 use App\Services\StudyTokenAllocator;
 use App\Support\AgeGroup;
@@ -47,6 +49,10 @@ class ReportingController extends BaseApiController
         'assigned', 'unreported', 'in_progress', 'priority',
         'drafts', 'preliminary', 'finalized', 'addenda', 'recent', 'all',
     ];
+
+    public function __construct(private readonly TranscriptionService $transcription)
+    {
+    }
 
     // ==================== reading worklist ====================
 
@@ -124,6 +130,108 @@ class ReportingController extends BaseApiController
                 'CustomerData', 'ServiceData.modality', 'referrer',
                 'assignedRadiologist', 'radiologyReports.author',
             ])),
+        ]);
+    }
+
+    // ==================== dictation ====================
+
+    /**
+     * What dictation can actually do in THIS clinic right now.
+     *
+     * The editor asks before it records anything: browser speech recognition is
+     * always available in a supporting browser but may send audio to a vendor,
+     * while the clinic's own self-hosted engine keeps it inside the network.
+     * Which one is in use is a clinical/privacy decision, so the server states
+     * the facts rather than the frontend guessing.
+     */
+    public function dictation(): JsonResponse
+    {
+        $this->denyUnless('report manage');
+
+        $integration = $this->transcription->resolve($this->tenantId());
+
+        return $this->ok([
+            'serverProvider' => [
+                'available' => $integration !== null,
+                'label' => $integration?->name,
+                'reason' => $integration === null
+                    ? 'No active self-hosted dictation service is configured for this clinic.'
+                    : null,
+            ],
+        ]);
+    }
+
+    /**
+     * Transcribe one recorded chunk through the clinic's own STT service.
+     *
+     * The audio is never stored: it lives in memory for this request only, and
+     * the response carries the text back to the editor, which inserts it into
+     * the field the radiologist is editing. Nothing is signed, saved or
+     * finalised here — dictation still has to be reviewed like any typed text.
+     */
+    public function transcribe(Request $request): JsonResponse
+    {
+        $this->denyUnlessAny(['report create', 'report edit'], 'report edit');
+
+        $request->validate([
+            'audio' => ['required', 'file', 'max:'.(int) (TranscriptionService::MAX_AUDIO_BYTES / 1024)],
+            'language' => ['sometimes', 'nullable', 'string', 'max:12'],
+            // The study being dictated into. Optional (the editor may not have
+            // one open yet) but recorded when present, so the audit trail says
+            // WHICH study a dictation session belonged to.
+            'appointmentId' => ['sometimes', 'nullable', 'integer'],
+        ]);
+
+        $integration = $this->transcription->resolve($this->tenantId());
+
+        if ($integration === null) {
+            // 409, not 403: the radiologist is allowed to dictate, this clinic
+            // simply has no self-hosted engine — the editor falls back to the
+            // browser (or to typing) with an explanation.
+            abort(response()->json([
+                'message' => 'Self-hosted dictation is not configured for this clinic. Use browser dictation or type the report.',
+                'error' => 'dictation.unconfigured',
+            ], 409));
+        }
+
+        $file = $request->file('audio');
+
+        try {
+            $result = $this->transcription->transcribe(
+                $integration,
+                (string) file_get_contents($file->getRealPath()),
+                (string) ($file->getClientOriginalName() ?: 'dictation.webm'),
+                (string) ($file->getMimeType() ?: 'audio/webm'),
+                $request->input('language'),
+            );
+        } catch (TranscriptionException $e) {
+            return response()->json([
+                'message' => $e->getMessage(),
+                'error' => 'dictation.failed',
+            ], 502);
+        }
+
+        // The study, when one was named — resolved inside the tenant, so an id
+        // from another clinic simply does not resolve rather than attaching a
+        // dictation event to someone else's record.
+        $study = $request->filled('appointmentId')
+            ? Appointment::where('business_id', $this->tenantId())->find($request->input('appointmentId'))
+            : null;
+
+        // Audited without content: that dictation happened, for which study,
+        // through which engine, and how long it took. The audio and its
+        // transcript are not recorded — the saved draft is the clinical record.
+        $this->audit('report_dictation', $study ?? $integration, [
+            'summary' => 'Dictation transcribed through '.$integration->name,
+            'appointmentId' => $study?->id,
+            'latencyMs' => $result['latencyMs'],
+            'characters' => mb_strlen($result['text']),
+        ]);
+
+        return $this->ok([
+            'text' => $result['text'],
+            'provider' => $result['provider'],
+            'latencyMs' => $result['latencyMs'],
         ]);
     }
 

@@ -44,35 +44,24 @@ export const emptyWorklistFilters: WorklistFilters = {
 /**
  * A radiologist's saved view: one click back to "my STAT CTs from today".
  *
- * Personal workstation state — the filter is a UI preference, so it is stored
- * locally per browser rather than pushed into the tenant's data model. Only
- * filter values are kept (never patient data).
+ * Stored on the USER's account (per clinic), not in the browser: a standing
+ * filter set that disappears at another workstation is not much of a standing
+ * filter set. Only filter values are held — never patient data.
  */
 export interface SavedWorklistView {
+  /** Server row id; absent only for a view still being migrated from localStorage. */
+  id: string;
   name: string;
   tab: ReportingTab;
   filters: WorklistFilters;
 }
 
-const SAVED_VIEWS_KEY = 'polytronx_ris_worklist_views';
-
-function readSavedViews(): SavedWorklistView[] {
-  try {
-    const raw = localStorage.getItem(SAVED_VIEWS_KEY);
-    const parsed = raw ? JSON.parse(raw) : [];
-    return Array.isArray(parsed) ? parsed.filter((view: SavedWorklistView) => view?.name) : [];
-  } catch {
-    return [];
-  }
-}
-
-function writeSavedViews(views: SavedWorklistView[]): void {
-  try {
-    localStorage.setItem(SAVED_VIEWS_KEY, JSON.stringify(views));
-  } catch {
-    /* storage unavailable (private mode) — views simply do not persist */
-  }
-}
+/**
+ * Where saved views used to live, before they moved onto the radiologist's
+ * account. Still read ONCE so a user's existing views are carried over rather
+ * than silently lost by the upgrade (see ReportingView's import step).
+ */
+export const LEGACY_SAVED_VIEWS_KEY = 'polytronx_ris_worklist_views';
 
 interface TabDefinition {
   key: ReportingTab;
@@ -110,6 +99,10 @@ interface ReportWorklistProps {
   radiologists: RadiologistSummary[];
   canAssignSelf: boolean;
   canReassign: boolean;
+  /** Views owned by the signed-in radiologist in this clinic (server-held). */
+  savedViews: SavedWorklistView[];
+  onSaveView: (name: string, tab: ReportingTab, filters: WorklistFilters) => void;
+  onDeleteView: (view: SavedWorklistView) => void;
   onTabChange: (tab: ReportingTab) => void;
   onFiltersChange: (filters: WorklistFilters) => void;
   onPageChange: (page: number) => void;
@@ -160,6 +153,9 @@ export const ReportWorklist: React.FC<ReportWorklistProps> = ({
   radiologists,
   canAssignSelf,
   canReassign,
+  savedViews,
+  onSaveView,
+  onDeleteView,
   onTabChange,
   onFiltersChange,
   onPageChange,
@@ -169,31 +165,21 @@ export const ReportWorklist: React.FC<ReportWorklistProps> = ({
 }) => {
   // The input is local so typing stays instant; the request is debounced.
   const [searchDraft, setSearchDraft] = useState(filters.q);
-  const [savedViews, setSavedViews] = useState<SavedWorklistView[]>(readSavedViews);
   const debounce = useRef<number | null>(null);
 
   const activeView = savedViews.find(view => view.tab === tab && sameFilters(view.filters, filters)) ?? null;
 
+  // Saving is the owning module's business: it writes to the user's account so
+  // the view survives a different workstation.
   const saveCurrentView = () => {
-    const name = window.prompt('Name this view (e.g. "My STAT CTs")')
-      ?? '';
+    const name = window.prompt('Name this view (e.g. "My STAT CTs")') ?? '';
     const trimmed = name.trim();
     if (trimmed === '') return;
 
-    const next = [
-      ...savedViews.filter(view => view.name !== trimmed),
-      { name: trimmed, tab, filters: { ...filters } },
-    ].slice(0, 8);
-
-    setSavedViews(next);
-    writeSavedViews(next);
+    onSaveView(trimmed, tab, { ...filters });
   };
 
-  const removeView = (name: string) => {
-    const next = savedViews.filter(view => view.name !== name);
-    setSavedViews(next);
-    writeSavedViews(next);
-  };
+  const removeView = (view: SavedWorklistView) => onDeleteView(view);
 
   useEffect(() => {
     setSearchDraft(filters.q);
@@ -264,7 +250,8 @@ export const ReportWorklist: React.FC<ReportWorklistProps> = ({
         <div className="px-3 flex flex-wrap items-center gap-1.5">
           {savedViews.map(view => (
             <span
-              key={view.name}
+              key={view.id || view.name}
+              data-testid="worklist-view"
               className={`inline-flex items-center gap-1 pl-2 pr-1 py-0.5 rounded-lg border text-[10px] font-bold ${
                 activeView?.name === view.name
                   ? 'bg-purple-600 text-white border-purple-600'
@@ -286,7 +273,7 @@ export const ReportWorklist: React.FC<ReportWorklistProps> = ({
               <button
                 type="button"
                 aria-label={`Delete saved view ${view.name}`}
-                onClick={() => removeView(view.name)}
+                onClick={() => removeView(view)}
                 className="opacity-60 hover:opacity-100 cursor-pointer"
               >
                 <X className="w-2.5 h-2.5" />

@@ -194,6 +194,30 @@ return [
             'required' => ['phoneNumberId'],
             'secrets' => ['accessToken'],
         ],
+        /*
+         * The clinic's OWN speech-to-text service.
+         *
+         * Browser speech recognition may hand clinical audio to a vendor's
+         * cloud service, which some clinics cannot accept. Configuring one of
+         * these makes the reporting editor dictate through a service the clinic
+         * runs itself instead: it records locally and posts the audio to
+         * `baseUrl`, which must answer JSON with the transcript.
+         *
+         * Most self-hosted engines run inside the clinic's own network without
+         * authentication, so only `baseUrl` is required. The optional secrets
+         * cover engines behind a gateway that expects an API token (`apiKey`)
+         * or basic auth, but are enforced only when the deployment's
+         * transcription service is actually called.
+         */
+        'dictation' => [
+            'label' => 'Self-hosted dictation (speech-to-text)',
+            'feature' => 'interop',
+            'probe' => 'http',
+            'required' => ['baseUrl'],
+            'secrets' => [],
+            // Accepted but not required — see the note above.
+            'optionalSecrets' => ['apiKey', 'username', 'password'],
+        ],
     ],
 
     /*

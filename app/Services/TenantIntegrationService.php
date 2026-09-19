@@ -46,10 +46,40 @@ class TenantIntegrationService
         return self::definition($type)['feature'] ?? null;
     }
 
-    /** @return array<int, string> */
+    /**
+     * Secrets the tenant MUST supply for this type.
+     *
+     * @return array<int, string>
+     */
     public static function secretKeys(string $type): array
     {
         return array_values((array) (self::definition($type)['secrets'] ?? []));
+    }
+
+    /**
+     * Secrets that may be supplied but are not required — a self-hosted
+     * service on the clinic's own network usually needs no API key, yet a
+     * deployment behind one must still be able to store it.
+     *
+     * @return array<int, string>
+     */
+    public static function optionalSecretKeys(string $type): array
+    {
+        return array_values((array) (self::definition($type)['optionalSecrets'] ?? []));
+    }
+
+    /**
+     * Every secret key the type can hold, required or not. Used for masking:
+     * a stored optional secret is still a secret.
+     *
+     * @return array<int, string>
+     */
+    public static function allSecretKeys(string $type): array
+    {
+        return array_values(array_unique([
+            ...self::secretKeys($type),
+            ...self::optionalSecretKeys($type),
+        ]));
     }
 
     /** @return array<int, string> */
@@ -68,6 +98,7 @@ class TenantIntegrationService
             'probe' => $def['probe'] ?? 'config',
             'requiredKeys' => array_values((array) ($def['required'] ?? [])),
             'secretKeys' => array_values((array) ($def['secrets'] ?? [])),
+            'optionalSecretKeys' => array_values((array) ($def['optionalSecrets'] ?? [])),
         ])->values()->all();
     }
 
@@ -75,7 +106,7 @@ class TenantIntegrationService
     public static function shape(TenantIntegration $i): array
     {
         $secrets = is_array($i->secrets) ? $i->secrets : [];
-        $secretKeys = self::secretKeys($i->type);
+        $secretKeys = self::allSecretKeys($i->type);
 
         return [
             'id' => (string) $i->id,
@@ -186,6 +217,8 @@ class TenantIntegrationService
             }
         }
 
+        // Only REQUIRED secrets are enforced; an optional one that is absent
+        // leaves the integration perfectly usable.
         $missingSecrets = [];
         foreach (self::secretKeys($type) as $key) {
             $value = $secrets[$key] ?? null;

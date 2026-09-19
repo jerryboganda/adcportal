@@ -1,4 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import * as api from '../../services/apiService';
+import { DictationCapability } from '../../types';
 
 /**
  * Browser speech recognition for radiology dictation.
@@ -16,13 +18,21 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
  */
 
 export interface DictationState {
-  /** A speech-recognition implementation exists in this browser. */
+  /**
+   * Dictation can be used right now: either this browser has a speech
+   * implementation, or the clinic runs its own engine (which needs no browser
+   * speech support at all, only a microphone and MediaRecorder).
+   */
   supported: boolean;
   listening: boolean;
   /** Interim (not yet final) hypothesis, shown but never stored verbatim. */
   interim: string;
   error: string | null;
   language: string;
+  /** Which engine is actually in use for this session. */
+  provider: 'browser' | 'server' | 'none';
+  /** True while a recorded chunk is being transcribed by the clinic's engine. */
+  transcribing: boolean;
 }
 
 export interface UseDictationResult extends DictationState {
@@ -44,12 +54,27 @@ const LANGUAGES = [
   { value: 'ar-SA', label: 'Arabic' },
 ];
 
-const LANGUAGE_KEY = 'polytronx_ris_dictation_language';
-
 function speechRecognitionCtor(): any | null {
   if (typeof window === 'undefined') return null;
   const w = window as any;
   return w.SpeechRecognition ?? w.webkitSpeechRecognition ?? null;
+}
+
+/**
+ * Recording a chunk for the clinic's own engine.
+ *
+ * Chunks are cut into short segments and sent as they close, so a long "start
+ * dictation … stop dictation" session keeps producing text instead of waiting
+ * for one huge upload at the end — and so a failed segment costs a phrase, not
+ * the whole dictation.
+ */
+const SERVER_CHUNK_MS = 12000;
+
+function mediaRecorderSupported(): boolean {
+  if (typeof window === 'undefined') return false;
+
+  return typeof (window as any).MediaRecorder === 'function'
+    && Boolean(navigator.mediaDevices?.getUserMedia);
 }
 
 /**
@@ -86,24 +111,82 @@ export function useDictation(options: {
   onInsert: (text: string) => void;
   /** Human label of the field that will receive dictation. */
   targetLabel: string | null;
+  /** The radiologist's saved language (the account is the source of truth). */
+  language: string;
+  onLanguageChange: (language: string) => void;
+  /** The clinic's own engine, when one is configured. */
+  serverProvider?: DictationCapability['serverProvider'] | null;
+  /** The provider the radiologist chose, when that choice is available. */
+  provider?: 'browser' | 'server';
+  /** The study being dictated into, so the audit trail can name it. */
+  appointmentId?: string | null;
 }): UseDictationResult {
-  const supported = useMemo(() => speechRecognitionCtor() !== null, []);
+  const serverAvailable = Boolean(options.serverProvider?.available) && mediaRecorderSupported();
+  const browserAvailable = useMemo(() => speechRecognitionCtor() !== null, []);
+
+  // Honour the saved choice, but never claim to use an engine that is not
+  // there: a clinic preference for server dictation on a machine with no
+  // self-hosted engine configured falls back to the browser rather than
+  // failing at the microphone.
+  const provider: DictationState['provider'] =
+    options.provider === 'server' && serverAvailable
+      ? 'server'
+      : browserAvailable
+        ? 'browser'
+        : serverAvailable
+          ? 'server'
+          : 'none';
+
+  const supported = provider !== 'none';
   const [listening, setListening] = useState(false);
   const [interim, setInterim] = useState('');
+  const [transcribing, setTranscribing] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [language, setLanguageState] = useState<string>(
-    () => localStorage.getItem(LANGUAGE_KEY) ?? 'en-US'
-  );
+  const language = options.language;
+  const { onLanguageChange } = options;
 
   const recognitionRef = useRef<any>(null);
+  const recorderRef = useRef<MediaRecorder | null>(null);
+  const streamRef = useRef<MediaStream | null>(null);
+  const chunkTimerRef = useRef<number | null>(null);
+  const languageRef = useRef(language);
+  languageRef.current = language;
+  const appointmentRef = useRef(options.appointmentId ?? null);
+  appointmentRef.current = options.appointmentId ?? null;
+  const providerRef = useRef(provider);
+  providerRef.current = provider;
+
+  /** Hold back 'no speech' noise: an empty chunk is normal, not an error. */
+  const sendChunk = useCallback(async (audio: Blob) => {
+    if (audio.size === 0) return;
+
+    setTranscribing(true);
+    try {
+      const result = await api.transcribeDictation(audio, languageRef.current, appointmentRef.current);
+      const cleaned = applyDictationCommands(result.text.trim());
+      if (cleaned !== '') {
+        insertRef.current(cleaned);
+        setError(null);
+      }
+    } catch (err: any) {
+      setError(
+        err?.status === 409
+          ? 'This clinic has no self-hosted dictation service. Switch to browser dictation in preferences.'
+          : err?.message ?? 'The dictation service could not transcribe that phrase. Type it instead.'
+      );
+    } finally {
+      setTranscribing(false);
+    }
+  }, []);
   // Kept in a ref so the long-lived recognition handlers always call the
   // CURRENT insert callback (the target field can change between phrases).
   const insertRef = useRef(options.onInsert);
   insertRef.current = options.onInsert;
 
+  // The chosen language is stored on the radiologist's account, so it follows
+  // them between workstations; the recognition session is told immediately.
   const setLanguage = useCallback((next: string) => {
-    setLanguageState(next);
-    localStorage.setItem(LANGUAGE_KEY, next);
+    onLanguageChange(next);
 
     if (recognitionRef.current) {
       try {
@@ -112,6 +195,25 @@ export function useDictation(options: {
         /* the next session picks the language up */
       }
     }
+  }, [onLanguageChange]);
+
+  const stopRecorder = useCallback(() => {
+    if (chunkTimerRef.current !== null) {
+      window.clearInterval(chunkTimerRef.current);
+      chunkTimerRef.current = null;
+    }
+
+    try {
+      recorderRef.current?.state !== 'inactive' && recorderRef.current?.stop();
+    } catch {
+      /* already stopped */
+    }
+    recorderRef.current = null;
+
+    // Release the microphone: leaving a track live keeps the browser's
+    // recording indicator on, which looks like the app is still listening.
+    streamRef.current?.getTracks().forEach(track => track.stop());
+    streamRef.current = null;
   }, []);
 
   const stop = useCallback(() => {
@@ -121,11 +223,70 @@ export function useDictation(options: {
       /* already stopped */
     }
     recognitionRef.current = null;
+    stopRecorder();
     setListening(false);
     setInterim('');
-  }, []);
+  }, [stopRecorder]);
+
+  /** Server dictation: record locally, transcribe in the clinic's network. */
+  const startServer = useCallback(async () => {
+    if (!options.targetLabel) {
+      setError('Click into a report field first — dictation is inserted into the field you are editing.');
+      return;
+    }
+
+    setError(null);
+
+    let stream: MediaStream;
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    } catch {
+      setError('Microphone permission was denied. Allow it in the browser, or type instead.');
+      return;
+    }
+
+    streamRef.current = stream;
+
+    const recorder = new (window as any).MediaRecorder(stream);
+    recorderRef.current = recorder;
+
+    recorder.ondataavailable = (event: any) => {
+      if (event.data && event.data.size > 0) void sendChunk(event.data);
+    };
+
+    recorder.onerror = () => {
+      setError('Recording failed. Your text is unchanged — try again or type.');
+      stop();
+    };
+
+    try {
+      recorder.start();
+    } catch {
+      setError('Could not start recording. Try again, or type the report.');
+      stopRecorder();
+      return;
+    }
+
+    setListening(true);
+
+    // A long session is transcribed in short phrases rather than one upload.
+    chunkTimerRef.current = window.setInterval(() => {
+      try {
+        if (recorder.state === 'recording') {
+          recorder.requestData();
+        }
+      } catch {
+        /* the next tick will try again */
+      }
+    }, SERVER_CHUNK_MS);
+  }, [options.targetLabel, sendChunk, stop, stopRecorder]);
 
   const start = useCallback(() => {
+    if (providerRef.current === 'server') {
+      void startServer();
+      return;
+    }
+
     const Recognition = speechRecognitionCtor();
 
     if (!Recognition) {
@@ -194,7 +355,7 @@ export function useDictation(options: {
       setError('Could not start dictation. Try again, or type the report.');
       setListening(false);
     }
-  }, [language, options.targetLabel]);
+  }, [language, options.targetLabel, startServer]);
 
   const toggle = useCallback(() => {
     if (listening) {
@@ -211,6 +372,14 @@ export function useDictation(options: {
     } catch {
       /* nothing to abort */
     }
+
+    if (chunkTimerRef.current !== null) window.clearInterval(chunkTimerRef.current);
+    try {
+      recorderRef.current?.state !== 'inactive' && recorderRef.current?.stop();
+    } catch {
+      /* nothing to stop */
+    }
+    streamRef.current?.getTracks().forEach(track => track.stop());
   }, []);
 
   return {
@@ -219,6 +388,8 @@ export function useDictation(options: {
     interim,
     error,
     language,
+    provider,
+    transcribing,
     targetLabel: options.targetLabel,
     languages: LANGUAGES,
     toggle,

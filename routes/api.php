@@ -20,6 +20,7 @@ use App\Http\Controllers\Api\V1\Platform\PlatformTenantController;
 use App\Http\Controllers\Api\V1\Platform\PlatformUserController;
 use App\Http\Controllers\Api\V1\ReportController;
 use App\Http\Controllers\Api\V1\ReportingController;
+use App\Http\Controllers\Api\V1\ReportingPreferenceController;
 use App\Http\Controllers\Api\V1\PublicTenantContextController;
 use App\Http\Controllers\Api\V1\QueueDisplayController;
 use App\Http\Controllers\Api\V1\SettingsController;
@@ -134,6 +135,17 @@ Route::middleware(['auth', 'tenant.active', 'throttle:tenant'])->group(function 
         Route::get('/worklist', [ReportingController::class, 'worklist']);
         Route::get('/studies/{appointment}', [ReportingController::class, 'study'])->whereNumber('appointment');
         Route::get('/roster', [ReportingController::class, 'roster']);
+
+        // The radiologist's own setup, per user AND per clinic.
+        Route::get('/preferences', [ReportingPreferenceController::class, 'show']);
+        Route::put('/preferences', [ReportingPreferenceController::class, 'update']);
+        Route::post('/views', [ReportingPreferenceController::class, 'storeView']);
+        Route::put('/views/{view}', [ReportingPreferenceController::class, 'updateView'])->whereNumber('view');
+        Route::delete('/views/{view}', [ReportingPreferenceController::class, 'destroyView'])->whereNumber('view');
+
+        // Dictation: the clinic's own self-hosted transcription, when configured.
+        Route::get('/dictation', [ReportingController::class, 'dictation']);
+        Route::post('/dictation/transcribe', [ReportingController::class, 'transcribe']);
 
         Route::get('/templates', [ReportingController::class, 'templates']);
         Route::post('/templates/resolve', [ReportingController::class, 'resolveTemplate']);

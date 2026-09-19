@@ -159,7 +159,7 @@ jobs:
           # locks for token allocation) — dialect bugs there would corrupt or
           # block a signed report in production. Widen to --testsuite=Feature
           # once the rest of the suite is proven dialect-clean.
-          php artisan test --filter='WalkInBookingFinancialsTest|StudyBookingPaymentTest|StudyBookingTokenTest|StudyTokenAllocatorTest|StudyTokenConcurrencyTest|StudyFactAtomicityTest|StudyWorkflowTest|BookingRoomTest|BillingTest|TenantIsolationTest|ReportingWorklistTest|ReportTemplateResolutionTest|ReportDraftConcurrencyTest|ReportManualCreationTest|ReportMacrosTest|ReportPdfTest|CriticalFindingLogTest' 2>&1 | tee /tmp/phpunit-pg.log
+          php artisan test --filter='WalkInBookingFinancialsTest|StudyBookingPaymentTest|StudyBookingTokenTest|StudyTokenAllocatorTest|StudyTokenConcurrencyTest|StudyFactAtomicityTest|StudyWorkflowTest|BookingRoomTest|BillingTest|TenantIsolationTest|ReportingWorklistTest|ReportingPreferencesTest|ReportTemplateResolutionTest|ReportDraftConcurrencyTest|ReportManualCreationTest|ReportMacrosTest|ReportDictationTest|ReportPdfTest|CriticalFindingLogTest' 2>&1 | tee /tmp/phpunit-pg.log
 
       # GitHub publishes at most ~10 `::error::` annotations PER STEP, so the
       # summary and every failing test name get their own step (fresh budget)

@@ -42,6 +42,15 @@ CI (`GitHub Actions`) is the only compute path: tests → SPA build → gated pr
 
 The gated delivery step is **skipped with an explicit notice** when the VPS SSH secrets are not configured for the repository (`notice | VPS SSH secrets not configured — skipping deploy step.`) — it never silently pretends to have deployed.
 
+### Migrations run on boot, so a deploy's schema work is not free
+
+The container entrypoint runs `php artisan migrate --force` under `set -e` *before* it serves, which is what makes a failed migration fatal instead of half-applied: the app will not come up with a schema its code does not match. Two consequences worth knowing before a release:
+
+- **A migration that locks a large table holds up the deploy, not just the query.** Adding indexes to `appointments` (the reporting worklist does this) takes a write lock for the duration of the index build; on a clinic with millions of studies that is noticeable, and the health check will time out if it runs too long. Run releases that touch wide tables outside reporting hours, and prefer additive columns with defaults (metadata-only on PostgreSQL 11+) over rewrites.
+- **A migration that fails leaves the previous container running.** The deploy step reports success for the *pull and restart*; if the new container never becomes healthy, check `docker logs adc-portal-app --since 5m` for the migration error rather than assuming the release landed. The post-deploy health probe (`/api/v1/health`) is the authority on whether it did.
+
+Migrations are additive by policy: a clinic's existing clinical records are never rewritten by a release. The reporting and preferences migrations follow that rule (new tables/columns plus a data backfill that only fills NULLs).
+
 ## Rate-limit posture (noisy-neighbor guard)
 
 | Limiter | Scope | Budget |

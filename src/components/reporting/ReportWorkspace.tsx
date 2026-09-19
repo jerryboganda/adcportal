@@ -29,11 +29,13 @@ import {
   Appointment,
   ClinicProfileSettings,
   CriticalFindingLog,
+  DictationCapability,
   PriorExam,
   RadiologistSummary,
   RadiologyReport,
   ReportMacro,
   ReportTemplate,
+  ReportingPreferences,
   StructuredField,
   StructuredValues,
   TemplateMatch,
@@ -69,6 +71,11 @@ interface ReportWorkspaceProps {
   clinicSettings?: ClinicProfileSettings;
   radiologists: RadiologistSummary[];
   controllerRef: React.MutableRefObject<WorkspaceController | null>;
+  /** The radiologist's own setup, held on their account (per clinic). */
+  preferences: ReportingPreferences;
+  /** Whether this clinic can dictate through its own transcription service. */
+  dictation: DictationCapability | null;
+  onPreferenceChange: (changes: Partial<ReportingPreferences>) => void;
   onStudyUpdated: (study: Appointment, report: RadiologyReport | null) => void;
   onToast: (message: string, tone?: 'success' | 'error') => void;
   onRejectToTech: (appointmentId: string, reason: string) => Promise<void>;
@@ -87,24 +94,6 @@ const DICTATABLE_FIELDS = [
 
 type FieldKey = (typeof DICTATABLE_FIELDS)[number]['key'];
 
-/**
- * Personal reporting preferences.
- *
- * Per-radiologist, per-workstation behaviour that the server has no business
- * storing (a language tag and whether an empty report pre-fills from the
- * resolved baseline). The dictation language is shared with the dictation hook
- * through the same storage key, so both stay in step.
- */
-const TEMPLATE_AUTOLOAD_KEY = 'polytronx_ris_template_autoload';
-
-export function readTemplateAutoload(): boolean {
-  try {
-    return localStorage.getItem(TEMPLATE_AUTOLOAD_KEY) !== '0';
-  } catch {
-    return true;
-  }
-}
-
 const REJECT_CATEGORIES = [
   'Patient motion artifact / image blurring',
   'Inadequate anatomical coverage / missing views',
@@ -122,6 +111,9 @@ export const ReportWorkspace: React.FC<ReportWorkspaceProps> = ({
   clinicSettings,
   radiologists,
   controllerRef,
+  preferences,
+  dictation: dictationCapability,
+  onPreferenceChange,
   onStudyUpdated,
   onToast,
   onRejectToTech,
@@ -161,8 +153,11 @@ export const ReportWorkspace: React.FC<ReportWorkspaceProps> = ({
   const [loadError, setLoadError] = useState<string | null>(null);
 
   const [preferencesOpen, setPreferencesOpen] = useState(false);
-  const autoLoadRef = useRef(readTemplateAutoload());
-  const [autoLoadTemplate, setAutoLoadTemplate] = useState(autoLoadRef.current);
+  // Kept in a ref as well: it is read inside the load effect, which must not
+  // re-run every time the radiologist toggles a preference.
+  const autoLoadRef = useRef(preferences.templateAutoload);
+  autoLoadRef.current = preferences.templateAutoload;
+  const autoLoadTemplate = preferences.templateAutoload;
   const [addendumOpen, setAddendumOpen] = useState(false);
   const [addendumText, setAddendumText] = useState('');
   const [criticalOpen, setCriticalOpen] = useState(false);
@@ -219,6 +214,13 @@ export const ReportWorkspace: React.FC<ReportWorkspaceProps> = ({
   const dictation = useDictation({
     onInsert: text => insertAtCursor(activeField, text),
     targetLabel: DICTATABLE_FIELDS.find(field => field.key === activeField)?.label ?? null,
+    // Preference from the radiologist's account; the provider decides whether
+    // audio stays in the clinic (self-hosted engine) or may leave it (browser).
+    language: preferences.dictationLanguage,
+    onLanguageChange: language => onPreferenceChange({ dictationLanguage: language }),
+    serverProvider: dictationCapability?.serverProvider ?? null,
+    provider: preferences.dictationProvider,
+    appointmentId,
   });
 
   // ---- load context -----------------------------------------------------
@@ -914,6 +916,31 @@ export const ReportWorkspace: React.FC<ReportWorkspaceProps> = ({
                     </span>
                   )}
 
+                  {/*
+                    Which engine is actually in use. A radiologist needs to know
+                    whether their voice may leave the clinic, so this states it
+                    rather than implying all dictation behaves the same.
+                  */}
+                  {dictation.supported && (
+                    <span
+                      data-testid="report-dictation-engine"
+                      className="text-[10px] text-slate-500"
+                      title={
+                        dictation.provider === 'server'
+                          ? 'Audio is posted to this clinic\u2019s own speech-to-text service.'
+                          : 'Recognition is provided by the browser and may be processed by its vendor\u2019s speech service.'
+                      }
+                    >
+                      {dictation.provider === 'server' ? 'clinic engine' : 'browser recognition'}
+                    </span>
+                  )}
+
+                  {dictation.transcribing && (
+                    <span data-testid="report-dictation-transcribing" className="text-[10px] text-slate-500 italic">
+                      transcribing…
+                    </span>
+                  )}
+
                   <label className="flex items-center gap-1 text-[11px] text-slate-500">
                     <Languages className="w-3.5 h-3.5" />
                     <select
@@ -945,9 +972,9 @@ export const ReportWorkspace: React.FC<ReportWorkspaceProps> = ({
                   data-testid="report-dictation-unavailable"
                   className="text-[11px] text-slate-500 bg-slate-50 border border-slate-200 rounded-lg p-2"
                 >
-                  This browser has no speech-recognition support (Chrome and Edge do; Firefox generally does not). Typing
-                  works exactly the same — dictation is an optional input method, and recognised text is never final
-                  until you sign the report.
+                  This browser has no speech-recognition support (Chrome and Edge do; Firefox generally does not) and
+                  this clinic has no self-hosted speech-to-text service configured. Typing works exactly the same —
+                  dictation is an optional input method, and recognised text is never final until you sign the report.
                 </p>
               )}
 
@@ -1494,18 +1521,13 @@ export const ReportWorkspace: React.FC<ReportWorkspaceProps> = ({
       {preferencesOpen && (
         <PreferencesModal
           languages={dictation.languages}
-          language={dictation.language}
+          language={preferences.dictationLanguage}
           onLanguageChange={dictation.setLanguage}
           autoLoadTemplate={autoLoadTemplate}
-          onAutoLoadChange={next => {
-            setAutoLoadTemplate(next);
-            autoLoadRef.current = next;
-            try {
-              localStorage.setItem(TEMPLATE_AUTOLOAD_KEY, next ? '1' : '0');
-            } catch {
-              /* storage unavailable (private mode) — the session default stands */
-            }
-          }}
+          onAutoLoadChange={next => onPreferenceChange({ templateAutoload: next })}
+          provider={preferences.dictationProvider}
+          onProviderChange={next => onPreferenceChange({ dictationProvider: next })}
+          serverDictation={dictationCapability?.serverProvider ?? null}
           onClose={() => setPreferencesOpen(false)}
         />
       )}
@@ -1728,32 +1750,94 @@ const PreferencesModal: React.FC<{
   onLanguageChange: (language: string) => void;
   autoLoadTemplate: boolean;
   onAutoLoadChange: (enabled: boolean) => void;
+  provider: 'browser' | 'server';
+  onProviderChange: (provider: 'browser' | 'server') => void;
+  serverDictation: DictationCapability['serverProvider'] | null;
   onClose: () => void;
-}> = ({ languages, language, onLanguageChange, autoLoadTemplate, onAutoLoadChange, onClose }) => (
+}> = ({
+  languages,
+  language,
+  onLanguageChange,
+  autoLoadTemplate,
+  onAutoLoadChange,
+  provider,
+  onProviderChange,
+  serverDictation,
+  onClose,
+}) => (
   <Modal
     title="Reporting preferences"
-    subtitle="Personal working preferences for this workstation. Clinical content and sign-off are governed by the clinic."
+    subtitle="Personal working preferences, saved to your account for this clinic — they follow you to any workstation."
     onClose={onClose}
   >
     <div className="space-y-4 text-xs">
-      <div>
-        <label className="block font-semibold text-slate-700 mb-1">Dictation language</label>
-        <select
-          aria-label="Dictation language preference"
-          value={language}
-          onChange={event => onLanguageChange(event.target.value)}
-          className="w-full p-2 rounded-xl border border-slate-300 cursor-pointer"
-        >
-          {languages.map(option => (
-            <option key={option.value} value={option.value}>
-              {option.label}
-            </option>
-          ))}
-        </select>
-        <p className="text-[11px] text-slate-500 mt-1">
-          Recognition accuracy and available languages are decided by the browser, not this application. Recognised
-          text is inserted as a draft you must review before signing.
-        </p>
+      <div
+        data-testid="report-preferences-dictation"
+        className="p-2.5 rounded-xl bg-slate-50 border border-slate-200 space-y-2"
+      >
+        <div className="font-semibold text-slate-800">Dictation</div>
+
+        <label className="flex items-start gap-2">
+          <input
+            type="radio"
+            name="dictation-provider"
+            checked={provider === 'browser'}
+            onChange={() => onProviderChange('browser')}
+            className="accent-purple-600 mt-0.5 cursor-pointer"
+          />
+          <span>
+            <span className="font-semibold text-slate-700">Browser speech recognition</span>
+            <span className="block text-[11px] text-slate-500">
+              Available in Chromium browsers. It is not guaranteed to run locally: the browser may send audio to its
+              vendor&apos;s speech service. Never auto-finalised — review before signing.
+            </span>
+          </span>
+        </label>
+
+        <label className={`flex items-start gap-2 ${serverDictation?.available ? '' : 'opacity-60'}`}>
+          <input
+            type="radio"
+            name="dictation-provider"
+            checked={provider === 'server'}
+            disabled={!serverDictation?.available}
+            onChange={() => onProviderChange('server')}
+            className="accent-purple-600 mt-0.5 cursor-pointer disabled:cursor-not-allowed"
+          />
+          <span>
+            <span className="font-semibold text-slate-700">
+              This clinic&apos;s own speech-to-text service
+              {serverDictation?.label ? ` — ${serverDictation.label}` : ''}
+            </span>
+            <span className="block text-[11px] text-slate-500">
+              {serverDictation?.available
+                ? 'Audio is posted to the engine your clinic runs. It is not stored by this application.'
+                : serverDictation?.reason ?? 'No self-hosted dictation service has been configured for this clinic.'}
+            </span>
+          </span>
+        </label>
+
+        <div>
+          <label htmlFor="dictation-language" className="block font-semibold text-slate-700 mb-1">
+            Dictation language
+          </label>
+          <select
+            id="dictation-language"
+            aria-label="Dictation language preference"
+            value={language}
+            onChange={event => onLanguageChange(event.target.value)}
+            className="w-full p-2 rounded-xl border border-slate-300 cursor-pointer"
+          >
+            {languages.map(option => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+          <p className="text-[11px] text-slate-500 mt-1">
+            Recognition accuracy and available languages are decided by the engine, not this application. Recognised
+            text is inserted as a draft you must review before signing.
+          </p>
+        </div>
       </div>
 
       <label className="flex items-start gap-2 p-2.5 rounded-xl bg-slate-50 border border-slate-200">

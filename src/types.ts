@@ -310,6 +310,60 @@ export interface ReportTemplate {
   updatedAt?: string | null;
 }
 
+/**
+ * A radiologist's reporting setup, stored per user AND per clinic.
+ *
+ * These were browser-localStorage values, which meant a radiologist lost their
+ * setup at any other workstation. They are workflow choices, not device
+ * settings, so the server is now the source of truth (localStorage is only a
+ * cache so the first paint is instant).
+ */
+export interface ReportingPreferences {
+  dictationLanguage: string;
+  dictationProvider: 'browser' | 'server';
+  templateAutoload: boolean;
+  defaultTab: ReportingTab;
+}
+
+export interface ReportingSavedView {
+  id: string;
+  name: string;
+  filters: ReportingViewFilters;
+}
+
+/**
+ * The filter values a saved view stores — never report content.
+ *
+ * The queue tab is part of the filter set: "my STAT CTs" is only meaningful
+ * together with the tab it was saved from.
+ */
+export interface ReportingViewFilters {
+  tab?: ReportingTab;
+  q?: string;
+  priority?: 'all' | 'routine' | 'urgent' | 'stat';
+  modalityId?: number | null;
+  reportStatus?: string | null;
+  assignee?: string | null;
+  sort?: 'priority' | 'oldest' | 'newest';
+  from?: string | null;
+  to?: string | null;
+}
+
+/**
+ * Whether this clinic can dictate through its OWN speech-to-text service.
+ *
+ * Browser speech recognition may send audio to a vendor's cloud service, so a
+ * clinic that cannot accept that configures a self-hosted engine and the editor
+ * posts the audio there instead.
+ */
+export interface DictationCapability {
+  serverProvider: {
+    available: boolean;
+    label: string | null;
+    reason: string | null;
+  };
+}
+
 export type ReportingTab =
   | 'assigned'
   | 'unreported'
