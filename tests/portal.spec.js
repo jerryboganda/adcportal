@@ -80,6 +80,7 @@ test('sign-out destroys the session and the login gate returns', async ({ page }
 });
 
 const RADIOLOGIST_EMAIL = 'dr.shahzad@amaddiagnosticcentre.com.pk';
+const RECEPTIONIST_EMAIL = 'amina.reception@amaddiagnosticcentre.com.pk';
 
 /**
  * Fill the walk-in form up to a selected, price-loaded procedure.
@@ -297,3 +298,179 @@ test('waiting-room TV kiosk renders the live queue with no login', async ({ page
     await expect(page.getByText('Display link is no longer valid')).toBeVisible({ timeout: 15000 });
     await expect(page.getByPlaceholder('Work email')).toHaveCount(0);
 });
+
+// ==================== radiology reporting workstation ====================
+
+/**
+ * The reporting module is exercised through its real entry paths: the
+ * server-backed reading queue and the "create report" workflow for studies
+ * that never came through scheduling. Every assertion below reads persisted
+ * server state — no mock data, no front-end-only shortcuts.
+ */
+async function loginAsRadiologist(page) {
+    await page.goto('/');
+    await page.getByPlaceholder('Work email').fill(RADIOLOGIST_EMAIL);
+    await page.getByPlaceholder('Password').fill(PASSWORD);
+    await page.getByRole('button', { name: 'Sign In', exact: true }).click();
+    await expect(page.getByText('Total Studies Today')).toBeVisible({ timeout: 20000 });
+}
+
+async function openReporting(page) {
+    await page.getByRole('button', { name: 'Radiology Reports' }).click();
+    await expect(page.getByText('Radiologist Reading & Reporting Suite')).toBeVisible({ timeout: 20000 });
+}
+
+test('radiologist reporting suite renders the server worklist with filters', async ({ page }) => {
+    await loginAsRadiologist(page);
+    await openReporting(page);
+
+    // The queue is server-issued: the header states it, and the tabs carry
+    // server counts (not client-side array lengths).
+    await expect(page.getByText('Reading worklist is live from the server')).toBeVisible();
+    await expect(page.getByTestId('reporting-worklist')).toBeVisible({ timeout: 15000 });
+
+    for (const tab of ['Unreported', 'Assigned to me', 'Priority', 'My drafts', 'Finalized']) {
+        await expect(page.getByRole('button', { name: new RegExp(`^${tab}`) })).toBeVisible();
+    }
+
+    // Clinical filters are real controls, and searching narrows the queue.
+    await expect(page.getByLabel('Filter by priority')).toBeVisible();
+    await expect(page.getByLabel('Filter by modality')).toBeVisible();
+    await expect(page.getByLabel('Filter by report status')).toBeVisible();
+
+    await page.getByLabel('Search reading worklist').fill('zzz-no-such-patient-zzz');
+    await expect(page.getByText('No studies match this view.')).toBeVisible({ timeout: 15000 });
+
+    // A radiologist's surface stays clinical: no reception or billing modules.
+    await expect(page.getByRole('button', { name: 'Reception Desk' })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'Billing & POS' })).toHaveCount(0);
+
+    // Report search and the governed template library are reachable.
+    await page.getByRole('button', { name: 'Find a report' }).click();
+    await expect(page.getByText('Report search')).toBeVisible({ timeout: 15000 });
+    await expect(page.getByPlaceholder('Patient, MRN, token, accession…')).toBeVisible();
+    await page.keyboard.press('Escape').catch(() => {});
+    await page.locator('button[aria-label="Close search"]').click();
+});
+
+test('radiologist creates, autosaves, signs and prints an external report', async ({ page }) => {
+    const patientName = `E2E External ${Date.now()}`;
+
+    await loginAsRadiologist(page);
+    await openReporting(page);
+
+    // ---- create a report for an offline/external study ------------------
+    await page.getByRole('button', { name: 'Create new report' }).click();
+    await expect(page.getByTestId('create-report-modal')).toBeVisible({ timeout: 15000 });
+
+    await page.getByRole('button', { name: 'Register a new patient' }).click();
+    await page.getByPlaceholder('Full name *').fill(patientName);
+    await page.getByPlaceholder('Age (years)').fill('52');
+    await page.getByPlaceholder('Clinical indication').fill('E2E external referral, headache.');
+
+    // The baseline is resolved from the clinic's templates, not hardcoded.
+    await expect(page.getByTestId('create-report-template')).toContainText('Baseline template');
+
+    await page.getByTestId('create-report-submit').click();
+
+    // The workspace opens on the new study with the patient identity shown.
+    await expect(page.getByTestId('report-workspace')).toBeVisible({ timeout: 20000 });
+    await expect(page.locator('body')).toContainText(patientName);
+    await expect(page.getByTestId('report-template-resolution')).toBeVisible();
+
+    // Dictation is an OPTIONAL input: either the browser supports speech
+    // recognition, or the editor says so and typing still works.
+    const dictationButton = page.getByTestId('report-dictation');
+    const unsupportedNote = page.getByTestId('report-dictation-unavailable');
+    expect((await dictationButton.count()) + (await unsupportedNote.count())).toBeGreaterThan(0);
+
+    // ---- author the report ---------------------------------------------
+    await page.getByTestId('report-findings').fill(
+        'E2E FINDINGS: No acute intracranial haemorrhage. Ventricles and sulci are normal.'
+    );
+    await page.getByTestId('report-impression').fill('E2E IMPRESSION: Unremarkable non-contrast CT brain.');
+
+    // ---- save draft (by keyboard), then prove it survived a reload ------
+    // Autosave reports its own state; an explicit save must confirm it landed,
+    // and Ctrl/Cmd+S is the shortcut a reporting radiologist actually uses.
+    await expect(page.getByTestId('report-autosave')).toBeVisible();
+    await expect(page.getByTestId('report-save-draft')).toBeVisible();
+    await page.getByTestId('report-findings').click();
+    await page.keyboard.press('Control+s');
+    await expect(page.getByText(/Draft (saved|updated)\./).first()).toBeVisible({ timeout: 15000 });
+
+    await page.reload();
+    await openReporting(page);
+    await page.getByLabel('Search reading worklist').fill('E2E External');
+    const row = page.getByTestId('worklist-row').filter({ hasText: patientName }).first();
+    await expect(row).toBeVisible({ timeout: 20000 });
+    await row.click();
+
+    await expect(page.getByTestId('report-workspace')).toBeVisible({ timeout: 20000 });
+    await expect(page.getByTestId('report-findings')).toHaveValue(/E2E FINDINGS/, { timeout: 15000 });
+    await expect(page.getByTestId('report-impression')).toHaveValue(/E2E IMPRESSION/);
+
+    // ---- print preview renders the filed document -----------------------
+    await page.getByTestId('report-print').click();
+    const sheet = page.getByTestId('report-print-sheet');
+    await expect(sheet).toBeVisible({ timeout: 15000 });
+    await expect(sheet).toContainText('Radiology Report');
+    await expect(sheet).toContainText(patientName);
+    await expect(sheet).toContainText('E2E IMPRESSION');
+    // An unsigned working copy is never presented as a filed report.
+    await expect(sheet).toContainText('DRAFT');
+    await page.locator('button[aria-label="Close print preview"]').click();
+
+    // ---- finalize (explicit human sign-off) -----------------------------
+    await page.getByTestId('report-finalize').click();
+    await expect(page.getByTestId('report-immutable')).toBeVisible({ timeout: 20000 });
+
+    // ---- the signed report is immutable and versioned -------------------
+    await expect(page.getByTestId('report-findings')).toBeDisabled();
+    await expect(page.getByRole('button', { name: 'Add signed addendum' })).toBeVisible();
+
+    // Reload: the finalized report is still present, identical and signed.
+    await page.reload();
+    await openReporting(page);
+    await page.getByLabel('Search reading worklist').fill('E2E External');
+    await expect(row).toBeVisible({ timeout: 20000 });
+    await row.click();
+    await expect(page.getByTestId('report-immutable')).toBeVisible({ timeout: 20000 });
+    await expect(page.getByTestId('report-impression')).toHaveValue(/E2E IMPRESSION/);
+
+    // And it is retrievable through report search with a Final status.
+    await page.getByRole('button', { name: 'Find a report' }).click();
+    await page.getByPlaceholder('Patient, MRN, token, accession…').fill('E2E IMPRESSION');
+    await expect(page.locator('body')).toContainText(patientName, { timeout: 20000 });
+});
+
+test('receptionist cannot author or sign radiology reports', async ({ page }) => {
+    // Log in as the RECEPTIONIST, not the clinic owner: the point of this test
+    // is the role that must NOT reach reporting. A hidden button is not a
+    // security control, so the server's answer is asserted too.
+    await page.goto('/');
+    await page.getByPlaceholder('Work email').fill(RECEPTIONIST_EMAIL);
+    await page.getByPlaceholder('Password').fill(PASSWORD);
+    await page.getByRole('button', { name: 'Sign In', exact: true }).click();
+    await expect(page.getByText('Total Studies Today')).toBeVisible({ timeout: 20000 });
+
+    // She is a real, working account — the refusal below is about reporting.
+    await expect(page.getByRole('button', { name: 'Reception Desk' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Radiology Reports' })).toHaveCount(0);
+
+    const status = async (url) =>
+        page.evaluate(async (target) => {
+            const response = await fetch(target, {
+                credentials: 'same-origin',
+                headers: { Accept: 'application/json' },
+            });
+            return response.status;
+        }, url);
+
+    // The reading queue, the study hand-off used by the dashboard, and the
+    // governed template library are all closed to her.
+    expect(await status('/api/v1/reporting/worklist')).toBe(403);
+    expect(await status('/api/v1/reporting/studies/1')).toBe(403);
+    expect(await status('/api/v1/reporting/templates')).toBe(403);
+});
+

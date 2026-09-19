@@ -2054,7 +2054,14 @@ const TemplateFormModal: React.FC<TemplateFormModalProps> = ({ template, modalit
       technique: technique.trim(),
       findings: findings.trim(),
       impression: impression.trim(),
-      recommendations: recommendations.trim()
+      recommendations: recommendations.trim(),
+      // Created from the catalog: clinic-wide, unpinned and unversioned until
+      // the server stores it (version 1, first revision).
+      scope: 'tenant',
+      isArchived: false,
+      isDefault: false,
+      version: template?.version ?? 1,
+      structuredFields: template?.structuredFields ?? []
     });
   };
 

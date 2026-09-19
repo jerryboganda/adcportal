@@ -45,6 +45,7 @@ class Appointment extends Model
         // Radiology study lifecycle
         'workflow_state',
         'priority',
+        'origin',
         'room_number',
         'assigned_radiologist_id',
         'performed_by_staff_id',
@@ -237,6 +238,12 @@ class Appointment extends Model
     public function radiologyReports()
     {
         return $this->hasMany(RadiologyReport::class)->orderByDesc('version');
+    }
+
+    /** Critical-result communications for this study (newest first). */
+    public function criticalFindingLogs()
+    {
+        return $this->hasMany(CriticalFindingLog::class)->orderByDesc('communicated_at');
     }
 
     public function latestReport()

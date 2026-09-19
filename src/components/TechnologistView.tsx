@@ -96,7 +96,12 @@ export const TechnologistView: React.FC<TechnologistViewProps> = ({
   // Active tech pipeline states
   const techStates = ['checked_in', 'preparing', 'in_progress', 'acquired'];
 
-  const allTechAppointments = appointments.filter((a) => techStates.includes(a.workflowState));
+  // Manual (external/offline) studies created from the reporting module live in
+  // the reading queue only: nothing was acquired here, so they never appear on
+  // an acquisition board.
+  const allTechAppointments = appointments.filter(
+    (a) => techStates.includes(a.workflowState) && a.origin !== 'manual'
+  );
 
   // Count summaries
   const statCount = allTechAppointments.filter(a => a.priority === 'stat').length;

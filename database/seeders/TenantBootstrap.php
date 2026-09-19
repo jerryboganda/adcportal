@@ -7,6 +7,7 @@ use App\Models\InventoryItem;
 use App\Models\Modality;
 use App\Models\PaymentMethod;
 use App\Models\Permission;
+use App\Models\ReportMacro;
 use App\Models\ReportTemplate;
 use App\Models\RisNotificationTemplate;
 use App\Models\Role;
@@ -108,15 +109,17 @@ class TenantBootstrap extends Seeder
             $modalityIds[$m['code']] = $modality->id;
         }
 
+        // `region` feeds the reporting module's modality + body-region template
+        // tier, so every procedure declares WHERE it images, not just what.
         $services = [
-            ['name' => 'Chest X-Ray PA & Lateral Views', 'code' => 'DX-CHEST-PA', 'modality' => 'DX', 'price' => 1800, 'duration' => 15, 'prep' => 'Remove any metal necklaces, brassieres with underwire, or upper body jewelry.', 'screening' => false, 'contrast' => 'none'],
-            ['name' => 'Whole Abdomen & Pelvis Ultrasound', 'code' => 'US-ABD-PEL', 'modality' => 'US', 'price' => 3500, 'duration' => 25, 'prep' => '6 hours fasting prior to appointment. Drink 1 litre of water 1 hour before exam for full bladder.', 'screening' => false, 'contrast' => 'none'],
-            ['name' => 'Carotid Doppler Bilateral', 'code' => 'US-CAROTID', 'modality' => 'US', 'price' => 4500, 'duration' => 30, 'prep' => 'No special preparation needed. Wear a loose collar shirt.', 'screening' => false, 'contrast' => 'none'],
-            ['name' => 'HRCT Chest (High Resolution CT)', 'code' => 'CT-CHEST-HR', 'modality' => 'CT', 'price' => 8500, 'duration' => 20, 'prep' => 'Fasting 4 hours if contrast indicated. Bring latest Serum Creatinine report.', 'screening' => true, 'contrast' => 'intravenous'],
-            ['name' => 'CT Brain Non-Contrast (NCCT)', 'code' => 'CT-BRAIN-NC', 'modality' => 'CT', 'price' => 6500, 'duration' => 15, 'prep' => 'Remove hairpins, earrings, dentures, and eyeglasses before scan.', 'screening' => false, 'contrast' => 'none'],
-            ['name' => 'MRI Brain with Spectroscopy & Diffusion', 'code' => 'MR-BRAIN-SPEC', 'modality' => 'MR', 'price' => 16500, 'duration' => 45, 'prep' => 'Complete mandatory MRI safety implant checklist. No magnetic objects, watches, or credit cards.', 'screening' => true, 'contrast' => 'intravenous'],
-            ['name' => 'MRI Lumbar Spine (LS Spine)', 'code' => 'MR-LUMBAR', 'modality' => 'MR', 'price' => 14500, 'duration' => 35, 'prep' => 'Wear comfortable hospital gown. Inform staff of any claustrophobia or pacemaker.', 'screening' => true, 'contrast' => 'none'],
-            ['name' => 'Bilateral Full-Field Digital Mammography', 'code' => 'MG-BILATERAL', 'modality' => 'MG', 'price' => 5200, 'duration' => 20, 'prep' => 'Do not apply deodorant, antiperspirant, powder, or lotions under arms or on breasts on the day of exam.', 'screening' => false, 'contrast' => 'none'],
+            ['name' => 'Chest X-Ray PA & Lateral Views', 'code' => 'DX-CHEST-PA', 'modality' => 'DX', 'price' => 1800, 'duration' => 15, 'prep' => 'Remove any metal necklaces, brassieres with underwire, or upper body jewelry.', 'screening' => false, 'contrast' => 'none', 'region' => 'Chest'],
+            ['name' => 'Whole Abdomen & Pelvis Ultrasound', 'code' => 'US-ABD-PEL', 'modality' => 'US', 'price' => 3500, 'duration' => 25, 'prep' => '6 hours fasting prior to appointment. Drink 1 litre of water 1 hour before exam for full bladder.', 'screening' => false, 'contrast' => 'none', 'region' => 'Abdomen'],
+            ['name' => 'Carotid Doppler Bilateral', 'code' => 'US-CAROTID', 'modality' => 'US', 'price' => 4500, 'duration' => 30, 'prep' => 'No special preparation needed. Wear a loose collar shirt.', 'screening' => false, 'contrast' => 'none', 'region' => 'Vascular'],
+            ['name' => 'HRCT Chest (High Resolution CT)', 'code' => 'CT-CHEST-HR', 'modality' => 'CT', 'price' => 8500, 'duration' => 20, 'prep' => 'Fasting 4 hours if contrast indicated. Bring latest Serum Creatinine report.', 'screening' => true, 'contrast' => 'intravenous', 'region' => 'Chest'],
+            ['name' => 'CT Brain Non-Contrast (NCCT)', 'code' => 'CT-BRAIN-NC', 'modality' => 'CT', 'price' => 6500, 'duration' => 15, 'prep' => 'Remove hairpins, earrings, dentures, and eyeglasses before scan.', 'screening' => false, 'contrast' => 'none', 'region' => 'Brain'],
+            ['name' => 'MRI Brain with Spectroscopy & Diffusion', 'code' => 'MR-BRAIN-SPEC', 'modality' => 'MR', 'price' => 16500, 'duration' => 45, 'prep' => 'Complete mandatory MRI safety implant checklist. No magnetic objects, watches, or credit cards.', 'screening' => true, 'contrast' => 'intravenous', 'region' => 'Brain'],
+            ['name' => 'MRI Lumbar Spine (LS Spine)', 'code' => 'MR-LUMBAR', 'modality' => 'MR', 'price' => 14500, 'duration' => 35, 'prep' => 'Wear comfortable hospital gown. Inform staff of any claustrophobia or pacemaker.', 'screening' => true, 'contrast' => 'none', 'region' => 'Spine'],
+            ['name' => 'Bilateral Full-Field Digital Mammography', 'code' => 'MG-BILATERAL', 'modality' => 'MG', 'price' => 5200, 'duration' => 20, 'prep' => 'Do not apply deodorant, antiperspirant, powder, or lotions under arms or on breasts on the day of exam.', 'screening' => false, 'contrast' => 'none', 'region' => 'Breast'],
         ];
 
         foreach ($services as $s) {
@@ -125,6 +128,7 @@ class TenantBootstrap extends Seeder
                 [
                     'name' => $s['name'],
                     'modality_id' => $modalityIds[$s['modality']],
+                    'body_region' => $s['region'],
                     'category_id' => $this->defaultCategoryId($business, $admin),
                     'price' => $s['price'],
                     'duration' => (string) $s['duration'],
@@ -140,6 +144,7 @@ class TenantBootstrap extends Seeder
 
         $this->seedScreeningForms($business, $admin, $modalityIds);
         $this->seedReportTemplates($business, $admin, $modalityIds);
+        $this->seedReportMacros($business, $admin, $modalityIds);
         $this->seedNotificationTemplates($business, $admin);
         $this->seedInventoryCatalog($business, $admin);
         $this->seedPaymentMethods($business, $admin);
@@ -248,18 +253,175 @@ class TenantBootstrap extends Seeder
             ['Bilateral Digital Mammography (BI-RADS 1)', 'MG', 'Asymptomatic routine screening mammogram.', 'Standard Cranio-Caudal (CC) and Medio-Lateral Oblique (MLO) full-field digital mammographic views of bilateral breasts.', "1. Breast Density: ACR Composition Category B (Scattered areas of fibroglandular density).\n2. Right Breast: Symmetric fibroglandular tissue distribution. No dominant solid mass, architectural distortion, or suspicious grouped microcalcifications.\n3. Left Breast: Symmetric appearance. No suspicious mass, focal asymmetry, or microcalcification clusters.\n4. Skin and nipple-areolar complexes are bilaterally normal without retraction or thickening.\n5. Axillary Regions: Bilateral benign-appearing lymph nodes with radiolucent fatty hilum. No suspicious adenopathy.", 'BI-RADS CATEGORY 1: Negative (Normal Bilateral Mammogram).', 'Continue routine annual or biennial screening mammography as per clinical guidelines.'],
         ];
 
+        // Clinical matching dimensions per seeded template:
+        // [code, body_region, age_group, sex, contrast]. A null age_group is
+        // the AGE-AGNOSTIC template of that procedure — the safe fallback for
+        // a patient whose cohort has no dedicated variant.
+        $dimensions = [
+            'Chest X-Ray PA View (Normal Routine)' => ['DX-CHEST-PA', 'Chest', null, null, 'without'],
+            'HRCT Chest (Parenchymal Evaluation)' => ['CT-CHEST-HR', 'Chest', null, null, 'without'],
+            'MRI Lumbar Spine (Degenerative Disc Disease)' => ['MR-LUMBAR', 'Spine', null, null, 'without'],
+            'Whole Abdomen Ultrasound (Normal)' => ['US-ABD-PEL', 'Abdomen', null, null, 'without'],
+            'Bilateral Digital Mammography (BI-RADS 1)' => ['MG-BILATERAL', 'Breast', null, 'female', 'without'],
+        ];
+
+        // Structured skeleton for the abdominal survey: each organ is a
+        // discrete field with CURATED normal phrasing, so the "Normal" quick
+        // control inserts approved text instead of the UI inventing it.
+        $abdomenStructure = [
+            ['key' => 'liver', 'label' => 'Liver', 'type' => 'radio', 'options' => ['Normal', 'Focal lesion', 'Diffusely abnormal'], 'normalText' => 'Liver is normal in size and echotexture without focal lesion.', 'required' => true],
+            ['key' => 'gallbladder', 'label' => 'Gallbladder', 'type' => 'radio', 'options' => ['Normal', 'Calculi', 'Wall thickening', 'Post-cholecystectomy'], 'normalText' => 'Gallbladder is well distended, thin walled and free of calculus or sludge.'],
+            ['key' => 'cbd_mm', 'label' => 'Common bile duct', 'type' => 'measurement', 'unit' => 'mm', 'placeholder' => '3.8', 'normalText' => 'Common bile duct is of normal calibre.'],
+            ['key' => 'pancreas', 'label' => 'Pancreas', 'type' => 'radio', 'options' => ['Normal', 'Not visualized', 'Abnormal'], 'normalText' => 'Pancreas is normal in size and echotexture.'],
+            ['key' => 'spleen', 'label' => 'Spleen', 'type' => 'radio', 'options' => ['Normal', 'Splenomegaly', 'Focal lesion'], 'normalText' => 'Spleen is normal in size and echotexture.'],
+            ['key' => 'hydronephrosis', 'label' => 'Hydronephrosis', 'type' => 'select', 'options' => ['None', 'Mild', 'Moderate', 'Severe'], 'normalText' => 'No hydronephrosis on either side.'],
+            ['key' => 'bladder', 'label' => 'Urinary bladder', 'type' => 'radio', 'options' => ['Normal', 'Calculus', 'Wall thickening'], 'normalText' => 'Urinary bladder is well filled with smooth wall contour and no intravesical lesion.'],
+            ['key' => 'free_fluid', 'label' => 'Free fluid / ascites', 'type' => 'checkbox', 'normalText' => 'No free fluid or ascites in the peritoneal cavity.'],
+        ];
+
         foreach ($templates as $t) {
+            [$code, $region, $ageGroup, $sex, $contrast] = $dimensions[$t[0]] ?? [null, null, null, null, null];
+
             ReportTemplate::updateOrCreate(
                 ['name' => $t[0], 'business_id' => $business->id],
                 [
                     'modality_id' => $modalityIds[$t[1]],
+                    'code' => $code,
+                    'body_region' => $region,
+                    'age_group' => $ageGroup,
+                    'sex' => $sex,
+                    'contrast' => $contrast,
+                    'structured_fields' => $t[0] === 'Whole Abdomen Ultrasound (Normal)' ? $abdomenStructure : null,
                     'clinical_history' => $t[2],
                     'technique' => $t[3],
                     'findings' => $t[4],
                     'impression' => $t[5],
                     'recommendations' => $t[6],
+                    'scope' => 'tenant',
                     'is_default' => false,
                     'created_by' => $admin->id,
+                    'updated_by' => $admin->id,
+                ]
+            );
+        }
+
+        $serviceIds = Service::where('business_id', $business->id)->pluck('id', 'code');
+
+        foreach ($this->ageVariantTemplates() as $variant) {
+            ReportTemplate::updateOrCreate(
+                ['name' => $variant['name'], 'business_id' => $business->id],
+                [
+                    'modality_id' => $modalityIds[$variant['modality']],
+                    'service_id' => ! empty($variant['service']) ? ($serviceIds[$variant['service']] ?? null) : null,
+                    'code' => $variant['code'],
+                    'body_region' => $variant['region'],
+                    'age_group' => $variant['ageGroup'],
+                    'contrast' => $variant['contrast'],
+                    'clinical_history' => $variant['history'],
+                    'technique' => $variant['technique'],
+                    'findings' => $variant['findings'],
+                    'impression' => $variant['impression'],
+                    'recommendations' => $variant['recommendations'],
+                    'scope' => 'tenant',
+                    'is_default' => false,
+                    'created_by' => $admin->id,
+                    'updated_by' => $admin->id,
+                ]
+            );
+        }
+    }
+
+    /**
+     * Age-specific baselines. Each is a DRAFTING AID for a named cohort — it
+     * is never an auto-confirmed normal, and the resolver only selects one when
+     * the patient's age band matches exactly.
+     *
+     * @return list<array<string,string|null>>
+     */
+    private function ageVariantTemplates(): array
+    {
+        return [
+            [
+                // The age-agnostic baseline of the same procedure: an adult
+                // study resolves here, a child resolves to the pediatric
+                // template below — never the other way round.
+                'name' => 'CT Brain (Non-Contrast) — Adult Baseline',
+                'code' => 'CT-BRAIN-NC', 'modality' => 'CT', 'region' => 'Brain',
+                'service' => 'CT-BRAIN-NC',
+                'ageGroup' => null, 'contrast' => 'without',
+                'history' => 'Head trauma, headache, focal neurological deficit, seizure or suspected acute intracranial pathology in an adult.',
+                'technique' => 'Non-contrast axial CT of the brain with coronal and sagittal reformations (120 kVp, automated exposure control).',
+                'findings' => "1. Grey-white differentiation is preserved. No intra- or extra-axial hemorrhage, infarct, or space-occupying lesion.\n2. Ventricles and sulci are age-appropriate; no hydrocephalus or cerebral oedema.\n3. Midline structures are central with no shift or herniation.\n4. Cranial vault and skull base show no fracture on bone windows.\n5. Visualized paranasal sinuses and mastoid air cells are normally aerated.\n6. No abnormal extra-axial collection.",
+                'impression' => 'No acute intracranial abnormality on this non-contrast CT brain.',
+                'recommendations' => 'Clinical correlation. MRI brain if symptoms persist or a posterior fossa/ischaemic cause is suspected.',
+            ],
+            [
+                'name' => 'Pediatric CT Brain (Non-Contrast)',
+                'code' => 'CT-BRAIN-NC', 'modality' => 'CT', 'region' => 'Brain',
+                'service' => 'CT-BRAIN-NC',
+                'ageGroup' => 'pediatric', 'contrast' => 'without',
+                'history' => 'Head trauma, seizure, persistent headache or suspected raised intracranial pressure in a pediatric patient.',
+                'technique' => 'Non-contrast axial CT of the brain with coronal and sagittal reformations, low-dose pediatric protocol (100 kVp, automated exposure control).',
+                'findings' => "1. Grey-white differentiation is preserved for age. No intra- or extra-axial hemorrhage.\n2. No skull vault fracture or depressed fracture on bone windows.\n3. Ventricles and subarachnoid spaces are normal in size and configuration for age.\n4. Midline structures are central; no mass effect or midline shift.\n5. No hydrocephalus, no cerebral oedema, and no abnormal extra-axial collection.\n6. Visualized paranasal sinuses and mastoid air cells are normally aerated.",
+                'impression' => 'No acute intracranial abnormality on this non-contrast pediatric CT brain.',
+                'recommendations' => 'Clinical correlation and neurological observation as indicated. MRI if symptoms persist or evolve.',
+            ],
+            [
+                'name' => 'Infant Cranial Ultrasound (Neonatal Head)',
+                'code' => 'US-CRANIAL', 'modality' => 'US', 'region' => 'Brain',
+                'ageGroup' => 'infant', 'contrast' => 'without',
+                'history' => 'Neonatal/infant cranial ultrasound for prematurity, suspected intraventricular hemorrhage, or abnormal head circumference.',
+                'technique' => 'Real-time cranial ultrasound through the anterior fontanelle in coronal and sagittal planes using a 7.5 MHz sector transducer, supplemented by mastoid fontanelle views.',
+                'findings' => "1. Bilateral lateral ventricles are symmetrical and of normal size for gestational and postnatal age.\n2. No germinal matrix, intraventricular, or parenchymal hemorrhage.\n3. The periventricular white matter shows normal echogenicity without cystic change.\n4. The corpus callosum and basal ganglia are normal in appearance.\n5. No extra-axial fluid collection. The cerebellum is normal on the mastoid fontanelle view.\n6. Midline structures are central.",
+                'impression' => 'Normal cranial ultrasound for age. No intracranial hemorrhage or ventriculomegaly.',
+                'recommendations' => 'Routine neonatal follow-up. Repeat cranial ultrasound only if clinically indicated.',
+            ],
+            [
+                'name' => 'Pediatric Chest X-Ray (PA View)',
+                'code' => 'DX-CHEST-PA', 'modality' => 'DX', 'region' => 'Chest',
+                'ageGroup' => 'pediatric', 'contrast' => 'without',
+                'history' => 'Cough, fever, breathlessness or suspected lower respiratory tract infection in a pediatric patient.',
+                'technique' => 'Erect PA chest radiograph obtained at adequate inspiration with standard pediatric exposure parameters.',
+                'findings' => "1. Both lung fields are clear without consolidation, collapse, or hyperinflation.\n2. The heart size is within normal limits for age (cardiothoracic ratio within pediatric norms).\n3. Both costophrenic angles are clear; no pleural effusion or pneumothorax.\n4. The mediastinum and thymic silhouette are normal for age.\n5. No radio-opaque foreign body in the aerodigestive tract.\n6. The visualized skeletal thorax is normal for age.",
+                'impression' => 'No acute cardiopulmonary abnormality on this pediatric chest radiograph.',
+                'recommendations' => 'Symptomatic treatment and clinical review as indicated.',
+            ],
+        ];
+    }
+
+    /**
+     * Macro / snippet library. Clinical report text lives in tenant-managed
+     * data so a clinic can curate it — never hardcoded inside a UI component.
+     * `null` modality = available for every study.
+     *
+     * @param array<string,int> $modalityIds
+     */
+    private function seedReportMacros(Business $business, User $admin, array $modalityIds): void
+    {
+        // Clinical snippet text comes from ReportMacroLibrary — the same
+        // curated source the backfill migration uses, so a clinic provisioned
+        // today and a clinic migrated from the earlier schema end up with
+        // identical libraries.
+        $macros = collect(\App\Support\ReportMacroLibrary::all())
+            ->map(fn (array $m) => [
+                $m['name'], $m['modality'], $m['shortcut'],
+                $m['findings'], $m['impression'], $m['recommendations'],
+            ])
+            ->all();
+
+        foreach ($macros as [$name, $modalityCode, $shortcut, $findings, $impression, $recommendations]) {
+            ReportMacro::updateOrCreate(
+                ['name' => $name, 'business_id' => $business->id],
+                [
+                    'modality_id' => $modalityCode ? ($modalityIds[$modalityCode] ?? null) : null,
+                    'shortcut' => $shortcut,
+                    'findings' => $findings,
+                    'impression' => $impression,
+                    'recommendations' => $recommendations,
+                    'scope' => 'tenant',
+                    'is_archived' => false,
+                    'created_by' => $admin->id,
+                    'updated_by' => $admin->id,
                 ]
             );
         }

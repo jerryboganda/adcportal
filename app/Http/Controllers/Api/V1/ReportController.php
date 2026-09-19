@@ -5,13 +5,17 @@ namespace App\Http\Controllers\Api\V1;
 use App\Http\Resources\ApiShape;
 use App\Models\Appointment;
 use App\Models\RadiologyReport;
+use App\Models\ReportTemplate;
 use App\Models\UsageCounter;
 use App\Services\StudyWorkflowService;
+use App\Support\ReportStructure;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use InvalidArgumentException;
 
 /**
@@ -42,7 +46,20 @@ class ReportController extends BaseApiController
             abort(422, 'An unsigned draft already exists for this study. Update it instead of creating another.');
         }
 
-        $report = DB::transaction(function () use ($validated, $appointment, $signed) {
+        $template = $this->resolveTemplate($validated['templateId'] ?? null);
+
+        [$structuredValues, $structureErrors] = ReportStructure::validateValues(
+            $template?->structured_fields,
+            $validated['structuredValues'] ?? null,
+        );
+
+        if ($structureErrors !== []) {
+            throw ValidationException::withMessages(
+                collect($structureErrors)->mapWithKeys(fn ($msg, $key) => ["structuredValues.{$key}" => $msg])->all()
+            );
+        }
+
+        $report = DB::transaction(function () use ($validated, $appointment, $signed, $template, $structuredValues) {
             $nextVersion = ((int) $appointment->radiologyReports()->max('version')) + 1;
             $parent = $appointment->radiologyReports()->first();
 
@@ -58,11 +75,13 @@ class ReportController extends BaseApiController
                 'clinical_history' => $validated['clinicalHistory'] ?? null,
                 'technique' => $validated['technique'] ?? null,
                 'comparison' => $validated['comparison'] ?? null,
-                'findings' => $validated['findings'],
-                'impression' => $validated['impression'],
+                'findings' => $validated['findings'] ?? null,
+                'impression' => $validated['impression'] ?? null,
                 'recommendations' => $validated['recommendations'] ?? null,
                 'critical_flag' => (bool) ($validated['criticalFlag'] ?? false),
-                'template_id' => $validated['templateId'] ?? null,
+                'template_id' => $template?->id,
+                'template_version' => $template?->version,
+                'structured_values' => $structuredValues ?: null,
                 'appointment_id' => $appointment->id,
                 'version' => $nextVersion,
                 'type' => $signed ? 'addendum' : 'draft',
@@ -91,9 +110,30 @@ class ReportController extends BaseApiController
             ),
         ]);
 
+        return response()->json([
+            'data' => [
+                'study' => ApiShape::appointment($appointment->fresh(StudyController::eager())),
+                'report' => ApiShape::radiologyReport($report->fresh(['author', 'signer', 'releases'])),
+            ],
+            'meta' => ['reportId' => (string) $report->id],
+        ]);
+    }
+
+    /** Current server state of one report version (draft recovery / conflict resolution). */
+    public function show(RadiologyReport $report): JsonResponse
+    {
+        if ($report->business_id !== $this->tenantId()) {
+            abort(404);
+        }
+
+        $this->denyUnless('report manage');
+
+        $report->loadMissing(['author', 'signer', 'releases.releaser']);
+
         return $this->ok([
-            'study' => ApiShape::appointment($appointment->fresh(StudyController::eager())),
-        ], ['reportId' => (string) $report->id]);
+            'report' => ApiShape::radiologyReport($report),
+            'study' => ApiShape::appointment($report->appointment->fresh(StudyController::eager())),
+        ]);
     }
 
     public function update(Request $request, RadiologyReport $report): JsonResponse
@@ -110,21 +150,140 @@ class ReportController extends BaseApiController
 
         $validated = $this->validated($request);
 
-        $report->update([
-            'clinical_history' => $validated['clinicalHistory'] ?? null,
-            'technique' => $validated['technique'] ?? null,
-            'comparison' => $validated['comparison'] ?? null,
-            'findings' => $validated['findings'],
-            'impression' => $validated['impression'],
-            'recommendations' => $validated['recommendations'] ?? null,
-            'critical_flag' => (bool) ($validated['criticalFlag'] ?? false),
-        ]);
-
-        if (! empty($validated['signNow'])) {
-            DB::transaction(fn () => $this->signReport($report, $validated['signAs'] ?? 'final'));
+        // Optimistic concurrency: an autosave built from a stale snapshot must
+        // not silently overwrite the other radiologist's work. The client is
+        // handed the authoritative current state so it can reconcile.
+        $expected = $validated['lockVersion'] ?? null;
+        if ($expected !== null && (int) $expected !== (int) ($report->lock_version ?? 1)) {
+            return response()->json([
+                'message' => 'This report was changed by someone else. Your copy is out of date.',
+                'error' => 'report.conflict',
+                'data' => ['report' => ApiShape::radiologyReport($report->fresh(['author', 'signer', 'releases']))],
+            ], 409);
         }
 
-        return $this->ok(['study' => ApiShape::appointment($report->appointment->fresh(StudyController::eager()))]);
+        $template = $report->template_id
+            ? ReportTemplate::forClinic($this->tenantId())->find($report->template_id)
+            : $this->resolveTemplate($validated['templateId'] ?? null);
+
+        [$structuredValues, $structureErrors] = ReportStructure::validateValues(
+            $template?->structured_fields,
+            $validated['structuredValues'] ?? null,
+        );
+
+        if ($structureErrors !== []) {
+            throw ValidationException::withMessages(
+                collect($structureErrors)->mapWithKeys(fn ($msg, $key) => ["structuredValues.{$key}" => $msg])->all()
+            );
+        }
+
+        DB::transaction(function () use ($report, $validated, $template, $structuredValues) {
+            $report->update([
+                'clinical_history' => $validated['clinicalHistory'] ?? null,
+                'technique' => $validated['technique'] ?? null,
+                'comparison' => $validated['comparison'] ?? null,
+                'findings' => $validated['findings'] ?? null,
+                'impression' => $validated['impression'] ?? null,
+                'recommendations' => $validated['recommendations'] ?? null,
+                'critical_flag' => (bool) ($validated['criticalFlag'] ?? false),
+                'structured_values' => $structuredValues ?: null,
+            ]);
+
+            if ($template !== null) {
+                $report->forceFill([
+                    'template_id' => $template->id,
+                    'template_version' => $template->version,
+                ])->save();
+            }
+
+            // Every accepted write advances the draft's revision counter.
+            $report->forceFill(['lock_version' => ((int) ($report->lock_version ?? 1)) + 1])->save();
+
+            if (! empty($validated['signNow'])) {
+                $this->signReport($report, $validated['signAs'] ?? 'final');
+            }
+        });
+
+        return $this->ok([
+            'report' => ApiShape::radiologyReport($report->fresh(['author', 'signer', 'releases'])),
+            'study' => ApiShape::appointment($report->appointment->fresh(StudyController::eager())),
+        ]);
+    }
+
+    /**
+     * Add an addendum to a SIGNED report.
+     *
+     * The original final version is never touched: an addendum is appended as
+     * its own signed version linked through `parent_report_id`, so the
+     * medicol-legal record keeps both documents exactly as they were signed.
+     */
+    public function addendum(Request $request, RadiologyReport $report): JsonResponse
+    {
+        if ($report->business_id !== $this->tenantId()) {
+            abort(404);
+        }
+
+        $this->denyUnless('report sign');
+
+        if (! $report->isSigned()) {
+            abort(422, 'Only a signed report can receive an addendum.');
+        }
+
+        $validated = $request->validate([
+            'text' => ['required', 'string', 'max:20000'],
+            'recommendations' => ['nullable', 'string', 'max:3000'],
+            'criticalFlag' => ['sometimes', 'boolean'],
+        ]);
+
+        // Chain onto the newest signed version for this study (the report the
+        // addendum actually amends).
+        $latestSigned = RadiologyReport::where('appointment_id', $report->appointment_id)
+            ->whereNotNull('locked_at')
+            ->orderByDesc('version')
+            ->first() ?? $report;
+
+        $addendum = DB::transaction(function () use ($validated, $report, $latestSigned) {
+            $nextVersion = ((int) RadiologyReport::where('appointment_id', $report->appointment_id)->max('version')) + 1;
+
+            $addendum = RadiologyReport::create([
+                // Context is copied so the addendum renders as a complete
+                // document on its own, while the amended FINDINGS/IMPRESSION
+                // stay exactly as originally signed.
+                'clinical_history' => $latestSigned->clinical_history,
+                'technique' => $latestSigned->technique,
+                'comparison' => $latestSigned->comparison,
+                'findings' => $validated['text'],
+                'impression' => null,
+                'recommendations' => $validated['recommendations'] ?? null,
+                'critical_flag' => (bool) ($validated['criticalFlag'] ?? $latestSigned->critical_flag),
+                'template_id' => $latestSigned->template_id,
+                'template_version' => $latestSigned->template_version,
+                'appointment_id' => $report->appointment_id,
+                'version' => $nextVersion,
+                'type' => 'addendum',
+                'parent_report_id' => $latestSigned->id,
+                'authored_by' => Auth::id(),
+                'business_id' => $this->tenantId(),
+                'created_by' => Auth::id(),
+            ]);
+
+            $this->signReport($addendum, 'final');
+
+            return $addendum;
+        });
+
+        $this->audit('report_addendum', $report->appointment, [
+            'summary' => "Signed addendum for {$report->appointment->patientDisplayName()} (#{$report->appointment->token_number})",
+            'report_id' => $addendum->id,
+            'parent_report_id' => $latestSigned->id,
+        ]);
+
+        return response()->json([
+            'data' => [
+                'report' => ApiShape::radiologyReport($addendum->fresh(['author', 'signer', 'releases'])),
+                'study' => ApiShape::appointment($report->appointment->fresh(StudyController::eager())),
+            ],
+        ], 201);
     }
 
     public function sign(Request $request, RadiologyReport $report): JsonResponse
@@ -263,22 +422,42 @@ class ReportController extends BaseApiController
 
     private function validated(Request $request): array
     {
+        // A DRAFT may be partial — a radiologist saves an indication, a
+        // technique or half a findings section and comes back to it. Completeness
+        // is a precondition of SIGNING, so the narrative sections are required
+        // only when the same request finalizes the report.
+        $signing = $request->boolean('signNow');
+
         return $request->validate([
             'clinicalHistory' => ['nullable', 'string', 'max:5000'],
             'technique' => ['nullable', 'string', 'max:5000'],
             'comparison' => ['nullable', 'string', 'max:2000'],
-            'findings' => ['required', 'string'],
-            'impression' => ['required', 'string'],
+            'findings' => [Rule::requiredIf($signing), 'nullable', 'string'],
+            'impression' => [Rule::requiredIf($signing), 'nullable', 'string'],
             'recommendations' => ['nullable', 'string', 'max:3000'],
             'criticalFlag' => ['sometimes', 'boolean'],
             'templateId' => ['nullable', 'integer'],
+            'structuredValues' => ['sometimes', 'array'],
+            // Draft autosave revision the client believes it is editing.
+            'lockVersion' => ['sometimes', 'integer', 'min:1'],
             'signNow' => ['sometimes', 'boolean'],
             'signAs' => ['sometimes', 'in:final,preliminary'],
         ]);
     }
 
+    /** Resolve a client-supplied template id INSIDE the tenant boundary. */
+    private function resolveTemplate(?int $templateId): ?ReportTemplate
+    {
+        if (empty($templateId)) {
+            return null;
+        }
+
+        // A template from another tenant simply does not exist here.
+        return ReportTemplate::forClinic($this->tenantId())->findOrFail($templateId);
+    }
+
     /** Typed-signature confirmation must match the signing radiologist's name. */
-    private function signReport(RadiologyReport $report, string $signAs): void
+    public function signReport(RadiologyReport $report, string $signAs): void
     {
         if ($report->isSigned()) {
             throw new InvalidArgumentException('Report is already signed.');

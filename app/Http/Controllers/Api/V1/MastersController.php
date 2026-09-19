@@ -380,51 +380,161 @@ class MastersController extends BaseApiController
 
     public function storeReportTemplate(Request $request): JsonResponse
     {
-        $this->denyUnless('report template create');
-
         $validated = $this->validateReportTemplate($request);
+        $scope = $validated['scope'] ?? 'personal';
+
+        // A tenant-wide template is governed clinical content; a radiologist's
+        // own private template only needs report-authoring rights.
+        if ($scope === 'tenant') {
+            $this->denyUnless('report template create');
+        } else {
+            $this->denyUnlessAny(['report template create', 'report edit'], 'report template create');
+        }
 
         $template = ReportTemplate::create([
-            ...collect($validated)->only(['name', 'clinicalHistory', 'technique', 'findings', 'impression', 'recommendations'])
-                ->mapWithKeys(fn ($v, $k) => [\Str::snake($k) => $v])->all(),
+            ...$this->templateColumns($validated),
             'modality_id' => $validated['modalityId'],
+            'service_id' => $validated['serviceId'] ?? null,
+            'body_region' => $validated['bodyRegion'] ?? null,
+            'age_group' => $validated['ageGroup'] ?? null,
+            'sex' => $validated['sex'] ?? null,
+            'contrast' => $validated['contrast'] ?? null,
+            'scope' => $scope,
+            'is_default' => (bool) ($validated['isDefault'] ?? false),
+            'version' => 1,
             'business_id' => $this->tenantId(),
             'created_by' => auth()->id(),
+            'updated_by' => auth()->id(),
         ]);
+
+        $this->audit('report_template_saved', $template, ['summary' => "Created report template \"{$template->name}\""]);
 
         return response()->json(['data' => ['template' => ApiShape::reportTemplate($template)]], 201);
     }
 
     public function updateReportTemplate(Request $request, ReportTemplate $template): JsonResponse
     {
-        $this->denyUnless('report template edit');
-
-        if ($template->business_id !== $this->tenantId()) {
-            abort(404);
-        }
+        $this->guardTemplate($template, 'report template edit');
 
         $validated = $this->validateReportTemplate($request);
 
         $template->update([
-            ...collect($validated)->only(['name', 'clinicalHistory', 'technique', 'findings', 'impression', 'recommendations'])
-                ->mapWithKeys(fn ($v, $k) => [\Str::snake($k) => $v])->all(),
+            ...$this->templateColumns($validated),
             'modality_id' => $validated['modalityId'],
+            'service_id' => $validated['serviceId'] ?? null,
+            'body_region' => $validated['bodyRegion'] ?? null,
+            'age_group' => $validated['ageGroup'] ?? null,
+            'sex' => $validated['sex'] ?? null,
+            'contrast' => $validated['contrast'] ?? null,
+            'is_default' => (bool) ($validated['isDefault'] ?? $template->is_default),
+            // Every edit is a new revision: reports record which revision they
+            // were authored against, so clinical text stays traceable.
+            'version' => ((int) $template->version) + 1,
+            'updated_by' => auth()->id(),
+        ]);
+
+        $this->audit('report_template_saved', $template, ['summary' => "Updated report template \"{$template->name}\" to v{$template->version}"]);
+
+        return $this->ok(['template' => ApiShape::reportTemplate($template->fresh(['modality', 'serviceData', 'author']))]);
+    }
+
+    public function destroyReportTemplate(ReportTemplate $template): JsonResponse
+    {
+        $this->guardTemplate($template, 'report template delete');
+
+        $template->delete();
+
+        $this->audit('report_template_deleted', $template, ['summary' => "Deleted report template \"{$template->name}\""]);
+
+        return $this->ok(['deleted' => true]);
+    }
+
+    /**
+     * Archive (retire) a template. Historical reports keep referencing it, so
+     * archival — not deletion — is the normal retirement path.
+     */
+    public function archiveReportTemplate(Request $request, ReportTemplate $template): JsonResponse
+    {
+        $this->guardTemplate($template, 'report template edit');
+
+        $validated = $request->validate(['archived' => ['sometimes', 'boolean']]);
+        $archived = (bool) ($validated['archived'] ?? true);
+
+        $template->forceFill(['is_archived' => $archived, 'updated_by' => auth()->id()])->save();
+
+        $this->audit('report_template_archived', $template, [
+            'summary' => ($archived ? 'Archived' : 'Restored')." report template \"{$template->name}\"",
         ]);
 
         return $this->ok(['template' => ApiShape::reportTemplate($template->fresh())]);
     }
 
-    public function destroyReportTemplate(ReportTemplate $template): JsonResponse
+    /** Copy a template (typically a shared one) into a new private or shared template. */
+    public function duplicateReportTemplate(Request $request, ReportTemplate $template): JsonResponse
     {
-        $this->denyUnless('report template delete');
-
         if ($template->business_id !== $this->tenantId()) {
             abort(404);
         }
 
-        $template->delete();
+        $validated = $request->validate([
+            'name' => ['nullable', 'string', 'max:255'],
+            'scope' => ['sometimes', 'in:tenant,personal'],
+        ]);
 
-        return $this->ok(['deleted' => true]);
+        $scope = $validated['scope'] ?? 'personal';
+
+        if ($scope === 'tenant') {
+            $this->denyUnless('report template create');
+        } else {
+            $this->denyUnlessAny(['report template create', 'report edit'], 'report template create');
+        }
+
+        $copy = $template->replicate(['deleted_at']);
+        $copy->name = $validated['name'] ?? $template->name.' (copy)';
+        $copy->scope = $scope;
+        $copy->is_default = false;
+        $copy->version = 1;
+        $copy->created_by = auth()->id();
+        $copy->updated_by = auth()->id();
+        $copy->save();
+
+        $this->audit('report_template_saved', $copy, ['summary' => "Duplicated report template \"{$template->name}\""]);
+
+        return response()->json(['data' => ['template' => ApiShape::reportTemplate($copy)]], 201);
+    }
+
+    /**
+     * Authorisation for a template. A radiologist may manage their OWN private
+     * template with report-authoring rights; shared clinic templates need the
+     * template permissions.
+     */
+    private function guardTemplate(ReportTemplate $template, string $sharedPermission): void
+    {
+        if ($template->business_id !== $this->tenantId()) {
+            abort(404);
+        }
+
+        $mine = ($template->scope === 'personal') && (int) $template->created_by === (int) auth()->id();
+
+        if ($mine) {
+            $this->denyUnlessAny([$sharedPermission, 'report edit'], $sharedPermission);
+
+            return;
+        }
+
+        $this->denyUnless($sharedPermission);
+    }
+
+    /** @return array<string,mixed> */
+    private function templateColumns(array $validated): array
+    {
+        return [
+            ...collect($validated)->only(['name', 'clinicalHistory', 'technique', 'findings', 'impression', 'recommendations'])
+                ->mapWithKeys(fn ($v, $k) => [\Str::snake($k) => $v])->all(),
+            'name' => $validated['name'],
+            'code' => $validated['code'] ?? null,
+            'structured_fields' => \App\Support\ReportStructure::sanitizeFields($validated['structuredFields'] ?? null) ?: null,
+        ];
     }
 
     // ==================== rooms (imaging suites) ====================
@@ -597,11 +707,25 @@ class MastersController extends BaseApiController
     {
         return $request->validate([
             'name' => ['required', 'string', 'max:255'],
+            'code' => ['nullable', 'string', 'max:60'],
             'modalityId' => $this->modalityRule(),
+            'serviceId' => [
+                'nullable', 'integer',
+                Rule::exists('services', 'id')->where(fn ($q) => $q->where('business_id', $this->tenantId())),
+            ],
+            'bodyRegion' => ['nullable', 'string', 'max:60'],
+            'ageGroup' => ['nullable', 'in:'.implode(',', \App\Support\AgeGroup::all())],
+            'sex' => ['nullable', 'in:male,female'],
+            'contrast' => ['nullable', 'in:with,without,both'],
+            'scope' => ['sometimes', 'in:tenant,personal'],
+            'isDefault' => ['sometimes', 'boolean'],
+            'structuredFields' => ['sometimes', 'array', 'max:60'],
             'clinicalHistory' => ['nullable', 'string', 'max:5000'],
             'technique' => ['nullable', 'string', 'max:5000'],
+            // A findings/impression skeleton may legitimately be empty: a
+            // template is a drafting aid, not a mandatory fill-in form.
             'findings' => ['nullable', 'string'],
-            'impression' => ['required', 'string'],
+            'impression' => ['nullable', 'string'],
             'recommendations' => ['nullable', 'string', 'max:3000'],
         ]);
     }

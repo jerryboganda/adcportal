@@ -150,6 +150,14 @@ export interface RadiologyReport {
   lockedAt?: string;
   pdfPath?: string;
   releases: ReportRelease[];
+  /** Draft revision used for optimistic locking (autosave conflict guard). */
+  lockVersion: number;
+  templateId?: string | null;
+  templateVersion?: number | null;
+  structuredValues: StructuredValues;
+  statusLabel: string;
+  summary: string;
+  isSigned: boolean;
 }
 
 export interface ReportRelease {
@@ -178,6 +186,8 @@ export interface Appointment {
   time: string;
   priority: Priority;
   workflowState: StudyState;
+  /** scheduled = booked; manual = created by reporting for an external study. */
+  origin?: 'scheduled' | 'manual';
   cancelReason?: string;
   rejectReason?: string;
   screeningRequired: boolean;
@@ -248,16 +258,199 @@ export interface Invoice {
   voidedAt?: string;
 }
 
+// ==================== radiology reporting module ====================
+
+/** Structured control types a template may declare. */
+export type StructuredFieldType = 'text' | 'number' | 'measurement' | 'select' | 'radio' | 'checkbox' | 'date';
+
+/**
+ * A structured report field. `normalText` is CLINIC-CURATED phrasing: the
+ * "Normal" quick control inserts exactly that sentence instead of the UI
+ * inventing clinical wording.
+ */
+export interface StructuredField {
+  key: string;
+  label: string;
+  type: StructuredFieldType;
+  required?: boolean;
+  unit?: string;
+  placeholder?: string;
+  options?: string[];
+  normalText?: string;
+}
+
+export type StructuredValues = Record<string, string | boolean>;
+
+/** How the "Normal" quick control can mark one field. */
+export type NormalMark = 'normal' | 'abnormal' | 'not_visualized' | 'na';
+
 export interface ReportTemplate {
   id: string;
   name: string;
-  code?: string;
+  code?: string | null;
   modalityId: number;
+  modalityCode?: string | null;
+  serviceId?: number | null;
+  serviceName?: string | null;
+  bodyRegion?: string | null;
+  ageGroup?: string | null;
+  sex?: 'male' | 'female' | null;
+  contrast?: 'with' | 'without' | 'both' | null;
+  scope: 'tenant' | 'personal';
+  isArchived: boolean;
+  isDefault: boolean;
+  version: number;
+  author?: string | null;
+  structuredFields: StructuredField[];
   clinicalHistory: string;
   technique: string;
   findings: string;
   impression: string;
   recommendations: string;
+  updatedAt?: string | null;
+}
+
+export type ReportingTab =
+  | 'assigned'
+  | 'unreported'
+  | 'in_progress'
+  | 'priority'
+  | 'drafts'
+  | 'preliminary'
+  | 'finalized'
+  | 'addenda'
+  | 'recent'
+  | 'all';
+
+export type ReportStatusFilter = 'not_started' | 'draft' | 'preliminary' | 'final' | 'addendum';
+
+/** One row of the server-side reading worklist. */
+export interface WorklistStudy {
+  id: string;
+  tokenNumber: string;
+  patientId: string;
+  patientName: string;
+  mrn: string;
+  age: number;
+  gender: 'male' | 'female' | 'other';
+  serviceId: number;
+  serviceName: string;
+  modalityId: number;
+  modalityCode: string;
+  modalityColor: string;
+  bodyRegion: string;
+  contrastType: string;
+  date: string;
+  time: string;
+  priority: Priority;
+  workflowState: StudyState;
+  assignedRadiologistId?: string | null;
+  assignedRadiologistName?: string | null;
+  referrerName?: string | null;
+  roomNumber: string;
+  rejectReason?: string | null;
+  acquiredAt?: string | null;
+  reportedAt?: string | null;
+  turnaroundHours?: number | null;
+  slaDueAt?: string | null;
+  reportId?: string | null;
+  reportStatus: string;
+  reportType?: 'draft' | 'preliminary' | 'final' | 'addendum' | null;
+  reportSignedAt?: string | null;
+  reportAuthor?: string | null;
+  criticalFlag: boolean;
+}
+
+export interface WorklistCounts {
+  assigned: number;
+  unreported: number;
+  in_progress: number;
+  priority: number;
+  drafts: number;
+  preliminary: number;
+  finalized: number;
+  addenda: number;
+  recent: number;
+  all: number;
+  stat: number;
+}
+
+export interface ReportingWorklistResult {
+  studies: WorklistStudy[];
+  counts: WorklistCounts;
+  tab: ReportingTab;
+  page: number;
+  perPage: number;
+  total: number;
+  hasMore: boolean;
+}
+
+/** Which template the resolver picked, and on what basis. */
+export interface TemplateMatch {
+  matched: ReportTemplate | null;
+  tier: string;
+  ageGroup: string | null;
+  ageGroupLabel: string;
+  candidates: number;
+  explanation: string;
+}
+
+/** A reusable reporting snippet. Clinical text is tenant data, not UI code. */
+export interface ReportMacro {
+  id: string;
+  name: string;
+  shortcut: string;
+  modalityId?: number | null;
+  serviceId?: number | null;
+  findings: string;
+  impression: string;
+  recommendations: string;
+  scope: 'tenant' | 'personal';
+  isArchived: boolean;
+  usageCount: number;
+  author?: string | null;
+}
+
+/** Critical-result communication — a record in its own right. */
+export interface CriticalFindingLog {
+  id: string;
+  appointmentId: string;
+  reportId?: string | null;
+  summary: string;
+  notifiedTo: string;
+  notifiedRole: string;
+  contact: string;
+  method: 'phone' | 'in_person' | 'sms' | 'email' | 'portal';
+  readBackVerified: boolean;
+  adviceGiven: string;
+  communicatedAt?: string | null;
+  communicatedBy?: string | null;
+}
+
+export interface ReportSearchRow {
+  report: RadiologyReport;
+  study: WorklistStudy | null;
+}
+
+export interface PriorExam {
+  study: WorklistStudy;
+  report: {
+    id: string;
+    type: string;
+    statusLabel: string;
+    signedAt?: string | null;
+    signedBy?: string | null;
+    impression: string;
+    findings: string;
+    comparison: string;
+  } | null;
+}
+
+export interface RadiologistSummary {
+  id: string;
+  name: string;
+  role: string;
+  department: string;
 }
 
 // Roles the backend can issue (see StaffUserController validation + seed).

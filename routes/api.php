@@ -19,6 +19,7 @@ use App\Http\Controllers\Api\V1\Platform\PlatformSupportSessionController;
 use App\Http\Controllers\Api\V1\Platform\PlatformTenantController;
 use App\Http\Controllers\Api\V1\Platform\PlatformUserController;
 use App\Http\Controllers\Api\V1\ReportController;
+use App\Http\Controllers\Api\V1\ReportingController;
 use App\Http\Controllers\Api\V1\PublicTenantContextController;
 use App\Http\Controllers\Api\V1\QueueDisplayController;
 use App\Http\Controllers\Api\V1\SettingsController;
@@ -119,10 +120,39 @@ Route::middleware(['auth', 'tenant.active', 'throttle:tenant'])->group(function 
 
     // Radiology reports
     Route::post('/studies/{appointment}/reports', [ReportController::class, 'store'])->whereNumber('appointment');
+    Route::get('/reports/{report}', [ReportController::class, 'show'])->whereNumber('report');
     Route::put('/reports/{report}', [ReportController::class, 'update'])->whereNumber('report');
     Route::post('/reports/{report}/sign', [ReportController::class, 'sign'])->whereNumber('report');
+    Route::post('/reports/{report}/addendum', [ReportController::class, 'addendum'])->whereNumber('report');
     Route::post('/reports/{report}/release', [ReportController::class, 'release'])->whereNumber('report');
     Route::get('/reports/{report}/pdf', [ReportController::class, 'downloadPdf'])->whereNumber('report');
+
+    // Radiologist reporting module: server-side reading worklist, template
+    // resolution/library, curated macros, report search, priors and the
+    // critical-result communication log.
+    Route::prefix('reporting')->group(function () {
+        Route::get('/worklist', [ReportingController::class, 'worklist']);
+        Route::get('/studies/{appointment}', [ReportingController::class, 'study'])->whereNumber('appointment');
+        Route::get('/roster', [ReportingController::class, 'roster']);
+
+        Route::get('/templates', [ReportingController::class, 'templates']);
+        Route::post('/templates/resolve', [ReportingController::class, 'resolveTemplate']);
+
+        Route::get('/macros', [ReportingController::class, 'macros']);
+        Route::post('/macros', [ReportingController::class, 'storeMacro']);
+        Route::put('/macros/{macro}', [ReportingController::class, 'updateMacro'])->whereNumber('macro');
+        Route::delete('/macros/{macro}', [ReportingController::class, 'destroyMacro'])->whereNumber('macro');
+        Route::post('/macros/{macro}/use', [ReportingController::class, 'useMacro'])->whereNumber('macro');
+
+        Route::get('/reports', [ReportingController::class, 'reportSearch']);
+        Route::post('/reports/manual', [ReportingController::class, 'storeManualReport']);
+        Route::get('/priors/{appointment}', [ReportingController::class, 'priors'])->whereNumber('appointment');
+
+        Route::get('/critical-findings/{appointment}', [ReportingController::class, 'criticalFindings'])->whereNumber('appointment');
+        Route::post('/critical-findings/{appointment}', [ReportingController::class, 'storeCriticalFinding'])->whereNumber('appointment');
+
+        Route::post('/studies/{appointment}/assign', [ReportingController::class, 'assign'])->whereNumber('appointment');
+    });
 
     // Billing
     Route::get('/invoices', [BillingController::class, 'index']);
@@ -155,6 +185,8 @@ Route::middleware(['auth', 'tenant.active', 'throttle:tenant'])->group(function 
     Route::post('/report-templates', [MastersController::class, 'storeReportTemplate']);
     Route::put('/report-templates/{template}', [MastersController::class, 'updateReportTemplate'])->whereNumber('template');
     Route::delete('/report-templates/{template}', [MastersController::class, 'destroyReportTemplate'])->whereNumber('template');
+    Route::post('/report-templates/{template}/duplicate', [MastersController::class, 'duplicateReportTemplate'])->whereNumber('template');
+    Route::post('/report-templates/{template}/archive', [MastersController::class, 'archiveReportTemplate'])->whereNumber('template');
 
     // Inventory & clinical safety
     Route::get('/inventory', [InventoryController::class, 'index']);

@@ -15,7 +15,8 @@ class RadiologyReport extends Model
         'clinical_history', 'technique', 'comparison', 'findings',
         'impression', 'recommendations',
         'critical_flag', 'critical_acked_at', 'critical_acked_by',
-        'template_id', 'authored_by', 'signed_by', 'signed_at', 'locked_at',
+        'template_id', 'template_version', 'structured_values',
+        'authored_by', 'signed_by', 'signed_at', 'locked_at',
         'pdf_path', 'business_id', 'created_by',
     ];
 
@@ -24,6 +25,10 @@ class RadiologyReport extends Model
         'critical_acked_at' => 'datetime',
         'signed_at' => 'datetime',
         'locked_at' => 'datetime',
+        'structured_values' => 'array',
+        'version' => 'integer',
+        'template_version' => 'integer',
+        'lock_version' => 'integer',
     ];
 
     public function scopeForClinic($query, $businessId = null, $creatorId = null)
@@ -51,6 +56,17 @@ class RadiologyReport extends Model
         return $this->hasMany(ReportRelease::class, 'report_id');
     }
 
+    public function template()
+    {
+        return $this->belongsTo(ReportTemplate::class, 'template_id');
+    }
+
+    /** Critical-result communications recorded against this report version. */
+    public function criticalFindingLogs()
+    {
+        return $this->hasMany(CriticalFindingLog::class, 'report_id');
+    }
+
     public function parentReport()
     {
         return $this->belongsTo(RadiologyReport::class, 'parent_report_id');
@@ -72,6 +88,26 @@ class RadiologyReport extends Model
         $this->forceFill(['locked_at' => now()])->save();
 
         return $this;
+    }
+
+    /** Authoring label used by worklists and the report history panel. */
+    public function statusLabel(): string
+    {
+        return match (true) {
+            $this->type === 'addendum' => 'Addendum',
+            $this->type === 'final' => 'Final',
+            $this->type === 'preliminary' => 'Preliminary',
+            default => 'Draft',
+        };
+    }
+
+    /** One-line preview for the report history/search list. */
+    public function summary(int $length = 140): string
+    {
+        $text = trim((string) ($this->impression ?: $this->findings ?: $this->clinical_history ?: ''));
+        $text = preg_replace('/\s+/', ' ', $text) ?? '';
+
+        return \Illuminate\Support\Str::limit($text, $length);
     }
 
     public function renderPdf(): string

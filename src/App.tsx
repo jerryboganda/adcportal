@@ -18,7 +18,6 @@ import {
   Modality,
   Patient,
   PaymentMethod,
-  RadiologyReport,
   Referrer,
   ReportTemplate,
   Room,
@@ -464,38 +463,9 @@ export const App: React.FC = () => {
 
   // ==================== reporting ====================
 
-  const handleSaveReport = useCallback(async (aptId: string, reportData: Partial<RadiologyReport>, isFinalize: boolean) => {
-    const apt = appointments.find(a => a.id === aptId);
-    const existing = apt?.report;
-    // Unsigned draft → edit it (PUT). Signed report → a save creates a new
-    // ADDENDUM version server-side. Nothing is ever duplicated silently.
-    const editableDraft = existing && !existing.lockedAt ? existing : null;
-    const payload = {
-      clinicalHistory: reportData.clinicalHistory ?? '',
-      technique: reportData.technique ?? '',
-      comparison: reportData.comparison ?? '',
-      findings: reportData.findings ?? '',
-      impression: reportData.impression ?? '',
-      recommendations: reportData.recommendations ?? '',
-      criticalFlag: reportData.criticalFlag ?? false,
-      signNow: isFinalize,
-      signAs: 'final' as const,
-    };
-    try {
-      if (editableDraft) {
-        const study = await api.updateReport(editableDraft.id, payload);
-        replaceStudy(study);
-      } else {
-        const { study, notifications: incoming } = await api.saveReport(aptId, payload);
-        replaceStudy(study);
-        adoptNotifications(incoming);
-      }
-      showFlash('success', isFinalize ? 'Report signed and saved.' : 'Draft report saved.');
-    } catch (err: any) {
-      fail(err, 'Could not save the report.');
-      throw err;
-    }
-  }, [appointments, adoptNotifications, fail, replaceStudy, showFlash]);
+  // Report persistence lives in the reporting workspace itself
+  // (components/reporting/ReportWorkspace.tsx), which owns the draft buffer,
+  // optimistic-lock version and autosave. App only mirrors the returned study.
 
   const handleReleaseReport = useCallback(async (aptId: string, channel: 'hand' | 'email' | 'portal') => {
     const apt = appointments.find(a => a.id === aptId);
@@ -1012,12 +982,21 @@ export const App: React.FC = () => {
 
   // ==================== selections & modals ====================
 
-  const [selectedAppointment, setSelectedAppointment] = useState<Appointment | null>(null);
+  /**
+   * A study the user asked to open from OUTSIDE the reporting tab: the
+   * dashboard's "Manage" button, global search, or a notification. Reporting
+   * owns its own selection (a server-driven, paginated worklist), so this is a
+   * one-way hand-off — it is never mirrored back. The nonce lets the same study
+   * be requested twice and still register.
+   */
+  const [studyFocus, setStudyFocus] = useState<{ id: number; nonce: number } | null>(null);
+  const focusStudy = useCallback((apt: Appointment | null) => {
+    if (!apt) return;
+    setStudyFocus(previous => ({ id: Number(apt.id), nonce: (previous?.nonce ?? 0) + 1 }));
+  }, []);
   const [screeningModalApt, setScreeningModalApt] = useState<Appointment | null>(null);
   const [doseModalApt, setDoseModalApt] = useState<Appointment | null>(null);
   const [bookingModalOpen, setBookingModalOpen] = useState(false);
-
-  const currentSelectedAppointment = appointments.find(a => a.id === selectedAppointment?.id) || selectedAppointment;
 
   // ==================== render gates ====================
 
@@ -1148,7 +1127,7 @@ export const App: React.FC = () => {
         role={role}
         entitlements={entitlements}
         brandName={branding?.appName ?? null}
-        onSelectAppointment={(apt) => setSelectedAppointment(apt)}
+        onSelectAppointment={focusStudy}
         onOpenBookingModal={openBookingModal}
         canOpenBooking={canBook}
         notifications={notifications}
@@ -1169,7 +1148,7 @@ export const App: React.FC = () => {
             invoices={invoices}
             permissions={permissions}
             setActiveTab={setActiveTab}
-            onSelectAppointment={(apt) => setSelectedAppointment(apt)}
+            onSelectAppointment={focusStudy}
             onOpenBookingModal={openBookingModal}
             canOpenBooking={canBook}
           />
@@ -1211,16 +1190,18 @@ export const App: React.FC = () => {
         {activeTab === 'reporting' && (
           <ReportingView
             appointments={appointments}
-            templates={templates}
+            patients={patients}
+            services={services}
+            modalities={modalities}
+            referrers={referrers}
             permissions={permissions}
-            selectedAppointment={currentSelectedAppointment}
             currentUser={user}
             clinicSettings={clinicSettings}
-            onSelectAppointment={(apt) => setSelectedAppointment(apt)}
-            onSaveReport={handleSaveReport}
+            studyFocus={studyFocus}
+            onStudyFocusHandled={() => setStudyFocus(null)}
             onRejectToTech={handleRejectToTech}
             onReleaseReport={handleReleaseReport}
-            onAddTemplate={handleAddTemplate}
+            flash={showFlash}
           />
         )}
 
@@ -1384,15 +1365,10 @@ export const App: React.FC = () => {
         onNavigateToTab={(tab, appointmentId) => {
           setActiveTab(tab);
           if (appointmentId) {
-            const apt = appointments.find(a => a.id === appointmentId);
-            if (apt) {
-              setSelectedAppointment(apt);
-            }
+            focusStudy(appointments.find(a => a.id === appointmentId) ?? null);
           }
         }}
-        onSelectAppointment={(apt) => {
-          setSelectedAppointment(apt);
-        }}
+        onSelectAppointment={focusStudy}
         appointments={appointments}
       />
 

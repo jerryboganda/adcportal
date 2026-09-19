@@ -186,13 +186,125 @@ class ApiShape
         return [
             'id' => self::id($t->id),
             'name' => $t->name,
-            'code' => null,
+            'code' => $t->code,
             'modalityId' => (int) ($t->modality_id ?? 0),
+            'modalityCode' => optional($t->relationLoaded('modality') ? $t->modality : null)->code,
+            'serviceId' => $t->service_id !== null ? (int) $t->service_id : null,
+            'serviceName' => optional($t->relationLoaded('serviceData') ? $t->serviceData : null)->name,
+            'bodyRegion' => $t->body_region,
+            'ageGroup' => $t->age_group,
+            'sex' => $t->sex,
+            'contrast' => $t->contrast,
+            'scope' => $t->scope ?: 'tenant',
+            'isArchived' => (bool) $t->is_archived,
+            'isDefault' => (bool) $t->is_default,
+            'version' => (int) ($t->version ?? 1),
+            'author' => optional($t->relationLoaded('author') ? $t->author : null)->name,
+            'structuredFields' => \App\Support\ReportStructure::sanitizeFields($t->structured_fields),
             'clinicalHistory' => (string) ($t->clinical_history ?? ''),
             'technique' => (string) ($t->technique ?? ''),
             'findings' => (string) ($t->findings ?? ''),
             'impression' => (string) ($t->impression ?? ''),
             'recommendations' => (string) ($t->recommendations ?? ''),
+            'updatedAt' => self::dateTime($t->updated_at),
+        ];
+    }
+
+    /** Tenant-curated reporting snippet (macro). */
+    public static function reportMacro(\App\Models\ReportMacro $m): array
+    {
+        return [
+            'id' => self::id($m->id),
+            'name' => $m->name,
+            'shortcut' => (string) ($m->shortcut ?? ''),
+            'modalityId' => $m->modality_id !== null ? (int) $m->modality_id : null,
+            'serviceId' => $m->service_id !== null ? (int) $m->service_id : null,
+            'findings' => (string) ($m->findings ?? ''),
+            'impression' => (string) ($m->impression ?? ''),
+            'recommendations' => (string) ($m->recommendations ?? ''),
+            'scope' => $m->scope ?: 'tenant',
+            'isArchived' => (bool) $m->is_archived,
+            'usageCount' => (int) $m->usage_count,
+            'author' => optional($m->relationLoaded('author') ? $m->author : null)->name,
+        ];
+    }
+
+    /** Critical-result communication record (separate from the report body). */
+    public static function criticalFindingLog(\App\Models\CriticalFindingLog $log): array
+    {
+        return [
+            'id' => self::id($log->id),
+            'appointmentId' => self::id($log->appointment_id),
+            'reportId' => $log->report_id ? self::id($log->report_id) : null,
+            'summary' => (string) $log->summary,
+            'notifiedTo' => (string) $log->notified_to,
+            'notifiedRole' => (string) ($log->notified_role ?? ''),
+            'contact' => (string) ($log->contact ?? ''),
+            'method' => (string) $log->method,
+            'readBackVerified' => (bool) $log->read_back_verified,
+            'adviceGiven' => (string) ($log->advice_given ?? ''),
+            'communicatedAt' => self::dateTime($log->communicated_at),
+            'communicatedBy' => optional($log->relationLoaded('communicator') ? $log->communicator : null)->name,
+        ];
+    }
+
+    /**
+     * The reading worklist row.
+     *
+     * Deliberately leaner than `appointment()`: a worklist page renders
+     * hundreds of rows and must not carry dose logs, screening answers or
+     * report release history for each one.
+     */
+    public static function worklistStudy(Appointment $a): array
+    {
+        $patient = $a->CustomerData ?? ($a->relationLoaded('customer') ? $a->customer : null);
+        $service = $a->ServiceData;
+        $modality = $service?->modality;
+        $report = $a->relationLoaded('radiologyReports') ? $a->radiologyReports->first() : null;
+
+        return [
+            'id' => self::id($a->id),
+            'tokenNumber' => (string) ($a->token_number ?? ''),
+            'patientId' => self::id($a->customer_id),
+            'patientName' => (string) ($patient?->name ?? $a->name ?? ''),
+            'mrn' => (string) ($patient?->mrn ?? ''),
+            'age' => (int) ($patient?->age ?? 0),
+            'gender' => in_array($patient?->gender, ['male', 'female', 'other'], true) ? $patient->gender : 'other',
+            'serviceId' => (int) $a->service_id,
+            'serviceName' => (string) ($service?->name ?? ''),
+            'modalityId' => (int) ($modality?->id ?? 0),
+            'modalityCode' => (string) ($modality?->code ?? ''),
+            'modalityColor' => (string) ($modality?->color ?? '#64748b'),
+            'bodyRegion' => (string) ($service?->body_region ?? ''),
+            'contrastType' => (string) ($service?->contrast_type ?? 'none'),
+            'date' => $a->date_sort ? substr((string) $a->date_sort, 0, 10) : (string) $a->date,
+            'time' => self::time($a->time),
+            'priority' => $a->priority ?: 'routine',
+            'workflowState' => $a->workflow_state,
+            'assignedRadiologistId' => $a->assigned_radiologist_id ? self::id($a->assigned_radiologist_id) : null,
+            'assignedRadiologistName' => optional($a->assignedRadiologist)->name,
+            'referrerName' => optional($a->referrer)->name,
+            'roomNumber' => (string) ($a->room_number ?? ''),
+            'rejectReason' => $a->reject_reason,
+            'acquiredAt' => self::dateTime($a->acquired_at),
+            'reportedAt' => self::dateTime($a->reported_at),
+            'turnaroundHours' => $a->turnaroundHours(),
+            'slaDueAt' => $a->acquired_at ? self::dateTime($a->acquired_at->copy()->addHours(24)) : null,
+            'reportId' => $report ? self::id($report->id) : null,
+            'reportStatus' => $report ? $report->statusLabel() : 'Not started',
+            'reportType' => $report?->type,
+            'reportSignedAt' => $report?->signed_at ? self::dateTime($report->signed_at) : null,
+            'reportAuthor' => $report ? (optional($report->author)->name) : null,
+            'criticalFlag' => (bool) ($report?->critical_flag ?? false),
+        ];
+    }
+
+    /** Report search / history row, carrying its study context. */
+    public static function reportHistoryRow(RadiologyReport $r, ?Appointment $a): array
+    {
+        return [
+            'report' => self::radiologyReport($r),
+            'study' => $a ? self::worklistStudy($a) : null,
         ];
     }
 
@@ -262,6 +374,13 @@ class ApiShape
             'impression' => (string) ($r->impression ?? ''),
             'recommendations' => (string) ($r->recommendations ?? ''),
             'criticalFlag' => (bool) $r->critical_flag,
+            'lockVersion' => (int) ($r->lock_version ?? 1),
+            'templateId' => $r->template_id ? self::id($r->template_id) : null,
+            'templateVersion' => $r->template_version !== null ? (int) $r->template_version : null,
+            'structuredValues' => (object) ($r->structured_values ?? []),
+            'statusLabel' => $r->statusLabel(),
+            'summary' => $r->summary(),
+            'isSigned' => $r->isSigned(),
             'authoredBy' => optional($r->author)->name ?? 'Radiologist',
             'signedBy' => $r->signed_by ? (optional($r->signer)->name).' ('.($r->signer->department ?? 'Radiologist').')' : null,
             'signedAt' => $r->signed_at ? self::time($r->signed_at) : null,
@@ -298,6 +417,10 @@ class ApiShape
             'time' => self::time($a->time),
             'priority' => $a->priority ?: 'routine',
             'workflowState' => $a->workflow_state,
+            // scheduled = came through booking; manual = a study record created
+            // by the reporting module for an external/offline examination.
+            // Acquisition boards exclude manual studies: nothing was scanned.
+            'origin' => $a->origin ?? 'scheduled',
             'cancelReason' => $a->cancel_reason,
             'rejectReason' => $a->reject_reason,
             'screeningRequired' => (bool) $a->screening_required,

@@ -6,6 +6,19 @@ import {
   AppNotification,
   Appointment,
   AuditLogEntry,
+  CriticalFindingLog,
+  PriorExam,
+  Priority,
+  RadiologistSummary,
+  ReportMacro,
+  ReportSearchRow,
+  ReportStatusFilter,
+  ReportingTab,
+  ReportingWorklistResult,
+  StructuredValues,
+  StudyState,
+  TemplateMatch,
+  WorklistStudy,
   ClinicProfileSettings,
   DicomNodeConfig,
   EffectiveAccess,
@@ -479,26 +492,311 @@ export interface ReportInput {
   recommendations: string;
   criticalFlag: boolean;
   templateId?: string;
+  /** Values collected by the template's structured fields (validated server-side). */
+  structuredValues?: StructuredValues;
+  /**
+   * Draft revision the editor loaded. The server refuses a save built from a
+   * stale revision (409 + the current state) instead of silently overwriting
+   * a colleague's work.
+   */
+  lockVersion?: number;
   signNow?: boolean;
   signAs?: 'final' | 'preliminary';
 }
 
-/** Create the first report — or a new ADDENDUM version when one is already signed. */
-export async function saveReport(appointmentId: string, input: ReportInput): Promise<{ study: Appointment; notifications: AppNotification[] }> {
+/** Create the first report for a study (an existing draft must be UPDATEd). */
+export async function saveReport(
+  appointmentId: string,
+  input: ReportInput
+): Promise<{ study: Appointment; report: RadiologyReport; notifications: AppNotification[] }> {
   const { data } = await http.post(`/studies/${appointmentId}/reports`, {
     ...input,
     templateId: input.templateId ? Number(input.templateId) : undefined,
   });
-  return { study: normalizeStudy(data.data.study), notifications: data.notifications ?? [] };
+  return {
+    study: normalizeStudy(data.data.study),
+    report: data.data.report,
+    notifications: data.notifications ?? [],
+  };
 }
 
-/** Edit the current UNSIGNED draft (signed reports are immutable — use saveReport for an addendum). */
-export async function updateReport(reportId: string, input: ReportInput): Promise<Appointment> {
+/** Edit the current UNSIGNED draft (signed reports are immutable — addenda instead). */
+export async function updateReport(
+  reportId: string,
+  input: ReportInput
+): Promise<{ study: Appointment; report: RadiologyReport }> {
   const { data } = await http.put(`/reports/${reportId}`, {
     ...input,
     templateId: input.templateId ? Number(input.templateId) : undefined,
   });
-  return normalizeStudy(data.data.study);
+  return { study: normalizeStudy(data.data.study), report: data.data.report };
+}
+
+/** One report version plus its study — used for draft recovery after an edit conflict. */
+export async function fetchReport(reportId: string): Promise<{ study: Appointment; report: RadiologyReport }> {
+  const { data } = await http.get(`/reports/${reportId}`);
+  return { study: normalizeStudy(data.data.study), report: data.data.report };
+}
+
+/**
+ * Append an addendum to a SIGNED report. The original signed version is never
+ * rewritten; the addendum becomes its own signed version.
+ */
+export async function createReportAddendum(
+  reportId: string,
+  input: { text: string; recommendations?: string; criticalFlag?: boolean }
+): Promise<{ study: Appointment; report: RadiologyReport }> {
+  const { data } = await http.post(`/reports/${reportId}/addendum`, input);
+  return { study: normalizeStudy(data.data.study), report: data.data.report };
+}
+
+// ==================== reporting module ====================
+
+/** Drop empty filter values so they never reach the query string. */
+function queryParams(params: Record<string, unknown>): Record<string, unknown> {
+  return Object.fromEntries(
+    Object.entries(params).filter(([, value]) => value !== undefined && value !== null && value !== '')
+  );
+}
+
+export interface WorklistQuery {
+  tab?: ReportingTab;
+  q?: string;
+  priority?: Priority | 'all';
+  modalityId?: number;
+  status?: StudyState;
+  reportStatus?: ReportStatusFilter;
+  assignee?: string;
+  from?: string;
+  to?: string;
+  sort?: 'priority' | 'oldest' | 'newest';
+  page?: number;
+  perPage?: number;
+}
+
+/** Server-side reading worklist: filtered, sorted and paginated in SQL. */
+export async function fetchReportingWorklist(query: WorklistQuery = {}): Promise<ReportingWorklistResult> {
+  const { data } = await http.get('/reporting/worklist', {
+    params: queryParams(query as Record<string, unknown>),
+  });
+  return data.data;
+}
+
+/**
+ * One study in worklist shape. Used when another board (the dashboard's
+ * "Manage" button, global search, a notification) hands a study to reporting:
+ * the worklist is paginated and filtered, so the row that was clicked is not
+ * reliably on the page the SPA already holds. The server re-checks the tenant
+ * and the study's state, so an id from another clinic resolves to a 404.
+ */
+export async function fetchReportingStudy(id: number): Promise<WorklistStudy> {
+  const { data } = await http.get(`/reporting/studies/${id}`);
+  return data.data.study;
+}
+
+/**
+ * Client mirror of `App\Support\AgeGroup` — used only to PREVIEW which template
+ * a manual study will resolve to. The server recomputes the band from the
+ * stored date of birth, so a wrong client value can never change the clinical
+ * text that is actually applied.
+ */
+export function ageGroupFor(ageYears?: number | null): string | undefined {
+  if (ageYears === undefined || ageYears === null || Number.isNaN(ageYears)) return undefined;
+  if (ageYears <= 1) return 'infant';
+  if (ageYears <= 12) return 'pediatric';
+  if (ageYears <= 17) return 'adolescent';
+  if (ageYears <= 64) return 'adult';
+  return 'older_adult';
+}
+
+export async function fetchReportingTemplates(params: {
+  q?: string;
+  modalityId?: number;
+  serviceId?: number;
+  includeArchived?: boolean;
+  mine?: boolean;
+} = {}): Promise<{ templates: ReportTemplate[]; ageGroups: Record<string, string> }> {
+  const { data } = await http.get('/reporting/templates', { params: queryParams(params) });
+  return data.data;
+}
+
+/** Ask which template a study resolves to, and why (nothing is saved). */
+export async function resolveReportTemplate(input: {
+  appointmentId?: string | number;
+  serviceId?: number;
+  modalityId?: number;
+  bodyRegion?: string;
+  ageGroup?: string;
+  sex?: 'male' | 'female';
+  contrast?: 'with' | 'without' | 'both';
+}): Promise<TemplateMatch> {
+  const { data } = await http.post('/reporting/templates/resolve', {
+    ...input,
+    appointmentId: input.appointmentId ? Number(input.appointmentId) : undefined,
+  });
+  return data.data;
+}
+
+export async function duplicateReportTemplate(
+  templateId: string,
+  input: { name?: string; scope?: 'tenant' | 'personal' } = {}
+): Promise<ReportTemplate> {
+  const { data } = await http.post(`/report-templates/${templateId}/duplicate`, input);
+  return data.data.template;
+}
+
+export async function archiveReportTemplate(templateId: string, archived = true): Promise<ReportTemplate> {
+  const { data } = await http.post(`/report-templates/${templateId}/archive`, { archived });
+  return data.data.template;
+}
+
+export async function fetchReportMacros(params: {
+  modalityId?: number;
+  serviceId?: number;
+  q?: string;
+} = {}): Promise<ReportMacro[]> {
+  const { data } = await http.get('/reporting/macros', { params: queryParams(params) });
+  return data.data.macros;
+}
+
+export async function createReportMacro(input: {
+  name: string;
+  shortcut?: string;
+  modalityId?: number | null;
+  serviceId?: number | null;
+  findings: string;
+  impression: string;
+  recommendations?: string;
+  scope: 'tenant' | 'personal';
+}): Promise<ReportMacro> {
+  const { data } = await http.post('/reporting/macros', input);
+  return data.data.macro;
+}
+
+export async function updateReportMacro(macro: ReportMacro): Promise<ReportMacro> {
+  const { data } = await http.put(`/reporting/macros/${macro.id}`, {
+    name: macro.name,
+    shortcut: macro.shortcut,
+    modalityId: macro.modalityId ?? null,
+    serviceId: macro.serviceId ?? null,
+    findings: macro.findings,
+    impression: macro.impression,
+    recommendations: macro.recommendations,
+    scope: macro.scope,
+  });
+  return data.data.macro;
+}
+
+export async function archiveReportMacro(macroId: string): Promise<void> {
+  await http.delete(`/reporting/macros/${macroId}`);
+}
+
+export async function useReportMacro(macroId: string): Promise<number> {
+  const { data } = await http.post(`/reporting/macros/${macroId}/use`);
+  return data.data.usageCount;
+}
+
+export interface ReportSearchQuery {
+  q?: string;
+  modalityId?: number;
+  radiologistId?: number;
+  patientId?: number;
+  status?: 'draft' | 'preliminary' | 'final' | 'addendum';
+  from?: string;
+  to?: string;
+  page?: number;
+  perPage?: number;
+}
+
+export async function searchReports(
+  query: ReportSearchQuery = {}
+): Promise<{ reports: ReportSearchRow[]; page: number; perPage: number; total: number; hasMore: boolean }> {
+  const { data } = await http.get('/reporting/reports', {
+    params: queryParams(query as Record<string, unknown>),
+  });
+  return data.data;
+}
+
+/** Prior examinations + their reports for the same patient (longitudinal record). */
+export async function fetchReportPriors(appointmentId: string): Promise<PriorExam[]> {
+  const { data } = await http.get(`/reporting/priors/${appointmentId}`);
+  return data.data.priors;
+}
+
+export async function fetchCriticalFindings(appointmentId: string): Promise<CriticalFindingLog[]> {
+  const { data } = await http.get(`/reporting/critical-findings/${appointmentId}`);
+  return data.data.logs;
+}
+
+export async function recordCriticalFinding(
+  appointmentId: string,
+  input: {
+    summary: string;
+    notifiedTo: string;
+    notifiedRole?: string;
+    contact?: string;
+    method: CriticalFindingLog['method'];
+    readBackVerified?: boolean;
+    adviceGiven?: string;
+    reportId?: string;
+  }
+): Promise<CriticalFindingLog> {
+  const { data } = await http.post(`/reporting/critical-findings/${appointmentId}`, {
+    ...input,
+    reportId: input.reportId ? Number(input.reportId) : undefined,
+  });
+  return data.data.log;
+}
+
+/** Radiologists who may receive a reading assignment (no `user manage` needed). */
+export async function fetchRadiologistRoster(): Promise<RadiologistSummary[]> {
+  const { data } = await http.get('/reporting/roster');
+  return data.data.radiologists;
+}
+
+export async function assignStudyToRadiologist(
+  appointmentId: string,
+  radiologistId: string | null
+): Promise<WorklistStudy> {
+  const { data } = await http.post(`/reporting/studies/${appointmentId}/assign`, {
+    radiologistId: radiologistId ? Number(radiologistId) : null,
+  });
+  return data.data.study;
+}
+
+export interface ManualReportInput {
+  patientId?: string;
+  newPatient?: Partial<Patient>;
+  serviceId: number;
+  referrerId?: number;
+  date: string;
+  studyDate?: string;
+  priority: Priority;
+  indication?: string;
+  templateId?: string;
+  technique?: string;
+  comparison?: string;
+  findings?: string;
+  impression?: string;
+  recommendations?: string;
+  criticalFlag?: boolean;
+  structuredValues?: StructuredValues;
+  signNow?: boolean;
+}
+
+/**
+ * Create a report for an external / imported / offline study. A real study
+ * record is created server-side (origin = manual) — reports are never left
+ * detached from the patient's longitudinal record.
+ */
+export async function createManualReport(
+  input: ManualReportInput
+): Promise<{ study: Appointment; report: RadiologyReport }> {
+  const { data } = await http.post('/reporting/reports/manual', {
+    ...input,
+    templateId: input.templateId ? Number(input.templateId) : undefined,
+  });
+  return { study: normalizeStudy(data.data.study), report: data.data.report };
 }
 
 export async function releaseReport(

@@ -1,2 +1,6 @@
+# Unit tests are first-class test assets: the previous `*` rule silently kept
+# every unit test out of version control, so a suite that passes locally never
+# ran in CI. Only scratch files are excluded now.
 *
 !.gitignore
+!*Test.php

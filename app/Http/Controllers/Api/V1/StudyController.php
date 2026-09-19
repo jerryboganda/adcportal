@@ -166,19 +166,10 @@ class StudyController extends BaseApiController
             if (! empty($validated['patientId'])) {
                 $customer = Customer::where('business_id', $this->tenantId())->findOrFail($validated['patientId']);
             } else {
-                $np = $validated['newPatient'];
-                $customer = Customer::create([
-                    'name' => $np['name'],
-                    'email' => $np['email'] ?? null,
-                    'phone' => $np['phone'] ?? null,
-                    'age' => $np['age'] ?? null,
-                    'gender' => $np['gender'] ?? 'other',
-                    'blood_group' => $np['bloodGroup'] ?? null,
-                    'allergies' => $np['allergies'] ?? null,
-                    'user_id' => $this->walkInUserId($np),
-                    'business_id' => $this->tenantId(),
-                    'created_by' => Auth::id(),
-                ]);
+                // One registration path for every entry point (booking,
+                // reception, reporting): a customer user identity plus the
+                // clinical record, never a bare Customer row.
+                $customer = Customer::register($validated['newPatient'], $this->tenantId(), Auth::id());
             }
 
             $requiresScreening = $service->requires_screening || $service->contrast_type !== 'none';
@@ -600,31 +591,6 @@ class StudyController extends BaseApiController
     }
 
     /** Walk-in patients get a login-less user row (customers.user_id is required). */
-    private function walkInUserId(array $np): int
-    {
-        $email = isset($np['email']) && $np['email'] !== ''
-            ? $np['email']
-            : 'walkin.'.time().'.'.random_int(100, 999).'@patients.local';
-
-        // Email column is unique across the platform — never collide.
-        if (User::where('email', $email)->exists()) {
-            $email = 'patient.'.time().'.'.random_int(100, 999).'@patients.local';
-        }
-
-        $user = User::create([
-            'name' => $np['name'],
-            'email' => $email,
-            'password' => Str::password(16),
-            'type' => 'customer',
-            'active_status' => 1,
-            'is_enable_login' => 0,
-            'business_id' => $this->tenantId(),
-            'created_by' => Auth::id(),
-        ]);
-
-        return $user->id;
-    }
-
     private function issueBookingInvoice(Appointment $appointment, Service $service): \App\Models\Invoice
     {
         $invoice = \App\Models\Invoice::create([

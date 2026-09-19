@@ -40,12 +40,15 @@ jobs:
             exit 1
           }
 
-      - name: Run API feature suite (auth, RBAC, tenant isolation, workflow, billing, inventory)
+      - name: Run API suite (auth, RBAC, tenant isolation, workflow, billing, inventory, reporting)
         run: |
           set -o pipefail
           # NOTE: no `|| echo` here — a failing suite MUST fail this step and
           # the job (the old swallow made the backend job unable to fail).
-          php artisan test --testsuite=Feature 2>&1 | tee /tmp/phpunit.log
+          # Unit is included explicitly: it holds the pure-logic tests (age
+          # bands, structured-report rendering, booking money) that the Feature
+          # suite only reaches through the API.
+          php artisan test --testsuite=Feature,Unit 2>&1 | tee /tmp/phpunit.log
 
       # NOTE: GitHub publishes at most ~10 `::error::` annotations PER STEP.
       # Every diagnostic below therefore lives in its OWN step so it gets a
@@ -147,13 +150,16 @@ jobs:
       - name: Bootstrap packages (package:discover)
         run: php artisan package:discover --ansi
 
-      - name: Booking, billing, token & tenancy suites on PostgreSQL
+      - name: Booking, billing, token, reporting & tenancy suites on PostgreSQL
         run: |
           set -o pipefail
-          # Run the money/queue/token paths on the engine production actually
-          # uses. Widen to --testsuite=Feature once the rest of the suite is
-          # proven dialect-clean.
-          php artisan test --filter='WalkInBookingFinancialsTest|StudyBookingPaymentTest|StudyBookingTokenTest|StudyTokenAllocatorTest|StudyTokenConcurrencyTest|StudyFactAtomicityTest|StudyWorkflowTest|BookingRoomTest|BillingTest|TenantIsolationTest' 2>&1 | tee /tmp/phpunit-pg.log
+          # Run the money/queue/token/reporting paths on the engine production
+          # actually uses. Reporting belongs here because it writes clinical
+          # records (versioning, JSON structured values, LIKE escaping, row
+          # locks for token allocation) — dialect bugs there would corrupt or
+          # block a signed report in production. Widen to --testsuite=Feature
+          # once the rest of the suite is proven dialect-clean.
+          php artisan test --filter='WalkInBookingFinancialsTest|StudyBookingPaymentTest|StudyBookingTokenTest|StudyTokenAllocatorTest|StudyTokenConcurrencyTest|StudyFactAtomicityTest|StudyWorkflowTest|BookingRoomTest|BillingTest|TenantIsolationTest|ReportingWorklistTest|ReportTemplateResolutionTest|ReportDraftConcurrencyTest|ReportManualCreationTest|ReportMacrosTest|ReportPdfTest|CriticalFindingLogTest' 2>&1 | tee /tmp/phpunit-pg.log
 
       # GitHub publishes at most ~10 `::error::` annotations PER STEP, so the
       # summary and every failing test name get their own step (fresh budget)
