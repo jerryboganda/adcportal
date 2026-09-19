@@ -99,4 +99,42 @@ class StudyTokenAllocatorTest extends ApiTestCase
 
         $this->assertSame(1, $token);
     }
+
+    public function test_counter_continues_after_tokens_written_outside_the_allocator(): void
+    {
+        $date = now()->toDateString();
+        $svc = \App\Models\Service::forClinic($this->businessA->id)->first();
+
+        // Seeded history / imports can write tokens without the allocator; the
+        // next allocation must continue past them instead of re-issuing 1.
+        // (token_number is deliberately NOT mass-assignable — only the
+        // allocator mints tokens — so history is written explicitly.)
+        $imported = $this->bookStudy($this->businessA->id, $svc->id, $this->adminA->id, $date);
+        $imported->forceFill(['token_number' => 7])->save();
+
+        $fresh = $this->bookStudy($this->businessA->id, $svc->id, $this->adminA->id, $date);
+
+        $this->assertSame(8, StudyTokenAllocator::assignTo($fresh, $date));
+    }
+
+    public function test_many_allocations_never_repeat_a_token(): void
+    {
+        $date = now()->toDateString();
+        $svc = \App\Models\Service::forClinic($this->businessA->id)->first();
+        $allocated = [];
+
+        foreach (range(1, 25) as $ignored) {
+            $apt = $this->bookStudy($this->businessA->id, $svc->id, $this->adminA->id, $date);
+            $allocated[] = StudyTokenAllocator::assignTo($apt, $date);
+        }
+
+        $this->assertSame(range(1, 25), $allocated);
+        $this->assertSame(25, count(array_unique($allocated)));
+
+        // The counter row is the day's high-water mark, per tenant.
+        $this->assertSame(25, (int) DB::table(StudyTokenAllocator::COUNTERS_TABLE)
+            ->where('business_id', $this->businessA->id)
+            ->where('token_date', $date)
+            ->value('last_token'));
+    }
 }

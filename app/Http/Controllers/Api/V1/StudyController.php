@@ -17,6 +17,7 @@ use App\Models\Business;
 use App\Models\UsageCounter;
 use App\Services\EntitlementService;
 use App\Services\StudyWorkflowService;
+use App\Support\BookingMoney;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -117,6 +118,28 @@ class StudyController extends BaseApiController
         $service = Service::forClinic($this->tenantId())->with('modality')->findOrFail($validated['serviceId']);
         $modality = $service->modality;
 
+        // Authoritative money: the TENANT'S configured price for THIS
+        // procedure, read server-side. A client that posts its own price or
+        // payable total is ignored entirely.
+        $basePrice = BookingMoney::fromMinor(BookingMoney::toMinor($service->price));
+        $discountAmount = $wantsDiscount
+            ? BookingMoney::fromMinor(BookingMoney::toMinor($validated['discount']['amount']))
+            : 0.0;
+
+        if ($wantsDiscount) {
+            $discountError = BookingMoney::validateDiscount($basePrice, $discountAmount);
+
+            if ($discountError !== null) {
+                // Rejected, never silently clamped: billing a different amount
+                // than the one entered is worse than refusing the booking.
+                throw ValidationException::withMessages([
+                    'discount.amount' => $discountError === BookingMoney::ERROR_DISCOUNT_EXCEEDS_PRICE
+                        ? $discountError.' (Rs. '.BookingMoney::format($basePrice).').'
+                        : $discountError,
+                ]);
+            }
+        }
+
         // Imaging suite: explicitly chosen (validated against tenant, activity
         // and modality) or auto-assigned as before. No suite configured → the
         // study simply has no room yet; the SPA shows the honest empty state.
@@ -138,7 +161,7 @@ class StudyController extends BaseApiController
                 ->first();
         }
 
-        [$appointment, $invoice, $paymentSummary] = DB::transaction(function () use ($validated, $service, $modality, $room, $wantsPayment, $wantsDiscount) {
+        [$appointment, $invoice, $paymentSummary] = DB::transaction(function () use ($validated, $service, $modality, $room, $wantsPayment, $discountAmount, $basePrice) {
             // Resolve or create the patient (tenant-scoped).
             if (! empty($validated['patientId'])) {
                 $customer = Customer::where('business_id', $this->tenantId())->findOrFail($validated['patientId']);
@@ -195,11 +218,23 @@ class StudyController extends BaseApiController
 
             $invoice = $this->issueBookingInvoice($appointment, $service);
 
-            // Booking-time cash discount — recorded on the invoice, whose
-            // recalculateTotals() clamps it against the subtotal.
-            if ($wantsDiscount) {
-                $invoice->forceFill(['manual_discount' => (float) $validated['discount']['amount']])->save();
+            // Booking-time cash discount — recorded on the invoice, and
+            // re-derived into its totals by the model (never taken from the
+            // request). A 100% discount is legal and yields payable 0.
+            if ($discountAmount > 0) {
+                $invoice->forceFill(['manual_discount' => $discountAmount])->save();
                 $invoice->recalculateTotals();
+
+                // The invoice's own math is authoritative: if it cannot
+                // represent the discount exactly (a future line item or tax
+                // change), fail the booking instead of quietly billing
+                // something else.
+                if (! BookingMoney::equals($invoice->discount_total, $discountAmount)) {
+                    throw ValidationException::withMessages([
+                        'discount.amount' => BookingMoney::ERROR_DISCOUNT_EXCEEDS_PRICE
+                            .' (Rs. '.BookingMoney::format($basePrice).').',
+                    ]);
+                }
             }
 
             // Settle against the freshly issued booking invoice. All money
@@ -216,6 +251,27 @@ class StudyController extends BaseApiController
         $this->audit('appointment_created', $appointment, [
             'summary' => "Booked {$service->name} for {$appointment->patientDisplayName()} (token {$appointment->token_number}).",
         ]);
+
+        // Discount trail: who discounted what, against which price and tenant
+        // (AuditLog::record stamps the actor, ip and business_id).
+        if ($discountAmount > 0) {
+            $this->audit('booking_discount_applied', $invoice, [
+                'summary' => sprintf(
+                    'Applied Rs. %s discount to %s (token %s): price Rs. %s → payable Rs. %s.',
+                    BookingMoney::format($discountAmount),
+                    $invoice->invoice_number,
+                    $appointment->token_number,
+                    BookingMoney::format($basePrice),
+                    BookingMoney::format($invoice->total),
+                ),
+                'bookingId' => $appointment->id,
+                'invoiceId' => $invoice->id,
+                'tenantId' => $this->tenantId(),
+                'originalPrice' => $basePrice,
+                'discountAmount' => $discountAmount,
+                'netPayable' => (float) $invoice->total,
+            ]);
+        }
 
         if ($paymentSummary !== null) {
             $this->audit('payment_recorded', $invoice, [
@@ -596,20 +652,50 @@ class StudyController extends BaseApiController
     }
 
     /**
-     * Settle the booking invoice at booking time. Validation rules:
-     * partial → 0 < amountPaid < payable; paid → amountPaid == payable
-     * (over-collection is a POS concern, mirror of the POS balance rule);
-     * the method must be one of THIS tenant's ACTIVE configured methods.
-     * Runs inside the booking transaction.
+     * Settle the booking invoice at booking time. Validation rules (all money
+     * recomputed server-side from the tenant's configured price):
+     *
+     *  - payable = 0 (100% discount): the booking is already settled by the
+     *    discount. ZERO IS A VALID MONEY VALUE — no method is demanded and no
+     *    payment row is written, but collecting anything against it is refused.
+     *  - payable > 0: partial → 0 < amountPaid < payable; paid → amountPaid ==
+     *    payable (over-collection is a POS concern, mirror of the POS balance
+     *    rule); the method must be one of THIS tenant's ACTIVE methods.
+     *
+     * Runs inside the booking transaction; returns null when no money moved.
      */
-    private function settleBookingPayment(\App\Models\Invoice $invoice, array $payment): array
+    private function settleBookingPayment(\App\Models\Invoice $invoice, array $payment): ?array
     {
-        $amount = round((float) ($payment['amountPaid'] ?? 0), 2);
-        $payable = round((float) $invoice->total, 2);
+        $payableMinor = BookingMoney::toMinor($invoice->total);
+        $status = (string) $payment['status'];
 
-        if ($amount <= 0) {
+        // Absent and 0 are different things: `?? 0` would make an omitted
+        // amount indistinguishable from an explicit zero. Normalise once.
+        $hasAmount = array_key_exists('amountPaid', $payment)
+            && $payment['amountPaid'] !== null
+            && $payment['amountPaid'] !== '';
+        $amountMinor = $hasAmount ? BookingMoney::toMinor($payment['amountPaid']) : 0;
+
+        if ($payableMinor <= 0) {
+            if ($status === 'partial') {
+                throw ValidationException::withMessages([
+                    'payment.status' => 'This study is fully discounted — there is nothing left to pay.',
+                ]);
+            }
+
+            if ($amountMinor > 0) {
+                throw ValidationException::withMessages([
+                    'payment.amountPaid' => BookingMoney::ERROR_NOTHING_TO_COLLECT,
+                ]);
+            }
+
+            // Zero-payable booking: accepted, settled, no money recorded.
+            return null;
+        }
+
+        if ($amountMinor <= 0) {
             throw ValidationException::withMessages([
-                'payment.amountPaid' => 'An amount greater than zero is required for this payment status.',
+                'payment.amountPaid' => BookingMoney::ERROR_AMOUNT_REQUIRED,
             ]);
         }
 
@@ -626,17 +712,21 @@ class StudyController extends BaseApiController
             throw ValidationException::withMessages(['payment.method' => 'The selected payment method is inactive.']);
         }
 
-        if ($payment['status'] === 'partial' && $amount >= $payable) {
+        if ($status === 'partial' && $amountMinor >= $payableMinor) {
             throw ValidationException::withMessages([
-                'payment.amountPaid' => 'A partial payment must be less than the payable amount (Rs. '.number_format($payable, 2).').',
+                'payment.amountPaid' => 'A partial payment must be less than the payable amount (Rs. '.BookingMoney::format($invoice->total).').',
             ]);
         }
 
-        if ($payment['status'] === 'paid' && abs($amount - $payable) > 0.001) {
+        if ($status === 'paid' && $amountMinor !== $payableMinor) {
             throw ValidationException::withMessages([
-                'payment.amountPaid' => 'The paid amount must match the payable amount (Rs. '.number_format($payable, 2).').',
+                'payment.amountPaid' => $amountMinor > $payableMinor
+                    ? BookingMoney::ERROR_AMOUNT_EXCEEDS_PAYABLE.' (Rs. '.BookingMoney::format($invoice->total).').'
+                    : BookingMoney::ERROR_AMOUNT_MUST_MATCH_PAYABLE.' (Rs. '.BookingMoney::format($invoice->total).').',
             ]);
         }
+
+        $amount = BookingMoney::fromMinor($amountMinor);
 
         app(\App\Services\InvoicePaymentService::class)->record(
             $invoice,

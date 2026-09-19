@@ -618,12 +618,33 @@ export const App: React.FC = () => {
         setPatients(prev => [study.patient, ...prev]);
       }
 
+      // The confirmation reception actually needs: the token minted
+      // server-side, next to the SERVER'S money (payable/balance recomputed
+      // from the tenant's configured price — never the form's numbers).
+      const symbol = clinicSettings?.currencySymbol ?? 'Rs.';
+      const token = study.tokenNumber ? `Token #${study.tokenNumber}` : 'Token pending';
+      const balance = invoice.balanceDue > 0
+        ? ` · balance ${symbol} ${invoice.balanceDue.toLocaleString()}`
+        : ' · settled';
+
+      showFlash('success', `Booked — ${token} · ${study.service.name} · payable ${symbol} ${invoice.total.toLocaleString()}${balance}.`);
+
       return study;
     } catch (err: any) {
-      fail(err, 'Booking failed.');
+      // A 5xx is not a validation problem: say so honestly, and make clear
+      // that the failed attempt left nothing behind, instead of echoing a
+      // bare "Server Error" with no next step.
+      if (typeof err?.status === 'number' && err.status >= 500) {
+        showFlash(
+          'error',
+          'The booking could not be completed on the server and nothing was saved. Please try again — if it keeps failing, note the time and contact support.',
+        );
+      } else {
+        fail(err, 'Booking failed.');
+      }
       throw err;
     }
-  }, [adoptNotifications, fail]);
+  }, [adoptNotifications, clinicSettings, fail, showFlash]);
 
   // ==================== master data ====================
 

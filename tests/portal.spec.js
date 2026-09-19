@@ -81,39 +81,111 @@ test('sign-out destroys the session and the login gate returns', async ({ page }
 
 const RADIOLOGIST_EMAIL = 'dr.shahzad@amaddiagnosticcentre.com.pk';
 
-test('reception booking captures full payment and lands paid in billing', async ({ page }) => {
-    await login(page);
-
-    // Open the booking modal from the dashboard cockpit module.
+/**
+ * Fill the walk-in form up to a selected, price-loaded procedure.
+ * Returns once the modal shows the tenant-configured price as payable.
+ */
+async function selectCtProcedure(page, patientName) {
     await page.getByRole('button', { name: 'Book Study' }).click();
     await expect(page.getByText('Book Diagnostic Imaging Study')).toBeVisible({ timeout: 15000 });
 
-    // Walk-in registration.
     await page.getByRole('button', { name: '+ New Walk-In' }).click();
-    await page.getByPlaceholder('e.g. Tariq Mehmood').fill('E2E Paid Walkin');
+    await page.getByPlaceholder('e.g. Tariq Mehmood').fill(patientName);
     await page.getByLabel('Phone Number').fill('0300-1234567');
     await page.getByLabel('Patient age').fill('34');
 
     // The imaging-suite dropdown is honest when nothing is configured.
     await expect(page.getByText(/No imaging suites are configured for this modality/)).toBeVisible();
 
-    // Tenant-configured procedure (server-seeded CT catalog).
+    // Tenant-configured procedure (server-seeded CT catalog) at Rs. 6,500.
     await page.getByLabel('Modality', { exact: true }).selectOption({ label: 'Computed Tomography (CT)' });
     await page.getByLabel('Procedure Service').selectOption({ label: 'CT Brain Non-Contrast (NCCT) - Rs. 6,500' });
 
+    await expect(page.getByTestId('booking-base-price')).toContainText('6,500');
+    await expect(page.getByTestId('booking-payable')).toContainText('6,500');
+}
+
+test('reception booking captures full payment and lands paid in billing', async ({ page }) => {
+    await login(page);
+    await selectCtProcedure(page, 'E2E Paid Walkin');
+
     // Settle in full, in cash — from the tenant-configured method list.
     await page.getByLabel('Payment Status').selectOption('paid');
+    // Full collection IS the final payable: the amount is derived, never typed.
+    await expect(page.getByTestId('booking-amount-received')).toContainText('6,500');
+    await expect(page.getByTestId('booking-outstanding')).toContainText('0');
     await page.getByLabel('Payment Method').selectOption({ label: 'Cash (Counter Drawer)' });
-    await page.getByLabel('Amount Paid').fill('6500');
 
     await page.getByRole('button', { name: 'Confirm & Generate Token' }).click();
     await expect(page.getByText('Book Diagnostic Imaging Study')).toBeHidden({ timeout: 15000 });
+
+    // The confirmation states the server-minted token and the settled amount.
+    await expect(page.getByRole('status')).toContainText('Token #');
 
     // The paid invoice is real: persisted server-side and visible in Billing.
     await page.getByRole('button', { name: 'Billing & POS' }).click();
     await expect(page.getByText('Clinical Billing & Point of Sale (POS)')).toBeVisible({ timeout: 15000 });
     await expect(page.locator('body')).toContainText('E2E Paid Walkin');
     await expect(page.locator('body')).toContainText('PAID');
+});
+
+test('walk-in discount recalculates the payable instantly and books the net amount', async ({ page }) => {
+    await login(page);
+    await selectCtProcedure(page, 'E2E Discount Walkin');
+
+    // Type a discount: 6,500 − 3,500 = 3,000, with no save, reload or API trip.
+    await page.getByTestId('booking-discount').fill('3500');
+    await expect(page.getByTestId('booking-payable')).toContainText('3,000');
+
+    await page.getByLabel('Payment Status').selectOption('paid');
+    await expect(page.getByTestId('booking-amount-received')).toContainText('3,000');
+    await expect(page.getByTestId('booking-outstanding')).toContainText('0');
+    await page.getByLabel('Payment Method').selectOption({ label: 'Cash (Counter Drawer)' });
+
+    await page.getByRole('button', { name: 'Confirm & Generate Token' }).click();
+    await expect(page.getByText('Book Diagnostic Imaging Study')).toBeHidden({ timeout: 15000 });
+    await expect(page.getByRole('status')).toContainText('Token #');
+
+    // The discounted invoice is what the server persisted — 3,000, not 6,500.
+    await page.getByRole('button', { name: 'Billing & POS' }).click();
+    await expect(page.getByText('Clinical Billing & Point of Sale (POS)')).toBeVisible({ timeout: 15000 });
+    const row = page.locator('tr', { hasText: 'E2E Discount Walkin' });
+    await expect(row).toContainText('3,000');
+    await expect(row).toContainText('PAID');
+});
+
+test('an over-discount is refused inline and books nothing', async ({ page }) => {
+    await login(page);
+    await selectCtProcedure(page, 'E2E Overdiscount Walkin');
+
+    await page.getByTestId('booking-discount').fill('7000');
+    await expect(page.getByTestId('booking-payable')).toContainText('0');
+    // An over-discount is NOT a waiver: it is an invalid entry.
+    await expect(page.getByTestId('booking-fully-discounted')).toHaveCount(0);
+
+    await page.getByRole('button', { name: 'Confirm & Generate Token' }).click();
+
+    // Still open, with a precise reason — and no booking created.
+    await expect(page.getByText('Book Diagnostic Imaging Study')).toBeVisible();
+    await expect(page.getByTestId('booking-form-error')).toContainText('Discount cannot exceed the study price');
+});
+
+test('100% discount books a zero-payable study and generates a token', async ({ page }) => {
+    await login(page);
+    await selectCtProcedure(page, 'E2E Waived Walkin');
+
+    await page.getByTestId('booking-discount').fill('6500');
+    await expect(page.getByTestId('booking-payable')).toContainText('0');
+    await expect(page.getByTestId('booking-fully-discounted')).toBeVisible();
+    // Nothing to collect, so no payment method is demanded.
+    await expect(page.getByLabel('Payment Method')).toHaveCount(0);
+
+    await page.getByRole('button', { name: 'Confirm & Generate Token' }).click();
+    await expect(page.getByText('Book Diagnostic Imaging Study')).toBeHidden({ timeout: 15000 });
+
+    // The zero-payable booking succeeded and still received its token.
+    await expect(page.getByRole('status')).toContainText('Token #');
+    await expect(page.getByRole('status')).toContainText('settled');
 });
 
 test('radiologist receives no booking privileges anywhere in the SPA', async ({ page }) => {

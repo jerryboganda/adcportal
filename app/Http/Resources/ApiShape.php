@@ -379,6 +379,9 @@ class ApiShape
             'paidTotal' => (float) $inv->paid_total,
             'balanceDue' => (float) $inv->balance_due,
             'status' => $inv->status,
+            // Zero payable because the study was discounted to nothing: settled
+            // without a collection, and never an outstanding debt.
+            'fullyDiscounted' => $inv->is_fully_discounted,
             'notes' => (string) ($inv->notes ?? ''),
             'items' => $inv->relationLoaded('items')
                 ? $inv->items->map(fn ($i) => [

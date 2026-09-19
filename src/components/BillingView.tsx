@@ -660,7 +660,9 @@ export const BillingView: React.FC<BillingViewProps> = ({
                       <td className="py-2.5 px-3.5 whitespace-nowrap">
                         <span
                           className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold whitespace-nowrap ${
-                            inv.status === 'paid'
+                            inv.fullyDiscounted
+                              ? 'bg-cyan-50 text-cyan-700 border border-cyan-200'
+                              : inv.status === 'paid'
                               ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
                               : inv.status === 'partial'
                               ? 'bg-amber-50 text-amber-700 border border-amber-200'
@@ -668,8 +670,9 @@ export const BillingView: React.FC<BillingViewProps> = ({
                               ? 'bg-slate-100 text-slate-500 border border-slate-300'
                               : 'bg-rose-50 text-rose-700 border border-rose-200'
                           }`}
+                          title={inv.fullyDiscounted ? 'Fully discounted — nothing was collectable' : undefined}
                         >
-                          {inv.status.toUpperCase()}
+                          {inv.fullyDiscounted ? 'WAIVED' : inv.status.toUpperCase()}
                         </span>
                       </td>
 

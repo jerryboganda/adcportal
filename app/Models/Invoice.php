@@ -84,6 +84,13 @@ class Invoice extends Model
         return round(max(0, (float) $this->total - (float) $this->paid_total), 2);
     }
 
+    /** Fully discounted / waived study: issued, but nothing left to collect. */
+    public function getIsFullyDiscountedAttribute(): bool
+    {
+        return \App\Support\BookingMoney::toMinor($this->total) <= 0
+            && \App\Support\BookingMoney::toMinor($this->subtotal) > 0;
+    }
+
     /** Recompute paid_total from payment rows and derive the status. */
     public function recalculateFromPayments(): void
     {
@@ -114,17 +121,39 @@ class Invoice extends Model
         ])->save();
     }
 
+    /**
+     * Derive the invoice status from its money. Two distinct "no payment
+     * recorded yet" cases must NOT collapse into one:
+     *
+     *  - payable > 0, nothing collected  → issued (an outstanding debt)
+     *  - payable = 0 (e.g. a 100% booking discount) → paid/settled. Nothing is
+     *    owed, so calling it "issued" would report a waived study as money the
+     *    clinic is still chasing.
+     */
     public function recalculateStatus(): void
     {
-        if ((float) $this->total <= 0 || (float) $this->paid_total <= 0) {
-            $this->attributes['status'] = in_array($this->status, [self::STATUS_DRAFT, self::STATUS_VOID], true)
+        $total = (float) $this->total;
+        $paid = (float) $this->paid_total;
+
+        $alreadyClosed = in_array($this->status, [self::STATUS_DRAFT, self::STATUS_VOID], true);
+
+        if ($total <= 0) {
+            $this->attributes['status'] = $alreadyClosed
+                ? $this->status
+                : ($this->issued_at ? self::STATUS_PAID : self::STATUS_DRAFT);
+
+            return;
+        }
+
+        if ($paid <= 0) {
+            $this->attributes['status'] = $alreadyClosed
                 ? $this->status
                 : ($this->issued_at ? self::STATUS_ISSUED : self::STATUS_DRAFT);
 
             return;
         }
 
-        if ((float) $this->paid_total + 0.001 >= (float) $this->total) {
+        if ($paid + 0.001 >= $total) {
             $this->attributes['status'] = self::STATUS_PAID;
         } else {
             $this->attributes['status'] = self::STATUS_PARTIAL;

@@ -238,6 +238,8 @@ export interface Invoice {
   paidTotal: number;
   balanceDue: number;
   status: 'draft' | 'issued' | 'partial' | 'paid' | 'void';
+  /** Zero payable because the study was discounted to nothing (waived). */
+  fullyDiscounted?: boolean;
   notes?: string;
   items: InvoiceItem[];
   payments: InvoicePayment[];

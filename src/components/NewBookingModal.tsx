@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Calendar,
   PlusCircle,
@@ -8,6 +8,16 @@ import {
 } from 'lucide-react';
 import { Patient, Service, Modality, Referrer, Priority, PaymentMethod, Room } from '../types';
 import { BookingInput, PaymentStatus } from '../services/apiService';
+import {
+  amountReceivedFor,
+  computeBookingTotals,
+  formatMoney,
+  fromMinor,
+  paymentStatusLabel,
+  toMinor,
+  validateDiscount,
+  validateSettlement,
+} from '../utils/bookingMoney';
 
 interface NewBookingModalProps {
   patients: Patient[];
@@ -84,20 +94,53 @@ export const NewBookingModal: React.FC<NewBookingModalProps> = ({
   const [amountPaid, setAmountPaid] = useState<number | ''>('');
   const [paymentMethodId, setPaymentMethodId] = useState<number | ''>('');
   const [paymentReference, setPaymentReference] = useState('');
+  const [formError, setFormError] = useState<string | null>(null);
+
+  // Double-submit latch: a ref closes the window before React re-renders, so
+  // one physical click can never create two patients/bookings/tokens.
+  const submitLock = useRef(false);
 
   const activePaymentMethods = useMemo(() => paymentMethods.filter(m => m.isActive), [paymentMethods]);
 
   const selectedService = services.find(s => s.id === selectedServiceId);
-  const netPayable = useMemo(() => {
-    const price = selectedService ? Number(selectedService.price) : 0;
-    const discount = canApplyDiscount && discountAmount !== '' ? Math.max(0, Number(discountAmount)) : 0;
-    return Math.max(0, price - discount);
-  }, [selectedService, discountAmount, canApplyDiscount]);
-  const balanceDue = paymentStatus === 'paid'
-    ? 0
-    : paymentStatus === 'partial'
-      ? Math.max(0, netPayable - (amountPaid === '' ? 0 : Number(amountPaid)))
-      : netPayable;
+
+  // SINGLE SOURCE OF TRUTH: the procedure's tenant-configured price, the
+  // discount and the money actually received are the only inputs — payable and
+  // outstanding are derived from them on every keystroke (utils/bookingMoney).
+  const totals = useMemo(
+    () => computeBookingTotals(
+      selectedService?.price ?? 0,
+      canApplyDiscount ? discountAmount : 0,
+      amountPaid,
+    ),
+    [selectedService, discountAmount, amountPaid, canApplyDiscount],
+  );
+
+  const discountError = canApplyDiscount
+    ? validateDiscount(totals.basePrice, totals.discount)
+    : null;
+
+  // A 100% discount settles the study by itself: there is no collection step,
+  // so payment inputs are hidden and no payment block is sent. Zero payable is
+  // a VALID booking — never treated as an outstanding debt.
+  const fullyDiscounted = totals.fullyDiscounted;
+  const effectiveStatus: PaymentStatus = fullyDiscounted ? 'unpaid' : paymentStatus;
+  const amountReceived = amountReceivedFor(effectiveStatus, totals, amountPaid);
+  const outstanding = fromMinor(Math.max(0, toMinor(totals.payable) - toMinor(amountReceived)));
+
+  // Keep "Amount Received" equal to the final payable while the status is
+  // Paid: applying (or removing) a discount must never leave a stale amount
+  // that the receptionist has to correct by hand.
+  useEffect(() => {
+    if (effectiveStatus === 'paid' && toMinor(amountPaid) !== toMinor(totals.payable)) {
+      setAmountPaid(totals.payable);
+    }
+  }, [effectiveStatus, totals.payable, amountPaid]);
+
+  // Any edit supersedes a previous validation message (client- or server-side).
+  useEffect(() => {
+    setFormError(null);
+  }, [selectedServiceId, discountAmount, paymentStatus, amountPaid, paymentMethodId]);
 
   const filteredPatients = useMemo(() => {
     const q = patientFilter.trim().toLowerCase();
@@ -117,37 +160,29 @@ export const NewBookingModal: React.FC<NewBookingModalProps> = ({
     setSelectedServiceId(validServices[0]?.id ?? '');
   };
 
-  /** Client-side mirror of the server's payment validation — fails fast,
-   *  but the server response remains authoritative. */
+  /** Client-side mirror of the server's booking validation — fails fast with
+   *  a readable reason, but the server response remains authoritative. */
   const validateFinancials = (): string | null => {
-    if (paymentStatus === 'unpaid') return null;
-    if (amountPaid === '' || Number(amountPaid) <= 0) {
-      return 'Enter the amount received for this payment status.';
+    if (discountError) {
+      return `${discountError} (${currencySymbol} ${formatMoney(totals.basePrice)}).`;
     }
-    if (paymentMethodId === '') {
-      return 'Select the payment method used for this collection.';
-    }
-    const paid = Number(amountPaid);
-    if (paymentStatus === 'partial' && paid >= netPayable) {
-      return `A partial payment must be less than the payable amount (${currencySymbol} ${netPayable.toLocaleString()}).`;
-    }
-    if (paymentStatus === 'paid' && Math.abs(paid - netPayable) > 0.001) {
-      return `The paid amount must match the payable amount (${currencySymbol} ${netPayable.toLocaleString()}).`;
-    }
-    return null;
+
+    if (!canRecordPayment) return null;
+
+    return validateSettlement(totals, effectiveStatus, amountReceived, paymentMethodId !== '');
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (submitting) return;
+    if (submitLock.current || submitting) return;
     if (!selectedServiceId || !selectedService) return;
 
-    if (canRecordPayment) {
-      const financialError = validateFinancials();
-      if (financialError) {
-        window.alert(financialError);
-        return;
-      }
+    const financialError = validateFinancials();
+    if (financialError) {
+      // Inline, next to the fields it describes — not an alert the
+      // receptionist has to dismiss before fixing the number.
+      setFormError(financialError);
+      return;
     }
 
     // Token number, room assignment and the patient MRN are SERVER-AUTHORITATIVE:
@@ -162,20 +197,21 @@ export const NewBookingModal: React.FC<NewBookingModalProps> = ({
       date: scheduledDate,
       time: scheduledTime,
       notes,
-      discountAmount:
-        canApplyDiscount && discountAmount !== '' && Number(discountAmount) > 0
-          ? Number(discountAmount)
-          : undefined,
-      payment: canRecordPayment
+      discountAmount: canApplyDiscount && totals.discount > 0 ? totals.discount : undefined,
+      // Fully discounted bookings send no payment block at all: nothing was
+      // collected, and the invoice is settled by the discount itself.
+      payment: canRecordPayment && !fullyDiscounted
         ? {
-            status: paymentStatus,
-            amountPaid: paymentStatus === 'unpaid' ? undefined : Number(amountPaid),
-            method: paymentStatus === 'unpaid' || paymentMethodId === '' ? undefined : Number(paymentMethodId),
+            status: effectiveStatus,
+            amountPaid: effectiveStatus === 'unpaid' ? undefined : amountReceived,
+            method: effectiveStatus === 'unpaid' || paymentMethodId === '' ? undefined : Number(paymentMethodId),
             reference: paymentReference.trim() || undefined,
           }
-        : { status: 'unpaid' },
+        : undefined,
     };
 
+    setFormError(null);
+    submitLock.current = true;
     setSubmitting(true);
     try {
       if (isNewPatient) {
@@ -198,11 +234,13 @@ export const NewBookingModal: React.FC<NewBookingModalProps> = ({
       }
       // Close only after the server has confirmed the booking.
       onClose();
-    } catch {
-      // The API layer surfaces the server's validation message as a flash;
-      // keep the form open with the submitting lock released.
+    } catch (err: any) {
+      // The API layer already flashed the server's message; keep it visible in
+      // the form too, where the value that needs correcting actually lives.
+      if (err?.message) setFormError(err.message);
     } finally {
       setSubmitting(false);
+      submitLock.current = false;
     }
   };
 
@@ -473,7 +511,10 @@ export const NewBookingModal: React.FC<NewBookingModalProps> = ({
             />
           </div>
 
-          {/* Financial Information — tenant-configured, server-validated */}
+          {/* Financial Information — tenant-configured, server-validated.
+              Only price, discount and money received are inputs; payable and
+              outstanding are derived live, so a discount can never leave a
+              stale amount for the receptionist to fix by hand. */}
           {(canRecordPayment || canApplyDiscount) && selectedService && (
             <div className="space-y-2 bg-slate-50 border border-slate-200 rounded-xl p-3">
               <div className="flex items-center justify-between">
@@ -481,94 +522,172 @@ export const NewBookingModal: React.FC<NewBookingModalProps> = ({
                   <Wallet className="w-3.5 h-3.5 mr-1.5 text-cyan-600" /> Payment
                 </label>
                 <div className="text-xs font-bold text-slate-900 font-mono">
-                  Payable: {currencySymbol} {netPayable.toLocaleString()}
+                  Payable: {currencySymbol} {formatMoney(totals.payable)}
                 </div>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                <div>
+                  <span className="text-[11px] text-slate-600 font-medium block mb-1">Study Price</span>
+                  <div
+                    data-testid="booking-base-price"
+                    className="w-full bg-slate-100 text-slate-700 p-2 rounded-lg border border-slate-200 text-xs font-mono"
+                    title="Tenant-configured procedure price"
+                  >
+                    {currencySymbol} {formatMoney(totals.basePrice)}
+                  </div>
+                </div>
+
                 {canApplyDiscount && (
                   <div>
                     <span className="text-[11px] text-slate-600 font-medium block mb-1">Discount ({currencySymbol})</span>
                     <input
                       type="number"
                       min="0"
+                      step="any"
+                      aria-label="Discount"
+                      data-testid="booking-discount"
                       value={discountAmount}
                       onChange={(e) => setDiscountAmount(e.target.value === '' ? '' : Number(e.target.value))}
                       placeholder="0"
-                      className="w-full bg-white text-slate-900 p-2 rounded-lg border border-slate-300 text-xs font-mono"
+                      className={`w-full bg-white text-slate-900 p-2 rounded-lg border text-xs font-mono ${
+                        discountError ? 'border-rose-400 ring-1 ring-rose-200' : 'border-slate-300'
+                      }`}
                     />
                   </div>
                 )}
+
                 <div>
-                  <span className="text-[11px] text-slate-600 font-medium block mb-1">Payment Status</span>
-                  <select
-                    aria-label="Payment Status"
-                    value={paymentStatus}
-                    onChange={(e) => {
-                      const next = e.target.value as PaymentStatus;
-                      setPaymentStatus(next);
-                      if (next === 'paid') setAmountPaid(netPayable);
-                    }}
-                    className="w-full bg-white text-slate-900 p-2 rounded-lg border border-slate-300 text-xs cursor-pointer"
+                  <span className="text-[11px] text-slate-600 font-medium block mb-1">Final Payable</span>
+                  <div
+                    data-testid="booking-payable"
+                    className="w-full bg-slate-100 text-slate-900 p-2 rounded-lg border border-slate-200 text-xs font-mono font-bold"
+                    title="Study price − discount"
                   >
-                    <option value="unpaid">Unpaid</option>
-                    <option value="partial">Partially Paid</option>
-                    <option value="paid" disabled={netPayable <= 0}>Paid</option>
-                  </select>
-                </div>
-                {paymentStatus !== 'unpaid' && (
-                  <div>
-                    <span className="text-[11px] text-slate-600 font-medium block mb-1">Amount Paid ({currencySymbol})</span>
-                    <input
-                      type="number"
-                      min="0"
-                      aria-label="Amount Paid"
-                      value={amountPaid}
-                      onChange={(e) => setAmountPaid(e.target.value === '' ? '' : Number(e.target.value))}
-                      placeholder="0"
-                      className="w-full bg-white text-slate-900 p-2 rounded-lg border border-slate-300 text-xs font-mono"
-                    />
+                    {currencySymbol} {formatMoney(totals.payable)}
                   </div>
-                )}
+                </div>
               </div>
 
-              {paymentStatus !== 'unpaid' && (
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                  <div className="sm:col-span-2">
-                    <span className="text-[11px] text-slate-600 font-medium block mb-1">Payment Method</span>
-                    <select
-                      aria-label="Payment Method"
-                      value={paymentMethodId}
-                      onChange={(e) => setPaymentMethodId(e.target.value === '' ? '' : Number(e.target.value))}
-                      className="w-full bg-white text-slate-900 p-2 rounded-lg border border-slate-300 text-xs cursor-pointer"
-                    >
-                      <option value="">Select method…</option>
-                      {activePaymentMethods.length === 0 && (
-                        <option value="" disabled>No payment methods configured — contact your administrator</option>
+              {fullyDiscounted ? (
+                <div
+                  data-testid="booking-fully-discounted"
+                  className="rounded-lg border border-emerald-200 bg-emerald-50 px-2.5 py-2 text-[11px] text-emerald-800"
+                >
+                  <strong>Fully discounted</strong> — nothing to collect at reception. The booking is valid and its
+                  invoice is settled at {currencySymbol} 0.
+                </div>
+              ) : (
+                <>
+                  {canRecordPayment && (
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                      <div>
+                        <span className="text-[11px] text-slate-600 font-medium block mb-1">Payment Status</span>
+                        <select
+                          aria-label="Payment Status"
+                          data-testid="booking-payment-status"
+                          value={effectiveStatus}
+                          onChange={(e) => {
+                            const next = e.target.value as PaymentStatus;
+                            setPaymentStatus(next);
+                            // A partial payment below the payable is a fresh
+                            // number to type, never a leftover full amount.
+                            if (next === 'partial' && toMinor(amountPaid) >= toMinor(totals.payable)) {
+                              setAmountPaid('');
+                            }
+                          }}
+                          className="w-full bg-white text-slate-900 p-2 rounded-lg border border-slate-300 text-xs cursor-pointer"
+                        >
+                          <option value="unpaid">Unpaid (bill later)</option>
+                          <option value="partial">Partially Paid</option>
+                          <option value="paid">Paid in Full</option>
+                        </select>
+                      </div>
+
+                      {effectiveStatus !== 'unpaid' && (
+                        <div>
+                          <span className="text-[11px] text-slate-600 font-medium block mb-1">Amount Received ({currencySymbol})</span>
+                          {effectiveStatus === 'paid' ? (
+                            <div
+                              data-testid="booking-amount-received"
+                              className="w-full bg-slate-100 text-slate-900 p-2 rounded-lg border border-slate-200 text-xs font-mono"
+                              title="Full collection: always equals the final payable"
+                            >
+                              {currencySymbol} {formatMoney(amountReceived)}
+                            </div>
+                          ) : (
+                            <input
+                              type="number"
+                              min="0"
+                              step="any"
+                              aria-label="Amount Received"
+                              data-testid="booking-amount-received"
+                              value={amountPaid}
+                              onChange={(e) => setAmountPaid(e.target.value === '' ? '' : Number(e.target.value))}
+                              placeholder="0"
+                              className="w-full bg-white text-slate-900 p-2 rounded-lg border border-slate-300 text-xs font-mono"
+                            />
+                          )}
+                        </div>
                       )}
-                      {activePaymentMethods.map(m => (
-                        <option key={m.id} value={m.id}>{m.name}</option>
-                      ))}
-                    </select>
-                  </div>
-                  <div>
-                    <span className="text-[11px] text-slate-600 font-medium block mb-1">Reference / Txn No.</span>
-                    <input
-                      type="text"
-                      value={paymentReference}
-                      onChange={(e) => setPaymentReference(e.target.value)}
-                      placeholder="Optional"
-                      className="w-full bg-white text-slate-900 p-2 rounded-lg border border-slate-300 text-xs font-mono"
-                    />
-                  </div>
-                </div>
-              )}
 
-              <div className="flex items-center justify-between text-[11px] text-slate-600 pt-1">
-                <span>Total: <strong className="text-slate-900 font-mono">{currencySymbol} {netPayable.toLocaleString()}</strong></span>
-                <span>Paid: <strong className="text-slate-900 font-mono">{currencySymbol} {(paymentStatus === 'unpaid' ? 0 : Number(amountPaid) || 0).toLocaleString()}</strong></span>
-                <span>Balance: <strong className={(balanceDue > 0 ? 'text-rose-600' : 'text-emerald-600') + ' font-mono'}>{currencySymbol} {balanceDue.toLocaleString()}</strong></span>
-              </div>
+                      <div>
+                        <span className="text-[11px] text-slate-600 font-medium block mb-1">Outstanding</span>
+                        <div
+                          data-testid="booking-outstanding"
+                          className={`w-full bg-slate-100 p-2 rounded-lg border border-slate-200 text-xs font-mono font-bold ${
+                            outstanding > 0 ? 'text-rose-600' : 'text-emerald-600'
+                          }`}
+                        >
+                          {currencySymbol} {formatMoney(outstanding)}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {canRecordPayment && effectiveStatus !== 'unpaid' && (
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                      <div className="sm:col-span-2">
+                        <span className="text-[11px] text-slate-600 font-medium block mb-1">Payment Method</span>
+                        <select
+                          aria-label="Payment Method"
+                          value={paymentMethodId}
+                          onChange={(e) => setPaymentMethodId(e.target.value === '' ? '' : Number(e.target.value))}
+                          className="w-full bg-white text-slate-900 p-2 rounded-lg border border-slate-300 text-xs cursor-pointer"
+                        >
+                          <option value="">Select method…</option>
+                          {activePaymentMethods.length === 0 && (
+                            <option value="" disabled>No payment methods configured — contact your administrator</option>
+                          )}
+                          {activePaymentMethods.map(m => (
+                            <option key={m.id} value={m.id}>{m.name}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div>
+                        <span className="text-[11px] text-slate-600 font-medium block mb-1">Reference / Txn No.</span>
+                        <input
+                          type="text"
+                          value={paymentReference}
+                          onChange={(e) => setPaymentReference(e.target.value)}
+                          placeholder="Optional"
+                          className="w-full bg-white text-slate-900 p-2 rounded-lg border border-slate-300 text-xs font-mono"
+                        />
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+          )}
+
+          {formError && (
+            <div
+              role="alert"
+              data-testid="booking-form-error"
+              className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-[11px] font-semibold text-rose-700"
+            >
+              {formError}
             </div>
           )}
 
@@ -584,10 +703,23 @@ export const NewBookingModal: React.FC<NewBookingModalProps> = ({
             {selectedService && (
               <>
                 <span>·</span>
-                <span className="font-mono font-bold">{currencySymbol} {netPayable.toLocaleString()}</span>
+                <span className="font-mono font-bold">{currencySymbol} {formatMoney(totals.payable)}</span>
+                {totals.discount > 0 && (
+                  <span className="text-emerald-700">
+                    (after {currencySymbol} {formatMoney(totals.discount)} discount)
+                  </span>
+                )}
                 <span>·</span>
-                <span className={paymentStatus === 'unpaid' ? 'text-amber-700 font-semibold' : 'text-emerald-700 font-semibold'}>
-                  {paymentStatus === 'unpaid' ? 'Unpaid' : paymentStatus === 'partial' ? 'Partially Paid' : 'Paid'}
+                <span
+                  className={
+                    fullyDiscounted
+                      ? 'text-cyan-700 font-semibold'
+                      : effectiveStatus === 'unpaid'
+                        ? 'text-amber-700 font-semibold'
+                        : 'text-emerald-700 font-semibold'
+                  }
+                >
+                  {paymentStatusLabel(effectiveStatus, totals)}
                 </span>
               </>
             )}
