@@ -312,8 +312,11 @@ export const CreateReportModal: React.FC<{
           {/* Examination */}
           <div className="grid grid-cols-2 gap-2">
             <div>
-              <label className="block font-semibold text-slate-700 mb-1">Modality *</label>
+              <label htmlFor="create-report-modality" className="block font-semibold text-slate-700 mb-1">
+                Modality *
+              </label>
               <select
+                id="create-report-modality"
                 value={modalityId}
                 onChange={event => setModalityId(Number(event.target.value))}
                 className="w-full p-2 rounded-xl border border-slate-300 cursor-pointer"
@@ -327,8 +330,11 @@ export const CreateReportModal: React.FC<{
             </div>
 
             <div>
-              <label className="block font-semibold text-slate-700 mb-1">Examination / procedure *</label>
+              <label htmlFor="create-report-procedure" className="block font-semibold text-slate-700 mb-1">
+                Examination / procedure *
+              </label>
               <select
+                id="create-report-procedure"
                 value={serviceId}
                 onChange={event => setServiceId(Number(event.target.value))}
                 className="w-full p-2 rounded-xl border border-slate-300 cursor-pointer"
@@ -343,8 +349,11 @@ export const CreateReportModal: React.FC<{
             </div>
 
             <div>
-              <label className="block font-semibold text-slate-700 mb-1">Study date *</label>
+              <label htmlFor="create-report-study-date" className="block font-semibold text-slate-700 mb-1">
+                Study date *
+              </label>
               <input
+                id="create-report-study-date"
                 type="date"
                 value={studyDate}
                 onChange={event => setStudyDate(event.target.value)}
@@ -353,8 +362,11 @@ export const CreateReportModal: React.FC<{
             </div>
 
             <div>
-              <label className="block font-semibold text-slate-700 mb-1">Priority</label>
+              <label htmlFor="create-report-priority" className="block font-semibold text-slate-700 mb-1">
+                Priority
+              </label>
               <select
+                id="create-report-priority"
                 value={priority}
                 onChange={event => setPriority(event.target.value as Priority)}
                 className="w-full p-2 rounded-xl border border-slate-300 cursor-pointer"
@@ -366,8 +378,11 @@ export const CreateReportModal: React.FC<{
             </div>
 
             <div className="col-span-2">
-              <label className="block font-semibold text-slate-700 mb-1">Referring doctor</label>
+              <label htmlFor="create-report-referrer" className="block font-semibold text-slate-700 mb-1">
+                Referring doctor
+              </label>
               <select
+                id="create-report-referrer"
                 value={referrerId}
                 onChange={event => setReferrerId(event.target.value === '' ? '' : Number(event.target.value))}
                 className="w-full p-2 rounded-xl border border-slate-300 cursor-pointer"
@@ -383,8 +398,15 @@ export const CreateReportModal: React.FC<{
             </div>
 
             <div className="col-span-2">
-              <label className="block font-semibold text-slate-700 mb-1">Clinical indication</label>
+              <label
+                htmlFor="create-report-indication"
+                className="block font-semibold text-slate-700 mb-1"
+              >
+                Clinical indication
+              </label>
               <textarea
+                id="create-report-indication"
+                data-testid="create-report-indication"
                 rows={2}
                 value={indication}
                 onChange={event => setIndication(event.target.value)}

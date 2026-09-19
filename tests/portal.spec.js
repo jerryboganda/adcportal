@@ -360,13 +360,15 @@ test('radiologist creates, autosaves, signs and prints an external report', asyn
     await openReporting(page);
 
     // ---- create a report for an offline/external study ------------------
-    await page.getByRole('button', { name: 'Create new report' }).click();
+    // Addressed by test id: the toolbar entry point and the workspace's
+    // empty-state button carry the same label, and a role query matches both.
+    await page.getByTestId('create-report-open').click();
     await expect(page.getByTestId('create-report-modal')).toBeVisible({ timeout: 15000 });
 
     await page.getByRole('button', { name: 'Register a new patient' }).click();
     await page.getByPlaceholder('Full name *').fill(patientName);
     await page.getByPlaceholder('Age (years)').fill('52');
-    await page.getByPlaceholder('Clinical indication').fill('E2E external referral, headache.');
+    await page.getByTestId('create-report-indication').fill('E2E external referral, headache.');
 
     // The baseline is resolved from the clinic's templates, not hardcoded.
     await expect(page.getByTestId('create-report-template')).toContainText('Baseline template');

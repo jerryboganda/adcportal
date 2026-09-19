@@ -385,8 +385,11 @@ export const TemplateLibrary: React.FC<{
               <div className="space-y-4 text-xs">
                 <div className="grid grid-cols-2 gap-3">
                   <div className="col-span-2">
-                    <label className="block font-semibold text-slate-700 mb-1">Name *</label>
+                    <label htmlFor="template-name" className="block font-semibold text-slate-700 mb-1">
+                      Name *
+                    </label>
                     <input
+                      id="template-name"
                       type="text"
                       value={draft.name}
                       onChange={event => setDraft({ ...draft, name: event.target.value })}
@@ -395,8 +398,11 @@ export const TemplateLibrary: React.FC<{
                   </div>
 
                   <div>
-                    <label className="block font-semibold text-slate-700 mb-1">Modality *</label>
+                    <label htmlFor="template-modality" className="block font-semibold text-slate-700 mb-1">
+                      Modality *
+                    </label>
                     <select
+                      id="template-modality"
                       value={draft.modalityId}
                       onChange={event => setDraft({ ...draft, modalityId: Number(event.target.value) })}
                       className="w-full p-2 rounded-xl border border-slate-300 cursor-pointer"
@@ -410,8 +416,11 @@ export const TemplateLibrary: React.FC<{
                   </div>
 
                   <div>
-                    <label className="block font-semibold text-slate-700 mb-1">Procedure (most specific)</label>
+                    <label htmlFor="template-procedure" className="block font-semibold text-slate-700 mb-1">
+                      Procedure (most specific)
+                    </label>
                     <select
+                      id="template-procedure"
                       value={draft.serviceId}
                       onChange={event =>
                         setDraft({ ...draft, serviceId: event.target.value === '' ? '' : Number(event.target.value) })
@@ -430,8 +439,11 @@ export const TemplateLibrary: React.FC<{
                   </div>
 
                   <div>
-                    <label className="block font-semibold text-slate-700 mb-1">Body region</label>
+                    <label htmlFor="template-body-region" className="block font-semibold text-slate-700 mb-1">
+                      Body region
+                    </label>
                     <input
+                      id="template-body-region"
                       type="text"
                       value={draft.bodyRegion}
                       onChange={event => setDraft({ ...draft, bodyRegion: event.target.value })}
@@ -441,8 +453,11 @@ export const TemplateLibrary: React.FC<{
                   </div>
 
                   <div>
-                    <label className="block font-semibold text-slate-700 mb-1">Age band</label>
+                    <label htmlFor="template-age-group" className="block font-semibold text-slate-700 mb-1">
+                      Age band
+                    </label>
                     <select
+                      id="template-age-group"
                       value={draft.ageGroup}
                       onChange={event => setDraft({ ...draft, ageGroup: event.target.value })}
                       className="w-full p-2 rounded-xl border border-slate-300 cursor-pointer"
@@ -456,8 +471,11 @@ export const TemplateLibrary: React.FC<{
                   </div>
 
                   <div>
-                    <label className="block font-semibold text-slate-700 mb-1">Sex (only if clinically relevant)</label>
+                    <label htmlFor="template-sex" className="block font-semibold text-slate-700 mb-1">
+                      Sex (only if clinically relevant)
+                    </label>
                     <select
+                      id="template-sex"
                       value={draft.sex}
                       onChange={event => setDraft({ ...draft, sex: event.target.value as TemplateDraft['sex'] })}
                       className="w-full p-2 rounded-xl border border-slate-300 cursor-pointer"
@@ -469,8 +487,11 @@ export const TemplateLibrary: React.FC<{
                   </div>
 
                   <div>
-                    <label className="block font-semibold text-slate-700 mb-1">Contrast / protocol</label>
+                    <label htmlFor="template-contrast" className="block font-semibold text-slate-700 mb-1">
+                      Contrast / protocol
+                    </label>
                     <select
+                      id="template-contrast"
                       value={draft.contrast}
                       onChange={event => setDraft({ ...draft, contrast: event.target.value as TemplateDraft['contrast'] })}
                       className="w-full p-2 rounded-xl border border-slate-300 cursor-pointer"
@@ -483,8 +504,11 @@ export const TemplateLibrary: React.FC<{
                   </div>
 
                   <div>
-                    <label className="block font-semibold text-slate-700 mb-1">Scope</label>
+                    <label htmlFor="template-scope" className="block font-semibold text-slate-700 mb-1">
+                      Scope
+                    </label>
                     <select
+                      id="template-scope"
                       value={draft.scope}
                       onChange={event => setDraft({ ...draft, scope: event.target.value as TemplateDraft['scope'] })}
                       className="w-full p-2 rounded-xl border border-slate-300 cursor-pointer"
@@ -518,8 +542,11 @@ export const TemplateLibrary: React.FC<{
                   ] as Array<[keyof TemplateDraft, string]>
                 ).map(([key, label]) => (
                   <div key={String(key)}>
-                    <label className="block font-semibold text-slate-700 mb-1">{label}</label>
+                    <label htmlFor={`template-section-${String(key)}`} className="block font-semibold text-slate-700 mb-1">
+                      {label}
+                    </label>
                     <textarea
+                      id={`template-section-${String(key)}`}
                       rows={key === 'findings' ? 5 : 2}
                       value={(draft[key] as string) ?? ''}
                       onChange={event => setDraft({ ...draft, [key]: event.target.value })}

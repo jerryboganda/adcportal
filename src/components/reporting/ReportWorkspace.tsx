@@ -1616,8 +1616,11 @@ const CriticalFindingModal: React.FC<{
         {error && <div className="p-2 rounded-lg bg-rose-50 border border-rose-200 text-rose-800">{error}</div>}
 
         <div>
-          <label className="block font-semibold text-slate-700 mb-1">Finding communicated *</label>
+          <label htmlFor="critical-finding-summary" className="block font-semibold text-slate-700 mb-1">
+            Finding communicated *
+          </label>
           <textarea
+            id="critical-finding-summary"
             rows={2}
             value={summary}
             onChange={event => setSummary(event.target.value)}
@@ -1628,8 +1631,11 @@ const CriticalFindingModal: React.FC<{
 
         <div className="grid grid-cols-2 gap-2">
           <div>
-            <label className="block font-semibold text-slate-700 mb-1">Clinician notified *</label>
+            <label htmlFor="critical-finding-notified" className="block font-semibold text-slate-700 mb-1">
+              Clinician notified *
+            </label>
             <input
+              id="critical-finding-notified"
               type="text"
               value={notifiedTo}
               onChange={event => setNotifiedTo(event.target.value)}
@@ -1637,8 +1643,11 @@ const CriticalFindingModal: React.FC<{
             />
           </div>
           <div>
-            <label className="block font-semibold text-slate-700 mb-1">Role</label>
+            <label htmlFor="critical-finding-role" className="block font-semibold text-slate-700 mb-1">
+              Role
+            </label>
             <input
+              id="critical-finding-role"
               type="text"
               value={notifiedRole}
               onChange={event => setNotifiedRole(event.target.value)}
@@ -1646,8 +1655,11 @@ const CriticalFindingModal: React.FC<{
             />
           </div>
           <div>
-            <label className="block font-semibold text-slate-700 mb-1">Contact</label>
+            <label htmlFor="critical-finding-contact" className="block font-semibold text-slate-700 mb-1">
+              Contact
+            </label>
             <input
+              id="critical-finding-contact"
               type="text"
               value={contact}
               onChange={event => setContact(event.target.value)}
@@ -1655,8 +1667,11 @@ const CriticalFindingModal: React.FC<{
             />
           </div>
           <div>
-            <label className="block font-semibold text-slate-700 mb-1">Method</label>
+            <label htmlFor="critical-finding-method" className="block font-semibold text-slate-700 mb-1">
+              Method
+            </label>
             <select
+              id="critical-finding-method"
               value={method}
               onChange={event => setMethod(event.target.value as CriticalFindingLog['method'])}
               className="w-full p-2 rounded-xl border border-slate-300 cursor-pointer"
@@ -1671,8 +1686,11 @@ const CriticalFindingModal: React.FC<{
         </div>
 
         <div>
-          <label className="block font-semibold text-slate-700 mb-1">Advice given</label>
+          <label htmlFor="critical-finding-advice" className="block font-semibold text-slate-700 mb-1">
+            Advice given
+          </label>
           <textarea
+            id="critical-finding-advice"
             rows={2}
             value={advice}
             onChange={event => setAdvice(event.target.value)}
@@ -1806,8 +1824,10 @@ const RejectModal: React.FC<{
         {error && <div className="p-2 rounded-lg bg-rose-50 border border-rose-200 text-rose-800">{error}</div>}
 
         <div>
-          <label className="block font-semibold text-slate-700 mb-1">QA deficiency</label>
-          <select value={category} onChange={event => setCategory(event.target.value)} className="w-full p-2 rounded-xl border border-slate-300 cursor-pointer">
+          <label htmlFor="reject-category" className="block font-semibold text-slate-700 mb-1">
+            QA deficiency
+          </label>
+          <select id="reject-category" value={category} onChange={event => setCategory(event.target.value)} className="w-full p-2 rounded-xl border border-slate-300 cursor-pointer">
             {REJECT_CATEGORIES.map(option => (
               <option key={option} value={option}>
                 {option}
@@ -1817,8 +1837,11 @@ const RejectModal: React.FC<{
         </div>
 
         <div>
-          <label className="block font-semibold text-slate-700 mb-1">Re-scan instructions</label>
+          <label htmlFor="reject-notes" className="block font-semibold text-slate-700 mb-1">
+            Re-scan instructions
+          </label>
           <textarea
+            id="reject-notes"
             rows={3}
             value={notes}
             onChange={event => setNotes(event.target.value)}
