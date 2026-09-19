@@ -244,9 +244,20 @@ class PlatformIntegrationController extends PlatformController
     }
 
     /** Only keys the type declares as credentials are ever stored. */
+    /**
+     * Keep only the secret keys this type DECLARES.
+     *
+     * "Declares" means required OR optional: a type may accept a credential it
+     * does not insist on (a self-hosted dictation engine usually runs unauthenticated
+     * inside the clinic's network, but sits behind a gateway token in some
+     * deployments). Filtering on the required list alone silently discarded an
+     * optional secret the console had just offered a field for — the integration
+     * saved as "active", then failed at call time with the gateway's 401 and no
+     * hint why. Undeclared keys are still dropped.
+     */
     private function filterSecretKeys(string $type, array $secrets): array
     {
-        $allowed = TenantIntegrationService::secretKeys($type);
+        $allowed = TenantIntegrationService::allSecretKeys($type);
         $filtered = [];
 
         foreach ($allowed as $key) {

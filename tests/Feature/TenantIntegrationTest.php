@@ -99,6 +99,59 @@ class TenantIntegrationTest extends ApiTestCase
         $this->assertSame(['clientSecret'], array_keys(TenantIntegration::find($id)->secrets));
     }
 
+    /**
+     * A secret the catalog OFFERS must be storable even when it is not required.
+     *
+     * The console renders a field for every declared key, so a key the console
+     * offers and the API then discards is the worst of both worlds: the admin
+     * watches their credential save as "active", and dictation only fails later,
+     * as a 401 from their own engine, with nothing pointing at the dropped key.
+     */
+    public function test_a_declared_optional_secret_is_stored_even_though_it_is_not_required(): void
+    {
+        $super = $this->platformUser();
+
+        // The catalog is what makes the console render the field at all.
+        $catalog = $this->actingAs($super)
+            ->getJson("/api/v1/platform/tenants/{$this->businessA->id}/integrations")
+            ->assertOk()
+            ->decodeResponseJson()['data']['catalog'];
+
+        $dictation = collect($catalog)->firstWhere('type', 'dictation');
+        $this->assertNotNull($dictation, 'A clinic must be able to register its own dictation engine.');
+        $this->assertContains('baseUrl', $dictation['requiredKeys']);
+        $this->assertSame([], $dictation['secretKeys'], 'An API key must not be mandatory: most engines run unauthenticated.');
+        $this->assertContains('apiKey', $dictation['optionalSecretKeys']);
+
+        // Configured the way a clinic whose engine sits behind a gateway would:
+        // the base URL it requires, plus the token that gateway expects.
+        $body = $this->actingAs($super)
+            ->confirmStepUp()->postJson("/api/v1/platform/tenants/{$this->businessA->id}/integrations", [
+                'type' => 'dictation',
+                'name' => 'Clinic STT engine',
+                'config' => ['baseUrl' => 'https://stt.alpha.test/v1/transcribe'],
+                'secrets' => ['apiKey' => 'gateway-token-value', 'totallyUnrelated' => 'y'],
+            ])
+            ->assertStatus(201)
+            ->decodeResponseJson()['data'];
+
+        $integration = $body['integration'];
+        $id = (int) $integration['id'];
+
+        // Usable with only the required key supplied…
+        $this->assertSame('active', $integration['status']);
+        // …and the supplied optional one is kept, masked in the response, and
+        // still encrypted at rest rather than stored in the clear.
+        $this->assertTrue($integration['secrets']['apiKey']['present']);
+        $this->assertStringNotContainsString('gateway-token-value', json_encode($integration));
+        $this->assertSame(['apiKey'], array_keys(TenantIntegration::find($id)->secrets));
+        $this->assertStringNotContainsString(
+            'gateway-token-value',
+            (string) DB::table('tenant_integrations')->where('id', $id)->value('secrets')
+        );
+        $this->assertSame('gateway-token-value', TenantIntegration::find($id)->secrets['apiKey']);
+    }
+
     public function test_integration_type_is_gated_by_its_entitlement(): void
     {
         $super = $this->platformUser();
