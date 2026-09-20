@@ -308,7 +308,6 @@ jobs:
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     permissions:
       packages: read
-      actions: read
     steps:
       - name: Check deploy secrets present
         id: secrets
@@ -323,33 +322,6 @@ jobs:
             echo "ready=false" >> "$GITHUB_OUTPUT"
             echo "::notice::VPS SSH secrets not configured - skipping deploy step."
           fi
-
-      - name: Wait for the image publish for this commit
-        if: steps.secrets.outputs.ready == 'true'
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          SHA: ${{ github.sha }}
-        run: |
-          # The deploy must ship THIS commit's image. Publish used to be
-          # path-filtered, so a docs-only push built nothing and :latest kept
-          # pointing at an older commit; the deploy then had to guess whether
-          # a missing image meant a race or a never-built commit. Publish now
-          # runs for every push to main, so the correct response to "no run
-          # for this SHA" is to wait — deterministically — and to fail if
-          # publishing failed. ~6 minutes covers the build comfortably.
-          for i in $(seq 1 36); do
-            read -r status conclusion <<<"$(gh run list --workflow=publish.yml --commit "$SHA" --limit 5 \
-              --json status,conclusion --jq '.[0] | "\(.status) \(.conclusion // "")"' 2>/dev/null || echo 'none none')"
-            case "$status" in
-              completed)
-                if [ "$conclusion" = "success" ]; then echo "Publish succeeded for $SHA."; exit 0; fi
-                echo "::error::Publish concluded '$conclusion' for this commit — refusing to deploy."
-                exit 1 ;;
-              *) sleep 10 ;;
-            esac
-          done
-          echo "::error::No successful image publish for this commit within 6 minutes — refusing to deploy an unverified :latest."
-          exit 1
 
       - name: Pull the freshly published image and restart the stack
         if: steps.secrets.outputs.ready == 'true'
@@ -374,8 +346,8 @@ jobs:
             # Deploy the EXACT image this run built and tested (tag = commit
             # SHA), never the floating :latest — a publish that failed or
             # raced CI would otherwise redeploy an OLD image while the
-            # pipeline reports green. The manifest check fails BEFORE the
-            # running app is touched.
+            # pipeline reports green. The pull itself is the existence proof:
+            # a SHA-tagged manifest can only be there if publish pushed it.
             IMAGE="ghcr.io/jerryboganda/adcportal:${IMAGE_TAG}"
 
             # A stored long-lived VPS credential can lapse and break every
@@ -386,22 +358,22 @@ jobs:
             printf '%s' "$GHCR_TOKEN" | docker login ghcr.io --username "$GHCR_USER" --password-stdin
             trap 'docker logout ghcr.io >/dev/null 2>&1 || true' EXIT
 
-            # Publish is a separate workflow that races this one on push;
-            # retry ~2 min before concluding the image is truly missing.
-            ok=""
+            # Publish races this workflow on push, so retry a few times
+            # before concluding the image is genuinely absent — and then
+            # fail BEFORE the running app is touched.
+            pulled=""
             for i in 1 2 3 4 5 6; do
-              if docker manifest inspect "$IMAGE" >/dev/null 2>&1; then ok=1; break; fi
-              sleep 20
+              if docker pull "$IMAGE"; then pulled=1; break; fi
+              echo "attempt $i: image not pullable yet — publish may still be running"; sleep 20
             done
-            if [ -z "$ok" ]; then
-              echo "::error::Image $IMAGE not in registry — publish failed or raced CI; refusing to redeploy a stale :latest."
+            if [ -z "$pulled" ]; then
+              echo "::error::Image $IMAGE not in registry after retries — publish failed; refusing to redeploy a stale :latest."
               exit 1
             fi
 
-            # Pull the pinned image, retag it locally as :latest so the
-            # existing compose file keeps working unchanged, then recreate.
-            # The entrypoint applies pending migrations + refreshes caches.
-            docker pull "$IMAGE"
+            # Retag the pinned image locally as :latest so the existing
+            # compose file keeps working unchanged, then recreate. The
+            # entrypoint applies pending migrations + refreshes caches.
             docker tag "$IMAGE" ghcr.io/jerryboganda/adcportal:latest
             docker compose up -d app
 
