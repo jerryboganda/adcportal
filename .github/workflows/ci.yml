@@ -308,6 +308,7 @@ jobs:
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     permissions:
       packages: read
+      actions: read
     steps:
       - name: Check deploy secrets present
         id: secrets
@@ -322,6 +323,33 @@ jobs:
             echo "ready=false" >> "$GITHUB_OUTPUT"
             echo "::notice::VPS SSH secrets not configured - skipping deploy step."
           fi
+
+      - name: Wait for the image publish for this commit
+        if: steps.secrets.outputs.ready == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SHA: ${{ github.sha }}
+        run: |
+          # The deploy must ship THIS commit's image. Publish used to be
+          # path-filtered, so a docs-only push built nothing and :latest kept
+          # pointing at an older commit; the deploy then had to guess whether
+          # a missing image meant a race or a never-built commit. Publish now
+          # runs for every push to main, so the correct response to "no run
+          # for this SHA" is to wait — deterministically — and to fail if
+          # publishing failed. ~6 minutes covers the build comfortably.
+          for i in $(seq 1 36); do
+            read -r status conclusion <<<"$(gh run list --workflow=publish.yml --commit "$SHA" --limit 5 \
+              --json status,conclusion --jq '.[0] | "\(.status) \(.conclusion // "")"' 2>/dev/null || echo 'none none')"
+            case "$status" in
+              completed)
+                if [ "$conclusion" = "success" ]; then echo "Publish succeeded for $SHA."; exit 0; fi
+                echo "::error::Publish concluded '$conclusion' for this commit — refusing to deploy."
+                exit 1 ;;
+              *) sleep 10 ;;
+            esac
+          done
+          echo "::error::No successful image publish for this commit within 6 minutes — refusing to deploy an unverified :latest."
+          exit 1
 
       - name: Pull the freshly published image and restart the stack
         if: steps.secrets.outputs.ready == 'true'

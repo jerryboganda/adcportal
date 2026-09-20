@@ -3,24 +3,6 @@ name: Publish — GHCR image (VPS pulls; compute lives here, never on the host)
 on:
   push:
     branches: [main]
-    paths:
-      - 'app/**'
-      - 'config/**'
-      - 'database/**'
-      - 'routes/**'
-      - 'resources/**'
-      - 'src/**'
-      - 'public/**'
-      - 'composer.json'
-      - 'composer.lock'
-      - 'package.json'
-      - 'package-lock.json'
-      - 'vite.config.ts'
-      - 'tsconfig.json'
-      - 'index.html'
-      - 'Dockerfile'
-      - 'docker/entrypoint.sh'
-      - '.github/workflows/publish.yml'
   workflow_dispatch:
 
 permissions:
