@@ -17,6 +17,11 @@ class Service extends Model
         'is_bookable_online' => 'boolean',
         'duration_minutes' => 'integer',
         'tat_target_hours' => 'integer',
+        'is_active' => 'boolean',
+        'minor_unit_precision' => 'integer',
+        'views' => 'array',
+        'price_configured_at' => 'datetime',
+        'lock_version' => 'integer',
     ];
 
         public function scopeForClinic($query, $businessId = null, $creatorId = null)
@@ -49,6 +54,21 @@ class Service extends Model
     public function reportTemplates()
     {
         return $this->hasMany(ReportTemplate::class);
+    }
+
+    public function canonicalProcedure()
+    {
+        return $this->belongsTo(CanonicalProcedure::class);
+    }
+
+    public function canonicalRevision()
+    {
+        return $this->belongsTo(CanonicalProcedureRevision::class, 'canonical_procedure_revision_id');
+    }
+
+    public function anatomicalRegion()
+    {
+        return $this->belongsTo(AnatomicalRegion::class);
     }
 
     // Service belongs to Business

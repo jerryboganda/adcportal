@@ -54,6 +54,8 @@ export interface Service {
   preparationInstructions: string;
   requiresScreening: boolean;
   requiresContrast: boolean;
+  /** Deactivating hides a procedure from new bookings without touching history. */
+  isBookableOnline: boolean;
 }
 
 export interface Patient {
@@ -77,6 +79,8 @@ export interface Referrer {
   email: string;
   phone: string;
   specialty: string;
+  /** Inactive referrers stay on history but cannot be picked for new bookings. */
+  isActive: boolean;
 }
 
 export interface DoseLog {
@@ -111,6 +115,16 @@ export interface ScreeningQuestion {
   sortOrder: number;
 }
 
+/** Fail-open Jev judgment on a drafted catalog artifact (advisory only). */
+export interface CatalogReview {
+  /** Judged verdict (true = safety question / adequate prep). */
+  isOk: boolean;
+  /** Judgment confidence 0..1. */
+  confidence: number;
+  /** Human-readable note when the verdict is negative; otherwise absent. */
+  note?: string;
+}
+
 export interface ScreeningForm {
   id: string;
   name: string;
@@ -118,6 +132,8 @@ export interface ScreeningForm {
   description: string;
   modalityId?: number | null;
   questions: ScreeningQuestion[];
+  /** Inactive forms are never served to technologists at check-in. */
+  isActive: boolean;
 }
 
 export interface StudyScreeningAnswer {
@@ -129,6 +145,28 @@ export interface StudyScreeningAnswer {
   overrideReason?: string;
   answeredBy: string;
   answeredAt: string;
+}
+
+/**
+ * Advisory AI safety-screening triage (TypeSafe System One / Jev through the
+ * Vercel AI Gateway). Computed server-side; NEVER changes the deterministic
+ * `screeningCleared` gate — it only helps staff prioritise review.
+ */
+export interface ScreeningTriage {
+  model: string;
+  evaluatedAt: string;
+  /** cleared = routine path; escalate = urgent radiologist consult; review = human eye. */
+  decision: 'cleared' | 'review' | 'escalate';
+  proceedProbability: number | null;
+  urgency: {
+    choice: string;
+    confidence: number;
+    probabilities: Record<string, number>;
+  } | null;
+  risk: { score: number | null; confidence: number } | null;
+  usage: { inputTokens: number; outputTokens: number };
+  /** True when a later evaluation failed and this stored judgment may be stale. */
+  degraded?: boolean;
 }
 
 export interface RadiologyReport {
@@ -192,6 +230,8 @@ export interface Appointment {
   rejectReason?: string;
   screeningRequired: boolean;
   screeningCleared: boolean;
+  /** Advisory AI triage over the screening answers (server-computed, never authoritative). */
+  screeningTriage?: ScreeningTriage | null;
   screeningAnswers?: StudyScreeningAnswer[];
   performedByStaff?: string;
   assignedRadiologistId?: string;
@@ -227,8 +267,39 @@ export interface InvoicePayment {
   /** Code of a TENANT-CONFIGURED payment method (see PaymentMethod). */
   method: string;
   reference?: string;
+  /** Full timestamp (date + time) — shift reconciliation scopes to a day. */
   paidAt: string;
+  /** ISO timestamp for precise day-scoping on the client. */
+  paidAtIso?: string;
   receivedBy: string;
+  /** 'payment' = money in; 'refund' = money out (negative amount). */
+  kind?: 'payment' | 'refund';
+  /** For refunds: the id of the collection this row reverses. */
+  refundsPaymentId?: string | null;
+}
+
+/** Per-tender aggregate from the server for ONE shift day. */
+export interface ShiftMethodSummary {
+  method: string;
+  total: number;
+  count: number;
+}
+
+/** Server-computed reconciliation numbers for one shift day. */
+export interface ShiftSummary {
+  date: string;
+  totalCollected: number;
+  refundedTotal: number;
+  invoiceCount: number;
+  paymentCount: number;
+  byMethod: ShiftMethodSummary[];
+}
+
+/** Advisory Jev judgment on a counted shift (fail-open; null = none). */
+export interface ShiftReview {
+  verdict: 'balanced' | 'minor' | 'investigate';
+  confidence: number;
+  note: string | null;
 }
 
 export interface Invoice {
@@ -254,7 +325,11 @@ export interface Invoice {
   items: InvoiceItem[];
   payments: InvoicePayment[];
   createdAt: string;
+  /** Date + time — invoices, CSV and receipts must show the DAY. */
+  createdAtFull?: string;
+  createdAtIso?: string;
   issuedAt?: string;
+  issuedAtFull?: string;
   voidedAt?: string;
 }
 

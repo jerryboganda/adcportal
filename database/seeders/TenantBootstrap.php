@@ -100,13 +100,14 @@ class TenantBootstrap extends Seeder
         ];
 
         $modalityIds = [];
+        $availableModalities = [];
         foreach ($modalities as $m) {
-            $modality = Modality::withTrashed()->updateOrCreate(
+            $modality = Modality::withTrashed()->firstOrCreate(
                 ['code' => $m['code'], 'business_id' => $business->id],
                 [...$m, 'is_active' => true, 'created_by' => $admin->id]
             );
-            $modality->restore();
             $modalityIds[$m['code']] = $modality->id;
+            $availableModalities[$m['code']] = $modality->is_active && ! $modality->trashed();
         }
 
         // `region` feeds the reporting module's modality + body-region template
@@ -123,7 +124,10 @@ class TenantBootstrap extends Seeder
         ];
 
         foreach ($services as $s) {
-            Service::updateOrCreate(
+            if (! $availableModalities[$s['modality']]) {
+                continue;
+            }
+            Service::withTrashed()->firstOrCreate(
                 ['code' => $s['code'], 'business_id' => $business->id],
                 [
                     'name' => $s['name'],

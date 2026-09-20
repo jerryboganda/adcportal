@@ -548,7 +548,8 @@ export const App: React.FC = () => {
     discountAmount: number,
     notes: string,
     extraItems?: InvoiceItem[],
-    initialPayment?: { amount: number; method: InvoicePayment['method']; reference: string }
+    initialPayment?: { amount: number; method: InvoicePayment['method']; reference: string },
+    taxRate?: number
   ) => {
     const apt = appointments.find(a => a.id === appointmentId);
     if (!apt) return;
@@ -563,6 +564,7 @@ export const App: React.FC = () => {
         // Cash discount is server-authoritative: it travels in the contract
         // and folds into the persisted totals (never recomputed client-side).
         discountAmount: discountAmount > 0 ? discountAmount : undefined,
+        taxRate: taxRate ?? 0,
         notes,
         initialPayment: initialPayment && initialPayment.amount > 0 ? initialPayment : undefined,
       });
@@ -570,6 +572,7 @@ export const App: React.FC = () => {
       showFlash('success', `Invoice ${invoice.invoiceNumber} created.`);
     } catch (err: any) {
       fail(err, 'Could not create the invoice.');
+      throw err; // keeps the cashier's modal open — the latch resets via finally
     }
   }, [appointments, fail, showFlash]);
 
@@ -584,6 +587,7 @@ export const App: React.FC = () => {
       replaceInvoice(invoice);
     } catch (err: any) {
       fail(err, 'Could not add the invoice line.');
+      throw err;
     }
   }, [fail, replaceInvoice]);
 
@@ -594,6 +598,24 @@ export const App: React.FC = () => {
       showFlash('success', 'Invoice voided.');
     } catch (err: any) {
       fail(err, 'Could not void the invoice.');
+      throw err;
+    }
+  }, [fail, replaceInvoice, showFlash]);
+
+  const handleRefundPayment = useCallback(async (
+    invoiceId: string,
+    paymentId: string,
+    amount: number,
+    reason: string,
+    reference?: string
+  ) => {
+    try {
+      const invoice = await api.refundInvoicePayment(invoiceId, paymentId, amount, reason, reference);
+      replaceInvoice(invoice);
+      showFlash('success', `Refund of Rs. ${amount.toLocaleString()} issued.`);
+    } catch (err: any) {
+      fail(err, 'Could not issue the refund.');
+      throw err;
     }
   }, [fail, replaceInvoice, showFlash]);
 
@@ -663,106 +685,121 @@ export const App: React.FC = () => {
     try {
       const service = await api.createService(newSvc);
       setServices(prev => [...prev, service]);
+      showFlash('success', `Procedure "${service.name}" added to the catalog.`);
     } catch (err: any) { fail(err, 'Could not create the procedure.'); }
-  }, [fail]);
+  }, [fail, showFlash]);
 
   const handleUpdateService = useCallback(async (updatedSvc: Service) => {
     try {
       const service = await api.updateService(updatedSvc);
       setServices(prev => prev.map(s => (s.id === service.id ? service : s)));
+      showFlash('success', `Procedure "${service.name}" updated.`);
     } catch (err: any) { fail(err, 'Could not update the procedure.'); }
-  }, [fail]);
+  }, [fail, showFlash]);
 
   const handleDeleteService = useCallback(async (serviceId: number) => {
     try {
       await api.deleteService(String(serviceId));
       setServices(prev => prev.filter(s => s.id !== serviceId));
+      showFlash('success', 'Procedure removed from the catalog.');
     } catch (err: any) { fail(err, 'Could not delete the procedure.'); }
-  }, [fail]);
+  }, [fail, showFlash]);
 
   const handleAddModality = useCallback(async (newMod: Omit<Modality, 'id'>) => {
     try {
       const modality = await api.createModality(newMod);
       setModalities(prev => [...prev, modality]);
+      showFlash('success', `Modality suite "${modality.name}" created.`);
     } catch (err: any) { fail(err, 'Could not create the modality.'); }
-  }, [fail]);
+  }, [fail, showFlash]);
 
   const handleUpdateModality = useCallback(async (updatedMod: Modality) => {
     try {
       const modality = await api.updateModality(updatedMod);
       setModalities(prev => prev.map(m => (m.id === modality.id ? modality : m)));
+      showFlash('success', `Modality suite "${modality.name}" updated.`);
     } catch (err: any) { fail(err, 'Could not update the modality.'); }
-  }, [fail]);
+  }, [fail, showFlash]);
 
   const handleDeleteModality = useCallback(async (modalityId: number) => {
     try {
       await api.deleteModality(String(modalityId));
       setModalities(prev => prev.filter(m => m.id !== modalityId));
+      showFlash('success', 'Modality suite deleted.');
     } catch (err: any) { fail(err, 'Could not delete the modality.'); }
-  }, [fail]);
+  }, [fail, showFlash]);
 
   const handleAddRoom = useCallback(async (newRoom: Omit<Room, 'id'>) => {
     try {
       const room = await api.createRoom(newRoom);
       setRooms(prev => [...prev, room]);
+      showFlash('success', `Imaging suite "${room.name}" created.`);
     } catch (err: any) { fail(err, 'Could not create the imaging suite.'); }
-  }, [fail]);
+  }, [fail, showFlash]);
 
   const handleUpdateRoom = useCallback(async (updatedRoom: Room) => {
     try {
       const room = await api.updateRoom(updatedRoom);
       setRooms(prev => prev.map(r => (r.id === room.id ? room : r)));
+      showFlash('success', `Imaging suite "${room.name}" updated.`);
     } catch (err: any) { fail(err, 'Could not update the imaging suite.'); }
-  }, [fail]);
+  }, [fail, showFlash]);
 
   const handleDeleteRoom = useCallback(async (roomId: number) => {
     try {
       await api.deleteRoom(String(roomId));
       setRooms(prev => prev.filter(r => r.id !== roomId));
+      showFlash('success', 'Imaging suite deleted.');
     } catch (err: any) { fail(err, 'Could not delete the imaging suite.'); }
-  }, [fail]);
+  }, [fail, showFlash]);
 
   const handleAddPaymentMethod = useCallback(async (input: { code: string; name: string; isActive?: boolean; sortOrder?: number }) => {
     try {
       const method = await api.createPaymentMethod(input);
       setPaymentMethods(prev => [...prev, method]);
+      showFlash('success', `Payment method "${method.name}" added.`);
     } catch (err: any) { fail(err, 'Could not create the payment method.'); }
-  }, [fail]);
+  }, [fail, showFlash]);
 
   const handleUpdatePaymentMethod = useCallback(async (method: { id: number; name: string; isActive?: boolean; sortOrder?: number }) => {
     try {
       const updated = await api.updatePaymentMethod(method);
       setPaymentMethods(prev => prev.map(m => (m.id === updated.id ? updated : m)));
+      showFlash('success', `Payment method "${updated.name}" updated.`);
     } catch (err: any) { fail(err, 'Could not update the payment method.'); }
-  }, [fail]);
+  }, [fail, showFlash]);
 
   const handleDeletePaymentMethod = useCallback(async (methodId: number) => {
     try {
       await api.deletePaymentMethod(String(methodId));
       setPaymentMethods(prev => prev.filter(m => m.id !== methodId));
+      showFlash('success', 'Payment method deleted.');
     } catch (err: any) { fail(err, 'Could not delete the payment method.'); }
-  }, [fail]);
+  }, [fail, showFlash]);
 
   const handleAddReferrer = useCallback(async (newRef: Omit<Referrer, 'id'>) => {
     try {
       const referrer = await api.createReferrer(newRef);
       setReferrers(prev => [...prev, referrer]);
+      showFlash('success', `Referring doctor "${referrer.name}" added.`);
     } catch (err: any) { fail(err, 'Could not create the referrer.'); }
-  }, [fail]);
+  }, [fail, showFlash]);
 
   const handleUpdateReferrer = useCallback(async (updatedRef: Referrer) => {
     try {
       const referrer = await api.updateReferrer(updatedRef);
       setReferrers(prev => prev.map(r => (r.id === referrer.id ? referrer : r)));
+      showFlash('success', `Referring doctor "${referrer.name}" updated.`);
     } catch (err: any) { fail(err, 'Could not update the referrer.'); }
-  }, [fail]);
+  }, [fail, showFlash]);
 
   const handleDeleteReferrer = useCallback(async (refId: number) => {
     try {
       await api.deleteReferrer(String(refId));
       setReferrers(prev => prev.filter(r => r.id !== refId));
+      showFlash('success', 'Referring doctor removed.');
     } catch (err: any) { fail(err, 'Could not delete the referrer.'); }
-  }, [fail]);
+  }, [fail, showFlash]);
 
   const handleAddForm = useCallback(async (newForm: {
     name: string;
@@ -779,20 +816,52 @@ export const App: React.FC = () => {
     try {
       const form = await api.createScreeningForm(newForm);
       setForms(prev => [...prev, form]);
+      showFlash('success', `Screening form "${form.name}" created.`);
     } catch (err: any) { fail(err, 'Could not create the screening form.'); }
-  }, [fail]);
+  }, [fail, showFlash]);
 
   const handleUpdateForm = useCallback(async (updatedForm: ScreeningForm) => {
     try {
       const form = await api.updateScreeningFormQuestions(updatedForm.id, updatedForm.questions);
       setForms(prev => prev.map(f => (f.id === form.id ? { ...f, questions: form.questions } : f)));
+      showFlash('success', 'Screening form questions updated.');
     } catch (err: any) { fail(err, 'Could not update the screening form.'); }
-  }, [fail]);
+  }, [fail, showFlash]);
+
+  const handleToggleScreeningForm = useCallback(async (formId: string) => {
+    try {
+      const form = await api.toggleScreeningForm(formId);
+      setForms(prev => prev.map(f => (f.id === form.id ? form : f)));
+      showFlash('success', form.isActive
+        ? `Screening form "${form.name}" activated — technologists will now receive it at check-in.`
+        : `Screening form "${form.name}" deactivated — it is no longer served at check-in.`);
+    } catch (err: any) { fail(err, 'Could not update the screening form.'); }
+  }, [fail, showFlash]);
+
+  const handleDeleteScreeningForm = useCallback(async (formId: string) => {
+    try {
+      await api.deleteScreeningForm(formId);
+      setForms(prev => prev.filter(f => f.id !== formId));
+      showFlash('success', 'Screening form deleted.');
+    } catch (err: any) { fail(err, 'Could not delete the screening form.'); }
+  }, [fail, showFlash]);
+
+  const handleUpdateScreeningFormMeta = useCallback(async (
+    formId: string,
+    meta: { name?: string; description?: string; modalityId?: number | null; isActive?: boolean }
+  ) => {
+    try {
+      const form = await api.updateScreeningFormMeta(formId, meta);
+      setForms(prev => prev.map(f => (f.id === form.id ? form : f)));
+      showFlash('success', 'Screening form updated.');
+    } catch (err: any) { fail(err, 'Could not update the screening form.'); }
+  }, [fail, showFlash]);
 
   const handleAddTemplate = useCallback(async (newTpl: Omit<ReportTemplate, 'id'>) => {
     try {
       const template = await api.createReportTemplate(newTpl);
       setTemplates(prev => [...prev, template]);
+      showFlash('success', `Report template "${template.name}" created.`);
     } catch (err: any) {
       fail(err, 'Could not create the template.');
       throw err; // callers decide whether a success toast is honest
@@ -803,15 +872,17 @@ export const App: React.FC = () => {
     try {
       const template = await api.updateReportTemplate(updatedTpl);
       setTemplates(prev => prev.map(t => (t.id === template.id ? template : t)));
+      showFlash('success', `Report template "${template.name}" saved as v${template.version}.`);
     } catch (err: any) { fail(err, 'Could not update the template.'); }
-  }, [fail]);
+  }, [fail, showFlash]);
 
   const handleDeleteTemplate = useCallback(async (templateId: string) => {
     try {
       await api.deleteReportTemplate(templateId);
       setTemplates(prev => prev.filter(t => t.id !== templateId));
+      showFlash('success', 'Report template deleted.');
     } catch (err: any) { fail(err, 'Could not delete the template.'); }
-  }, [fail]);
+  }, [fail, showFlash]);
 
   // ==================== staff ====================
 
@@ -1228,6 +1299,7 @@ export const App: React.FC = () => {
             onSendToReading={handleSendToReading}
             onCancelStudy={handleCancelStudy}
             onUpdateAppointment={handleUpdateAppointment}
+            onTriageUpdated={replaceStudy}
           />
         )}
 
@@ -1261,6 +1333,7 @@ export const App: React.FC = () => {
             onCreateInvoice={handleCreateInvoice}
             onAddInvoiceItem={handleAddInvoiceItem}
             onVoidInvoice={handleVoidInvoice}
+            onRefundPayment={handleRefundPayment}
           />
         )}
 
@@ -1315,7 +1388,11 @@ export const App: React.FC = () => {
             onDeleteReferrer={handleDeleteReferrer}
             onAddForm={handleAddForm}
             onUpdateForm={handleUpdateForm}
+            onToggleForm={handleToggleScreeningForm}
+            onDeleteForm={handleDeleteScreeningForm}
+            onUpdateFormMeta={handleUpdateScreeningFormMeta}
             onAddTemplate={handleAddTemplate}
+            clinicName={clinicSettings?.name ?? null}
             onUpdateTemplate={handleUpdateTemplate}
             onDeleteTemplate={handleDeleteTemplate}
             onExportBackup={handleExportBackup}

@@ -72,7 +72,9 @@ export const NewBookingModal: React.FC<NewBookingModalProps> = ({
   const activeModalities = useMemo(() => modalities.filter(m => m.isActive), [modalities]);
   const [selectedModalityId, setSelectedModalityId] = useState<number | ''>(activeModalities[0]?.id ?? '');
   const modalityServices = useMemo(
-    () => services.filter(s => s.modalityId === selectedModalityId),
+    // Retired procedures (isBookableOnline = false) stay on history but must
+    // not be selectable for new bookings.
+    () => services.filter(s => s.modalityId === selectedModalityId && s.isBookableOnline !== false),
     [services, selectedModalityId]
   );
   const modalityRooms = useMemo(
@@ -156,7 +158,7 @@ export const NewBookingModal: React.FC<NewBookingModalProps> = ({
   const handleModalityChange = (modId: number) => {
     setSelectedModalityId(modId);
     setSelectedRoomId('');
-    const validServices = services.filter(s => s.modalityId === modId);
+    const validServices = services.filter(s => s.modalityId === modId && s.isBookableOnline !== false);
     setSelectedServiceId(validServices[0]?.id ?? '');
   };
 
@@ -488,7 +490,7 @@ export const NewBookingModal: React.FC<NewBookingModalProps> = ({
                 className="w-full bg-white text-slate-900 p-2.5 rounded-xl border border-slate-300 text-xs cursor-pointer shadow-xs"
               >
                 <option value="">Self / Walk-in (no referrer)</option>
-                {referrers.map(r => (
+                {referrers.filter(r => r.isActive !== false).map(r => (
                   <option key={r.id} value={r.id}>
                     {r.name} ({r.specialty})
                   </option>

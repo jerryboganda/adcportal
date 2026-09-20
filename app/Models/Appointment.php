@@ -67,6 +67,8 @@ class Appointment extends Model
     protected $casts = [
         'screening_required' => 'boolean',
         'screening_cleared' => 'boolean',
+        // Advisory AI screening triage payload (ScreeningTriageService).
+        'screening_triage' => 'array',
         'checked_in_at' => 'datetime',
         'preparing_at' => 'datetime',
         'in_progress_at' => 'datetime',

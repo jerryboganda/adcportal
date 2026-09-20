@@ -30,6 +30,7 @@ import {
 } from 'lucide-react';
 import { Appointment, Modality, DoseLog, WorkflowState } from '../types';
 import { canAny } from '../services/permissions';
+import { rerunScreeningTriage } from '../services/apiService';
 import { WorklistFilterToolbar } from './WorklistFilterToolbar';
 import { SortableColumnHeader } from './SortableColumnHeader';
 import { Barcode } from './Barcode';
@@ -54,6 +55,8 @@ interface TechnologistViewProps {
   onSendToReading: (aptId: string) => void;
   onCancelStudy: (aptId: string, reason: string) => void;
   onUpdateAppointment?: (aptId: string, updates: Partial<Appointment>) => void;
+  /** Receives the refreshed study after an advisory AI triage re-run. */
+  onTriageUpdated?: (study: Appointment) => void;
 }
 
 export const TechnologistView: React.FC<TechnologistViewProps> = ({
@@ -67,6 +70,7 @@ export const TechnologistView: React.FC<TechnologistViewProps> = ({
   onSendToReading,
   onCancelStudy,
   onUpdateAppointment,
+  onTriageUpdated,
 }) => {
   // Advanced Filters & Multi-Column Sorting state
   // Server-issued workflow permissions (API enforces the same checks).
@@ -581,6 +585,11 @@ export const TechnologistView: React.FC<TechnologistViewProps> = ({
                     </button>
                   </div>
 
+                  {/* Advisory AI Screening Triage (TypeSafe System One) —
+                      never gates acquisition; the deterministic clearance
+                      above stays authoritative. */}
+                  <ScreeningTriagePanel apt={apt} canScreen={canScreen} onTriageUpdated={onTriageUpdated} />
+
                   {/* Dose & Acquisition Log Summary if completed */}
                   {apt.doseLog && (
                     <div className="mt-2 p-2 rounded-lg bg-purple-50/90 border border-purple-200 text-[11px] text-purple-900 space-y-1">
@@ -1010,6 +1019,83 @@ const PacsInspectorModal: React.FC<PacsInspectorModalProps> = ({
           </div>
         </div>
       </div>
+    </div>
+  );
+};
+
+// ==================== Advisory AI Screening Triage ====================
+
+/**
+ * Advisory triage panel for one study, backed by TypeSafe's System One
+ * evaluation model (Jev) through the Vercel AI Gateway. The server computes
+ * the decision from the submitted screening form; confidence gates live in
+ * backend code. This panel is informational only — it can never clear or
+ * block a study (the deterministic safety gate above stays authoritative).
+ */
+const ScreeningTriagePanel: React.FC<{
+  apt: Appointment;
+  canScreen: boolean;
+  onTriageUpdated?: (study: Appointment) => void;
+}> = ({ apt, canScreen, onTriageUpdated }) => {
+  const [rerunning, setRerunning] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const triage = apt.screeningTriage;
+
+  if (!triage) return null;
+
+  const tone = triage.degraded
+    ? { badge: 'bg-slate-100 text-slate-600 border-slate-200', dot: 'bg-slate-400', label: 'TRIAGE UNAVAILABLE' }
+    : triage.decision === 'escalate'
+      ? { badge: 'bg-red-50 text-red-700 border-red-200', dot: 'bg-red-500', label: 'TRIAGE: ESCALATE' }
+      : triage.decision === 'cleared'
+        ? { badge: 'bg-emerald-50 text-emerald-700 border-emerald-200', dot: 'bg-emerald-500', label: 'TRIAGE: ROUTINE' }
+        : { badge: 'bg-amber-50 text-amber-800 border-amber-200', dot: 'bg-amber-500', label: 'TRIAGE: REVIEW' };
+
+  const rerun = async () => {
+    setRerunning(true);
+    setError(null);
+    try {
+      const { study } = await rerunScreeningTriage(apt.id);
+      onTriageUpdated?.(study);
+    } catch (err: any) {
+      setError(err?.message ?? 'Could not re-run the triage.');
+    } finally {
+      setRerunning(false);
+    }
+  };
+
+  return (
+    <div className={`mt-1.5 p-2 rounded-lg border text-[11px] ${tone.badge}`}>
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center space-x-1.5 min-w-0">
+          <Sparkles className="w-3.5 h-3.5 shrink-0" />
+          <span className="font-bold font-mono text-[10px] tracking-wide">{tone.label}</span>
+          {triage.risk?.score != null && !triage.degraded && (
+            <span className="font-mono text-[10px] opacity-80">risk {triage.risk.score.toFixed(1)}/4</span>
+          )}
+        </div>
+        {canScreen && (
+          <button
+            onClick={rerun}
+            disabled={rerunning}
+            title="Re-run the advisory AI triage over the current screening answers"
+            className="shrink-0 px-2 py-0.5 rounded bg-white/70 hover:bg-white font-bold text-[10px] border border-black/10 transition-colors cursor-pointer disabled:opacity-50"
+          >
+            {rerunning ? '…' : 'Re-run'}
+          </button>
+        )}
+      </div>
+      {!triage.degraded && (
+        <div className="mt-1 font-mono text-[10px] opacity-80">
+          proceed {Math.round((triage.proceedProbability ?? 0) * 100)}% · review need{' '}
+          {triage.urgency ? triage.urgency.choice.replace(/_/g, ' ') : '—'}
+          {triage.model ? ` · ${triage.model}` : ''}
+        </div>
+      )}
+      {triage.degraded && (
+        <div className="mt-1 text-[10px] opacity-80">Last judgment could not be refreshed — treat as stale.</div>
+      )}
+      {error && <div className="mt-1 text-[10px] text-red-700 font-medium">{error}</div>}
     </div>
   );
 };

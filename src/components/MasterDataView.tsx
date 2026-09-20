@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef } from 'react';
 import {
   Database,
   Layers,
@@ -32,8 +32,9 @@ import {
   ChevronRight,
   Eye,
 } from 'lucide-react';
-import { Modality, Service, Referrer, ScreeningForm, ReportTemplate, ScreeningQuestion, Room, PaymentMethod } from '../types';
+import { Modality, Service, Referrer, ScreeningForm, ReportTemplate, ScreeningQuestion, Room, PaymentMethod, CatalogReview } from '../types';
 import { canAny } from '../services/permissions';
+import * as api from '../services/apiService';
 
 interface MasterDataViewProps {
   modalities: Modality[];
@@ -73,6 +74,11 @@ interface MasterDataViewProps {
     }>;
   }) => void;
   onUpdateForm?: (updatedForm: ScreeningForm) => void;
+  onToggleForm?: (formId: string) => void;
+  onDeleteForm?: (formId: string) => void;
+  onUpdateFormMeta?: (formId: string, meta: { name?: string; description?: string; modalityId?: number | null; isActive?: boolean }) => void;
+  /** Clinic display name for the official printable catalog. */
+  clinicName?: string | null;
   onAddTemplate?: (newTpl: Omit<ReportTemplate, 'id'>) => Promise<void>;
   onUpdateTemplate?: (updatedTpl: ReportTemplate) => void;
   onDeleteTemplate?: (templateId: string) => void;
@@ -105,7 +111,11 @@ export const MasterDataView: React.FC<MasterDataViewProps> = ({
   onDeleteReferrer,
   onAddForm,
   onUpdateForm,
+  onToggleForm,
+  onDeleteForm,
+  onUpdateFormMeta,
   onAddTemplate,
+  clinicName,
   onUpdateTemplate,
   onDeleteTemplate,
   onExportBackup,
@@ -163,6 +173,9 @@ export const MasterDataView: React.FC<MasterDataViewProps> = ({
   const [newFormQuestions, setNewFormQuestions] = useState<Array<{ questionText: string; isRiskBlocking: boolean }>>([
     { questionText: '', isRiskBlocking: true },
   ]);
+  // Jev advisory reviews for drafted questions (fail-open: null = no judgment)
+  const [questionReviews, setQuestionReviews] = useState<Record<number, CatalogReview | null>>({});
+  const [reviewingQuestion, setReviewingQuestion] = useState<number | null>(null);
 
   const [questionModalOpen, setQuestionModalOpen] = useState(false);
   const [targetFormId, setTargetFormId] = useState<string | null>(null);
@@ -178,6 +191,12 @@ export const MasterDataView: React.FC<MasterDataViewProps> = ({
     setCopiedId(id);
     setTimeout(() => setCopiedId(null), 2000);
   };
+
+  // Double-submit latch: a modal's Save can fire twice before React re-renders,
+  // silently creating a duplicate procedure/room/doctor. One save per open.
+  const submitLock = useRef(false);
+  const lockSubmit = () => { submitLock.current = true; };
+  const releaseSubmit = () => { submitLock.current = false; };
 
   // Export Fee Schedule as CSV
   const handleExportCSV = () => {
@@ -196,14 +215,17 @@ export const MasterDataView: React.FC<MasterDataViewProps> = ({
       ];
     });
 
-    const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map(e => e.join(','))].join('\n');
-    const encodedUri = encodeURI(csvContent);
+    // BOM first: without it Excel opens the file as ANSI and every PKR fee
+    // line renders with mojibake whenever a procedure name is non-ASCII.
+    const csv = '\uFEFF' + [headers.join(','), ...rows.map(e => e.join(','))].join('\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
     const link = document.createElement('a');
-    link.setAttribute('href', encodedUri);
-    link.setAttribute('download', `PolytronX_Enterprise_PACS_RIS_Fee_Schedule_${new Date().toISOString().split('T')[0]}.csv`);
+    link.setAttribute('href', URL.createObjectURL(blob));
+    link.setAttribute('download', `Fee_Schedule_${new Date().toISOString().split('T')[0]}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+    URL.revokeObjectURL(link.href);
   };
 
   // Filtered Services
@@ -605,6 +627,11 @@ export const MasterDataView: React.FC<MasterDataViewProps> = ({
                                 Contrast
                               </span>
                             )}
+                            {!svc.isBookableOnline && (
+                              <span className="px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 text-[10px] font-bold border border-slate-300">
+                                Not bookable
+                              </span>
+                            )}
                             {!svc.requiresScreening && !svc.requiresContrast && (
                               <span className="text-[10px] text-slate-400">Standard</span>
                             )}
@@ -930,6 +957,9 @@ export const MasterDataView: React.FC<MasterDataViewProps> = ({
                   </div>
                 </div>
                 <div className="flex items-center space-x-2">
+                  <span className={`text-[10px] px-2 py-0.5 rounded-md font-bold border ${f.isActive !== false ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-slate-100 text-slate-500 border-slate-200'}`}>
+                    {f.isActive !== false ? 'ACTIVE' : 'INACTIVE'}
+                  </span>
                   <span className="text-xs font-mono px-2 py-0.5 rounded bg-slate-100 text-slate-600 border border-slate-200">
                     {f.slug}
                   </span>
@@ -953,6 +983,47 @@ export const MasterDataView: React.FC<MasterDataViewProps> = ({
                     <PlusCircle className="w-3 h-3" />
                     <span>Add Question</span>
                   </button>
+                  {onUpdateFormMeta && canCrud.form.edit && (
+                    <button
+                      onClick={() => {
+                        const name = prompt('Rename screening form:', f.name);
+                        if (name === null || !name.trim()) return;
+                        const description = prompt('Description (shown to technologists):', f.description);
+                        if (description === null) return;
+                        onUpdateFormMeta(f.id, { name: name.trim(), description: description.trim() });
+                      }}
+                      className="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-semibold flex items-center space-x-1 border border-slate-200 transition-colors cursor-pointer"
+                    >
+                      <Edit2 className="w-3 h-3" />
+                      <span>Rename</span>
+                    </button>
+                  )}
+                  {onToggleForm && canCrud.form.edit && (
+                    <button
+                      onClick={() => onToggleForm(f.id)}
+                      className={`px-2.5 py-1 rounded-lg text-xs font-semibold flex items-center space-x-1 border transition-colors cursor-pointer ${
+                        f.isActive !== false
+                          ? 'bg-slate-100 hover:bg-slate-200 text-slate-700 border-slate-200'
+                          : 'bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border-emerald-200'
+                      }`}
+                      title={f.isActive !== false ? 'Hide this form from technologists at check-in' : 'Serve this form to technologists again'}
+                    >
+                      {f.isActive !== false ? <span>Deactivate</span> : <span>Activate</span>}
+                    </button>
+                  )}
+                  {onDeleteForm && canCrud.form.del && (
+                    <button
+                      onClick={() => {
+                        if (confirm(`Delete screening form "${f.name}"? Forms with screening history cannot be deleted — deactivate instead.`)) {
+                          onDeleteForm(f.id);
+                        }
+                      }}
+                      className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-md transition-colors cursor-pointer"
+                      title="Delete Screening Form"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  )}
                 </div>
               </div>
 
@@ -988,6 +1059,44 @@ export const MasterDataView: React.FC<MasterDataViewProps> = ({
                           <span className="text-[10px] text-slate-500 font-medium bg-slate-200/60 px-1.5 py-0.5 rounded">
                             Advisory
                           </span>
+                        )}
+                        {canCrud.form.edit && (
+                          <div className="flex items-center gap-1">
+                            <button
+                              onClick={() => {
+                                const text = prompt('Edit question text:', q.questionText);
+                                if (text === null || !text.trim()) return;
+                                const updated = {
+                                  ...f,
+                                  questions: f.questions.map(x => (x.id === q.id ? { ...x, questionText: text.trim() } : x)),
+                                };
+                                onUpdateForm?.(updated);
+                              }}
+                              className="p-1 text-slate-400 hover:text-cyan-600 rounded cursor-pointer"
+                              title="Edit question text"
+                            >
+                              <Edit2 className="w-3 h-3" />
+                            </button>
+                            <button
+                              onClick={() => {
+                                if (confirm(`Remove question: "${q.questionText}"?`)) {
+                                  const updated = {
+                                    ...f,
+                                    questions: f.questions.filter(x => x.id !== q.id),
+                                  };
+                                  if (updated.questions.length === 0) {
+                                    alert('A screening form needs at least one question. Add another before removing this one.');
+                                    return;
+                                  }
+                                  onUpdateForm?.(updated);
+                                }
+                              }}
+                              className="p-1 text-slate-400 hover:text-rose-600 rounded cursor-pointer"
+                              title="Delete question"
+                            >
+                              <Trash2 className="w-3 h-3" />
+                            </button>
+                          </div>
                         )}
                       </div>
                     </div>
@@ -1135,15 +1244,22 @@ export const MasterDataView: React.FC<MasterDataViewProps> = ({
                 </div>
 
                 <div className="pt-2.5 border-t border-slate-100 flex items-center justify-between">
-                  <a
-                    href={`https://wa.me/${r.phone.replace(/[^0-9]/g, '')}`}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="text-emerald-700 hover:text-emerald-800 text-[11px] font-semibold flex items-center space-x-1"
-                  >
-                    <span>WhatsApp</span>
-                    <ExternalLink className="w-2.5 h-2.5" />
-                  </a>
+                  <div className="flex items-center gap-2">
+                    <span className={`text-[10px] px-1.5 py-0.5 rounded-md font-bold border ${r.isActive !== false ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-slate-100 text-slate-500 border-slate-200'}`}>
+                      {r.isActive !== false ? 'ACTIVE' : 'INACTIVE'}
+                    </span>
+                    {r.isActive !== false && r.phone.replace(/[^0-9]/g, '') !== '' && (
+                      <a
+                        href={`https://wa.me/${r.phone.replace(/[^0-9]/g, '')}`}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-emerald-700 hover:text-emerald-800 text-[11px] font-semibold flex items-center space-x-1"
+                      >
+                        <span>WhatsApp</span>
+                        <ExternalLink className="w-2.5 h-2.5" />
+                      </a>
+                    )}
+                  </div>
                   <div className="flex items-center space-x-1">
 {canCrud.referrer.edit && (
                     <button
@@ -1186,6 +1302,10 @@ export const MasterDataView: React.FC<MasterDataViewProps> = ({
           service={editingService}
           modalities={modalities}
           onSave={(svcData) => {
+            // Latch: the second click of a double-submit would create a
+            // duplicate procedure before React re-renders.
+            if (submitLock.current) return;
+            if (!editingService) lockSubmit();
             if (editingService && onUpdateService) {
               onUpdateService({ ...svcData, id: editingService.id });
             } else if (onAddService) {
@@ -1193,6 +1313,7 @@ export const MasterDataView: React.FC<MasterDataViewProps> = ({
             }
             setServiceModalOpen(false);
             setEditingService(null);
+            releaseSubmit();
           }}
           onClose={() => {
             setServiceModalOpen(false);
@@ -1206,6 +1327,8 @@ export const MasterDataView: React.FC<MasterDataViewProps> = ({
         <ModalityFormModal
           modality={editingModality}
           onSave={(modData) => {
+            if (submitLock.current) return;
+            if (!editingModality) lockSubmit();
             if (editingModality && onUpdateModality) {
               onUpdateModality({ ...modData, id: editingModality.id });
             } else if (onAddModality) {
@@ -1213,6 +1336,7 @@ export const MasterDataView: React.FC<MasterDataViewProps> = ({
             }
             setModalityModalOpen(false);
             setEditingModality(null);
+            releaseSubmit();
           }}
           onClose={() => {
             setModalityModalOpen(false);
@@ -1227,6 +1351,8 @@ export const MasterDataView: React.FC<MasterDataViewProps> = ({
           room={editingRoom}
           modalities={modalities}
           onSave={(roomData) => {
+            if (submitLock.current) return;
+            if (!editingRoom) lockSubmit();
             if (editingRoom && onUpdateRoom) {
               onUpdateRoom({ ...roomData, id: editingRoom.id });
             } else if (onAddRoom) {
@@ -1234,6 +1360,7 @@ export const MasterDataView: React.FC<MasterDataViewProps> = ({
             }
             setRoomModalOpen(false);
             setEditingRoom(null);
+            releaseSubmit();
           }}
           onClose={() => {
             setRoomModalOpen(false);
@@ -1247,6 +1374,8 @@ export const MasterDataView: React.FC<MasterDataViewProps> = ({
         <PaymentMethodFormModal
           method={editingPaymentMethod}
           onSave={(data) => {
+            if (submitLock.current) return;
+            if (!editingPaymentMethod) lockSubmit();
             if (editingPaymentMethod && onUpdatePaymentMethod) {
               onUpdatePaymentMethod({ ...data, id: editingPaymentMethod.id });
             } else if (onAddPaymentMethod) {
@@ -1254,6 +1383,7 @@ export const MasterDataView: React.FC<MasterDataViewProps> = ({
             }
             setPaymentMethodModalOpen(false);
             setEditingPaymentMethod(null);
+            releaseSubmit();
           }}
           onClose={() => {
             setPaymentMethodModalOpen(false);
@@ -1267,6 +1397,8 @@ export const MasterDataView: React.FC<MasterDataViewProps> = ({
         <ReferrerFormModal
           referrer={editingReferrer}
           onSave={(refData) => {
+            if (submitLock.current) return;
+            if (!editingReferrer) lockSubmit();
             if (editingReferrer && onUpdateReferrer) {
               onUpdateReferrer({ ...refData, id: editingReferrer.id });
             } else if (onAddReferrer) {
@@ -1274,6 +1406,7 @@ export const MasterDataView: React.FC<MasterDataViewProps> = ({
             }
             setReferrerModalOpen(false);
             setEditingReferrer(null);
+            releaseSubmit();
           }}
           onClose={() => {
             setReferrerModalOpen(false);
@@ -1288,6 +1421,8 @@ export const MasterDataView: React.FC<MasterDataViewProps> = ({
           template={editingTemplate}
           modalities={modalities}
           onSave={(tplData) => {
+            if (submitLock.current) return;
+            if (!editingTemplate) lockSubmit();
             if (editingTemplate && onUpdateTemplate) {
               onUpdateTemplate({ ...tplData, id: editingTemplate.id });
             } else if (onAddTemplate) {
@@ -1295,6 +1430,7 @@ export const MasterDataView: React.FC<MasterDataViewProps> = ({
             }
             setTemplateModalOpen(false);
             setEditingTemplate(null);
+            releaseSubmit();
           }}
           onClose={() => {
             setTemplateModalOpen(false);
@@ -1377,7 +1513,8 @@ export const MasterDataView: React.FC<MasterDataViewProps> = ({
               <div className="space-y-2">
                 <label className="block font-semibold text-slate-700">Questions *</label>
                 {newFormQuestions.map((q, i) => (
-                  <div key={i} className="flex items-center gap-2">
+                  <div key={i} className="space-y-1">
+                    <div className="flex items-center gap-2">
                     <input
                       type="text"
                       value={q.questionText}
@@ -1403,12 +1540,58 @@ export const MasterDataView: React.FC<MasterDataViewProps> = ({
                     </label>
                     <button
                       type="button"
+                      title="Jev (TypeSafe System One) judges whether this really probes a patient-safety risk — advisory only, never blocks saving"
+                      disabled={!q.questionText.trim() || reviewingQuestion === i}
+                      onClick={async () => {
+                        setReviewingQuestion(i);
+                        try {
+                          const siblings = newFormQuestions
+                            .map((x, j) => (j === i ? '' : x.questionText.trim()))
+                            .filter(Boolean);
+                          const review = await api.reviewScreeningQuestion(q.questionText.trim(), siblings);
+                          setQuestionReviews(prev => ({ ...prev, [i]: review }));
+                        } catch {
+                          setQuestionReviews(prev => ({ ...prev, [i]: null }));
+                        } finally {
+                          setReviewingQuestion(null);
+                        }
+                      }}
+                      className="p-1 text-cyan-600 hover:text-cyan-800 disabled:opacity-40 cursor-pointer"
+                    >
+                      <Sparkles className="w-3.5 h-3.5" />
+                    </button>
+                    <button
+                      type="button"
                       onClick={() => setNewFormQuestions(newFormQuestions.filter((_, j) => j !== i))}
                       className="text-rose-500 hover:text-rose-700 font-bold px-1 cursor-pointer"
                       disabled={newFormQuestions.length === 1}
                     >
                       ×
                     </button>
+                    </div>
+                    {questionReviews[i] && (
+                      <div
+                        className={`text-[10px] px-2 py-1 rounded-lg border flex items-center gap-1 ${
+                          questionReviews[i]!.isOk
+                            ? 'bg-emerald-50 border-emerald-200 text-emerald-700'
+                            : 'bg-amber-50 border-amber-300 text-amber-800'
+                        }`}
+                      >
+                        <Sparkles className="w-3 h-3" />
+                        <span>
+                          Jev ({Math.round(questionReviews[i]!.confidence * 100)}% conf.):{' '}
+                          {questionReviews[i]!.isOk
+                            ? 'this probes a genuine safety risk.'
+                            : (questionReviews[i]!.note ?? 'not clearly a safety question.')}
+                        </span>
+                      </div>
+                    )}
+                    {reviewingQuestion === i && (
+                      <div className="text-[10px] text-slate-400 flex items-center gap-1">
+                        <Sparkles className="w-3 h-3 animate-pulse" />
+                        <span>Jev is judging this question…</span>
+                      </div>
+                    )}
                   </div>
                 ))}
                 <button
@@ -1451,6 +1634,7 @@ export const MasterDataView: React.FC<MasterDataViewProps> = ({
                   setNewFormDescription('');
                   setNewFormModality(null);
                   setNewFormQuestions([{ questionText: '', isRiskBlocking: true }]);
+                  setQuestionReviews({});
                 }}
                 className="px-4 py-2 rounded-lg bg-cyan-600 hover:bg-cyan-700 text-white font-bold text-xs cursor-pointer"
               >
@@ -1561,13 +1745,16 @@ export const MasterDataView: React.FC<MasterDataViewProps> = ({
             </div>
             <div className="p-6 overflow-y-auto space-y-6 text-xs text-slate-800 print:p-0">
               <div className="text-center border-b border-slate-200 pb-4">
-                <h2 className="text-lg font-black text-slate-900 tracking-tight">POLYTRONX - RIS</h2>
+                <h2 className="text-lg font-black text-slate-900 tracking-tight">{(clinicName || 'POLYTRONX - RIS').toUpperCase()}</h2>
                 <p className="text-slate-600 font-medium">Radiology & Clinical Imaging Department</p>
                 <p className="text-[11px] text-slate-500 font-mono mt-1">Official Master Procedure Schedule & Fee Registry • {new Date().toLocaleDateString()}</p>
               </div>
 
               <div className="space-y-6">
                 {modalities.map(mod => {
+                  // Retired modalities have no place on an official fee
+                  // schedule handed to patients.
+                  if (!mod.isActive) return null;
                   const modServices = services.filter(s => s.modalityId === mod.id);
                   if (modServices.length === 0) return null;
                   return (
@@ -1634,11 +1821,14 @@ interface ServiceFormModalProps {
 const ServiceFormModal: React.FC<ServiceFormModalProps> = ({ service, modalities, onSave, onClose }) => {
   const [name, setName] = useState(service?.name || '');
   const [code, setCode] = useState(service?.code || '');
-  const [modalityId, setModalityId] = useState<number>(service?.modalityId || modalities[0]?.id || 1);
+  // No magic modality id: with zero configured modalities the submit must be
+  // blocked (with a readable hint), not silently booked against "modality 1".
+  const [modalityId, setModalityId] = useState<number | ''>(service?.modalityId || modalities[0]?.id || '');
   const [price, setPrice] = useState<number>(service?.price || 5000);
   const [durationMinutes, setDurationMinutes] = useState<number>(service?.durationMinutes || 20);
   const [requiresScreening, setRequiresScreening] = useState<boolean>(service?.requiresScreening || false);
   const [requiresContrast, setRequiresContrast] = useState<boolean>(service?.requiresContrast || false);
+  const [isBookableOnline, setIsBookableOnline] = useState<boolean>(service ? service.isBookableOnline : true);
   const [preparationInstructions, setPreparationInstructions] = useState(service?.preparationInstructions || '');
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -1647,14 +1837,19 @@ const ServiceFormModal: React.FC<ServiceFormModalProps> = ({ service, modalities
       alert('Please fill in procedure name and code.');
       return;
     }
+    if (!modalityId) {
+      alert('No modality suite is configured yet. Create one under the Modalities tab first.');
+      return;
+    }
     onSave({
       name: name.trim(),
       code: code.trim().toUpperCase(),
-      modalityId,
+      modalityId: Number(modalityId),
       price: Number(price),
       durationMinutes: Number(durationMinutes),
       requiresScreening,
       requiresContrast,
+      isBookableOnline,
       preparationInstructions: preparationInstructions.trim() || 'No special preparation needed.'
     });
   };
@@ -1707,6 +1902,7 @@ const ServiceFormModal: React.FC<ServiceFormModalProps> = ({ service, modalities
                   onChange={(e) => setModalityId(Number(e.target.value))}
                   className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-medium focus:ring-1 focus:ring-cyan-500 focus:outline-none"
                 >
+                  {modalities.length === 0 && <option value="">No modalities configured</option>}
                   {modalities.map(m => (
                     <option key={m.id} value={m.id}>{m.code} - {m.name}</option>
                   ))}
@@ -1744,7 +1940,7 @@ const ServiceFormModal: React.FC<ServiceFormModalProps> = ({ service, modalities
 
             <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 space-y-2">
               <span className="font-semibold text-slate-700 block">Clinical Safety Flags</span>
-              <div className="flex items-center space-x-6">
+              <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
                 <label className="flex items-center space-x-2 cursor-pointer">
                   <input
                     type="checkbox"
@@ -1764,6 +1960,20 @@ const ServiceFormModal: React.FC<ServiceFormModalProps> = ({ service, modalities
                   <span className="text-slate-800">Requires IV Contrast Injection</span>
                 </label>
               </div>
+              <label className="flex items-center space-x-2 cursor-pointer pt-1 border-t border-slate-200">
+                <input
+                  type="checkbox"
+                  checked={isBookableOnline}
+                  onChange={(e) => setIsBookableOnline(e.target.checked)}
+                  className="w-4 h-4 text-cyan-600 rounded border-slate-300 focus:ring-cyan-500"
+                />
+                <span className="text-slate-800">Bookable — appears for new bookings (untick to retire)</span>
+              </label>
+              {!isBookableOnline && (
+                <p className="text-[11px] text-amber-700">
+                  Retired procedures keep every historical study and invoice rendering, but cannot be booked again.
+                </p>
+              )}
             </div>
 
             <div>
@@ -1813,6 +2023,11 @@ const ModalityFormModal: React.FC<ModalityFormModalProps> = ({ modality, onSave,
   const [bufferMinutes, setBufferMinutes] = useState(modality?.bufferMinutes || 10);
   const [isActive, setIsActive] = useState(modality ? modality.isActive : true);
 
+  // The select offers the five standard DICOM codes; a custom code is any
+  // value outside that list (a tenant-created suite, or the edit case).
+  const STANDARD_CODES = ['MR', 'CT', 'US', 'DX', 'MG'] as const;
+  const isCustomCode = !STANDARD_CODES.includes(code as (typeof STANDARD_CODES)[number]);
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim()) return;
@@ -1853,8 +2068,14 @@ const ModalityFormModal: React.FC<ModalityFormModalProps> = ({ modality, onSave,
               <div>
                 <label className="block font-semibold text-slate-700 mb-1">Modality Code</label>
                 <select
-                  value={code}
-                  onChange={(e) => setCode(e.target.value as Modality['code'])}
+                  value={isCustomCode ? '__custom__' : code}
+                  onChange={(e) => {
+                    if (e.target.value === '__custom__') {
+                      setCode('' as Modality['code']);
+                    } else {
+                      setCode(e.target.value as Modality['code']);
+                    }
+                  }}
                   className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-mono font-bold"
                 >
                   <option value="MR">MR - Magnetic Resonance</option>
@@ -1862,7 +2083,17 @@ const ModalityFormModal: React.FC<ModalityFormModalProps> = ({ modality, onSave,
                   <option value="US">US - Ultrasound / Doppler</option>
                   <option value="DX">DX - Digital Radiography</option>
                   <option value="MG">MG - Mammography</option>
+                  <option value="__custom__">Custom code…</option>
                 </select>
+                {isCustomCode && (
+                  <input
+                    type="text"
+                    value={code}
+                    onChange={(e) => setCode(e.target.value.toUpperCase().slice(0, 10) as Modality['code'])}
+                    placeholder="e.g. NM, PT, BMD"
+                    className="mt-1.5 w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-mono font-bold uppercase"
+                  />
+                )}
               </div>
               <div>
                 <label className="block font-semibold text-slate-700 mb-1">Inter-Slot Buffer (Mins)</label>
@@ -1898,6 +2129,11 @@ const ModalityFormModal: React.FC<ModalityFormModalProps> = ({ modality, onSave,
               />
               <span className="font-semibold text-slate-800">Suite Active in Online Scheduling</span>
             </label>
+            {!isActive && (
+              <p className="text-[11px] text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-2.5 py-1.5">
+                Inactive suites disappear from booking and the printable fee schedule — existing studies keep rendering them.
+              </p>
+            )}
           </div>
           <div className="p-4 border-t border-slate-200 flex justify-end space-x-2">
             <button type="button" onClick={onClose} className="px-3 py-1.5 bg-slate-100 text-slate-700 rounded-lg text-xs font-semibold">
@@ -1935,7 +2171,8 @@ const ReferrerFormModal: React.FC<ReferrerFormModalProps> = ({ referrer, onSave,
       specialty: specialty.trim() || 'General Medicine',
       clinicName: clinicName.trim() || 'Private Clinic',
       phone: phone.trim(),
-      email: email.trim()
+      email: email.trim(),
+      isActive: referrer ? referrer.isActive : true,
     });
   };
 
@@ -2255,7 +2492,14 @@ const RoomFormModal: React.FC<RoomFormModalProps> = ({ room, modalities, onSave,
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name.trim() || !modalityId) return;
+    if (!name.trim()) {
+      alert('Please provide a suite name.');
+      return;
+    }
+    if (!modalityId) {
+      alert('No modality suite is configured yet. Create one under the Modalities tab first.');
+      return;
+    }
     onSave({
       name: name.trim(),
       modalityId: Number(modalityId),

@@ -270,6 +270,47 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | TypeSafe System One (AI safety-screening triage)
+    |--------------------------------------------------------------------------
+    |
+    | The screening triage service asks TypeSafe's System One evaluation model
+    | (Jev) for typed judgments over a submitted safety-screening form and
+    | stores an ADVISORY triage decision on the study. The deterministic
+    | flagsRisk() gate stays authoritative; this only helps staff prioritise
+    | review.
+    |
+    | Requests go through the Vercel AI Gateway (OpenAI-compatible host with a
+    | dedicated evaluation surface at POST /v1/evaluate; there the yes/no
+    | primitive is named "boolean" — TypeSafe's own docs call it "noul").
+    | Read via config() — never env() directly — so config:cache keeps working.
+    |
+    | Fail-open by contract: when the key is missing or the gateway is down,
+    | screening continues exactly as before with no triage payload.
+    |
+    */
+
+    'typesafe' => [
+        'enabled' => env('TYPESAFE_ENABLED', true),
+        'api_key' => env('AI_GATEWAY_API_KEY'),
+        'base_url' => env('AI_GATEWAY_BASE_URL', 'https://ai-gateway.vercel.sh'),
+        // Optional absolute path to a PEM CA bundle. Leave empty for the
+        // default strict system verification (CI/production). Only needed in
+        // constrained environments whose PHP lacks a configured CA store
+        // (e.g. a bare Windows PHP install), which would otherwise fail every
+        // TLS handshake with cURL error 60.
+        'ca_bundle' => env('TYPESAFE_CA_BUNDLE'),
+        'model' => env('TYPESAFE_MODEL', 'typesafe-ai/jev'),
+        'timeout_seconds' => env('TYPESAFE_TIMEOUT_SECONDS', 6),
+        'max_attempts' => env('TYPESAFE_MAX_ATTEMPTS', 2),
+        'max_backoff_ms' => env('TYPESAFE_MAX_BACKOFF_MS', 2000),
+        // Confidence gates (docs.typesafe.ai/confidence). Calibrate on real
+        // screening outcomes before trusting higher automation.
+        'escalate_confidence' => env('TYPESAFE_ESCALATE_CONFIDENCE', 0.6),
+        'clear_confidence' => env('TYPESAFE_CLEAR_CONFIDENCE', 0.85),
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | Control-plane step-up re-authentication
     |--------------------------------------------------------------------------
     |

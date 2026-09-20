@@ -248,10 +248,12 @@ export const PrintableInvoiceModal: React.FC<PrintableInvoiceModalProps> = ({ in
                       {invoice.payments.map((p, pIdx) => (
                         <tr key={p.id || pIdx}>
                           <td className="p-1.5 text-slate-500 font-mono text-[10px]">{p.paidAt || 'Standard'}</td>
-                          <td className="p-1.5 font-bold uppercase text-[10px]">{p.method}</td>
+                          <td className={`p-1.5 font-bold uppercase text-[10px] ${p.kind === 'refund' ? 'text-rose-700' : ''}`}>
+                            {p.kind === 'refund' ? `REFUND (${p.method})` : p.method}
+                          </td>
                           <td className="p-1.5 font-mono text-slate-600 text-[10px]">{p.reference || 'N/A'}</td>
-                          <td className="p-1.5 text-right font-mono font-bold text-emerald-700">
-                            Rs. {p.amount.toLocaleString()}
+                          <td className={`p-1.5 text-right font-mono font-bold ${p.kind === 'refund' ? 'text-rose-700' : 'text-emerald-700'}`}>
+                            {p.kind === 'refund' ? '-' : ''}Rs. {Math.abs(p.amount).toLocaleString()}
                           </td>
                         </tr>
                       ))}

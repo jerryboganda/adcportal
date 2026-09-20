@@ -91,10 +91,19 @@ class Invoice extends Model
             && \App\Support\BookingMoney::toMinor($this->subtotal) > 0;
     }
 
-    /** Recompute paid_total from payment rows and derive the status. */
+    /** Recompute paid_total from payment rows and derive the status.
+     *
+     * The ledger is the sum of ALL payment rows, refunds included (refund
+     * rows are NEGATIVE amounts), so an over-collected invoice heals to the
+     * over-payment amount instead of hiding collectable money. The SQL sum
+     * arrives in major units (decimal column); it is normalized through
+     * integer minor units exactly once so binary-float noise (0.1+0.2)
+     * can never decide what has been collected.
+     */
     public function recalculateFromPayments(): void
     {
-        $this->paid_total = (float) $this->payments()->sum('amount');
+        $sum = (float) $this->payments()->sum('amount');
+        $this->paid_total = max(0, \App\Support\BookingMoney::fromMinor(\App\Support\BookingMoney::toMinor($sum)));
         $this->save();
     }
 

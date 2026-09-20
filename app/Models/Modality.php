@@ -17,6 +17,7 @@ class Modality extends Model
     protected $casts = [
         'is_active' => 'boolean',
         'buffer_minutes' => 'integer',
+        'lock_version' => 'integer',
     ];
 
         public function scopeForClinic($query, $businessId = null, $creatorId = null)
@@ -29,6 +30,11 @@ class Modality extends Model
     public function rooms()
     {
         return $this->hasMany(Room::class);
+    }
+
+    public function canonicalModality()
+    {
+        return $this->belongsTo(CanonicalModality::class);
     }
 
     public function procedures()

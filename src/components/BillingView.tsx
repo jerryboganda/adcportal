@@ -22,12 +22,13 @@ import {
   History,
   ShieldCheck,
   Percent,
-  Check
+  Check,
+  RotateCcw
 } from 'lucide-react';
-import { Invoice, Appointment, Patient, InvoiceItem, ClinicProfileSettings, PaymentMethod } from '../types';
+import { Invoice, Appointment, Patient, InvoiceItem, InvoicePayment, ClinicProfileSettings, PaymentMethod, ShiftSummary, ShiftReview } from '../types';
 import { canAny } from '../services/permissions';
 import { generateShiftClosingPdf, ShiftClosingData } from '../utils/pdfGenerator';
-import { invoicePdfUrl } from '../services/apiService';
+import { invoicePdfUrl, fetchShiftSummary, requestShiftReview } from '../services/apiService';
 import { PrintableInvoiceModal } from './PrintableInvoiceModal';
 import { Barcode } from './Barcode';
 
@@ -51,10 +52,18 @@ interface BillingViewProps {
     discount: number,
     notes: string,
     extraItems?: InvoiceItem[],
-    initialPayment?: { amount: number; method: string; reference: string }
+    initialPayment?: { amount: number; method: string; reference: string },
+    taxRate?: number
   ) => void;
   onAddInvoiceItem?: (invoiceId: string, item: InvoiceItem) => void;
   onVoidInvoice?: (invoiceId: string, reason: string) => void;
+  onRefundPayment?: (
+    invoiceId: string,
+    paymentId: string,
+    amount: number,
+    reason: string,
+    reference?: string
+  ) => Promise<void>;
 }
 
 export const BillingView: React.FC<BillingViewProps> = ({
@@ -68,6 +77,7 @@ export const BillingView: React.FC<BillingViewProps> = ({
   onCreateInvoice,
   onAddInvoiceItem,
   onVoidInvoice,
+  onRefundPayment,
 }) => {
   // Search & Filters
   const [searchTerm, setSearchTerm] = useState('');
@@ -102,11 +112,33 @@ export const BillingView: React.FC<BillingViewProps> = ({
   const [voidInvoiceModal, setVoidInvoiceModal] = useState<Invoice | null>(null);
   const [voidReason, setVoidReason] = useState('Patient cancelled examination before acquisition');
 
+  // Refund Modal — money OUT, always against one recorded collection.
+  const [refundModalInvoice, setRefundModalInvoice] = useState<Invoice | null>(null);
+  const [refundPaymentId, setRefundPaymentId] = useState('');
+  const [refundAmount, setRefundAmount] = useState<number>(0);
+  const [refundReason, setRefundReason] = useState('Patient cancelled examination — fee returned');
+  const [refundRef, setRefundRef] = useState('');
+
+  // Double-submit latches — a double-click must never double-charge.
+  const [submittingPayment, setSubmittingPayment] = useState(false);
+  const [submittingCreate, setSubmittingCreate] = useState(false);
+  const [submittingItem, setSubmittingItem] = useState(false);
+  const [submittingVoid, setSubmittingVoid] = useState(false);
+  const [submittingRefund, setSubmittingRefund] = useState(false);
+
+  // Shift reconciliation: the SERVER ledger for the day (source of truth for
+  // "Expected in Drawer"), plus the advisory Jev judgment on the variance.
+  const [shiftSummary, setShiftSummary] = useState<ShiftSummary | null>(null);
+  const [shiftSummaryLoading, setShiftSummaryLoading] = useState(false);
+  const [shiftReview, setShiftReview] = useState<ShiftReview | null>(null);
+  const [shiftReviewLoading, setShiftReviewLoading] = useState(false);
+
   // Create Invoice Modal State
   const [createModalOpen, setCreateModalOpen] = useState(false);
   const [selectedAptId, setSelectedAptId] = useState('');
   const [discountType, setDiscountType] = useState<'fixed' | 'percent'>('fixed');
   const [discountValue, setDiscountValue] = useState<number>(0);
+  const [taxRate, setTaxRate] = useState<number>(0);
   const [discountReason, setDiscountReason] = useState('Doctor Courtesy / Referral');
   const [selectedAddons, setSelectedAddons] = useState<{ id: string; name: string; price: number; selected: boolean }[]>([
     { id: 'add-contrast', name: 'IV Contrast Omnipaque 50ml (Non-Ionic)', price: 2500, selected: false },
@@ -140,13 +172,22 @@ export const BillingView: React.FC<BillingViewProps> = ({
     10: 0,
   });
 
-  // Calculate Aggregates
-  const totalInvoiced = invoices.filter(i => i.status !== 'void').reduce((acc, curr) => acc + curr.total, 0);
-  const totalPaid = invoices.filter(i => i.status !== 'void').reduce((acc, curr) => acc + curr.paidTotal, 0);
-  const totalDue = invoices.filter(i => i.status !== 'void').reduce((acc, curr) => acc + curr.balanceDue, 0);
-  const totalDiscounts = invoices.filter(i => i.status !== 'void').reduce((acc, curr) => acc + curr.discountTotal, 0);
+  // ---- Aggregates (ALL-TIME LEDGER) ----
+  const activeInvoices = invoices.filter(i => i.status !== 'void');
+  const totalInvoiced = activeInvoices.reduce((acc, curr) => acc + curr.total, 0);
+  const totalPaid = activeInvoices.reduce((acc, curr) => acc + curr.paidTotal, 0);
+  const totalDue = activeInvoices.reduce((acc, curr) => acc + curr.balanceDue, 0);
+  const totalDiscounts = activeInvoices.reduce((acc, curr) => acc + curr.discountTotal, 0);
 
-  // Collections by Tender — keyed by the tenant's CONFIGURED method codes.
+  // ---- Aggregates (THIS SHIFT = today, scoped by payment timestamp) ----
+  // Reconciliation must never sum all-time money: the drawer only holds what
+  // came in (and went back out) TODAY. Refund rows are negative amounts and
+  // belong in the same ledger — refunded cash is no longer in the drawer.
+  const isTodayIso = (iso?: string) => !!iso && new Date(iso).toDateString() === new Date().toDateString();
+  const todayPayments = activeInvoices.flatMap(i => i.payments).filter(p => isTodayIso(p.paidAtIso));
+  const todayCollections = todayPayments.filter(p => (p.kind ?? 'payment') === 'payment');
+  const todayRefunds = todayPayments.filter(p => p.kind === 'refund');
+
   const allPayments = invoices.flatMap(i => (i.status !== 'void' ? i.payments : []));
   const collectionsByMethod = allPayments.reduce<Record<string, number>>((acc, p) => {
     acc[p.method] = (acc[p.method] ?? 0) + p.amount;
@@ -158,6 +199,53 @@ export const BillingView: React.FC<BillingViewProps> = ({
   const bankCollected = methodTotal('bank');
   const mobileCollected = methodTotal('mobile');
   const insuranceCollected = methodTotal('insurance');
+
+  // Server-ledger shift figures when loaded; deterministic client fallback
+  // (same arithmetic over today's payments) keeps the window usable offline.
+  const shiftCashExpected = shiftSummary
+    ? Math.max(0, shiftSummary.byMethod.find(m => m.method === 'cash')?.total ?? 0)
+    : todayPayments.filter(p => p.method === 'cash').reduce((s, p) => s + p.amount, 0);
+  const shiftTotalCollected = shiftSummary?.totalCollected ?? todayPayments.reduce((s, p) => s + p.amount, 0);
+  const shiftRefundedTotal = shiftSummary?.refundedTotal ?? todayRefunds.reduce((s, p) => s + p.amount, 0);
+  const shiftPaymentCount = shiftSummary?.paymentCount ?? todayCollections.length;
+  const shiftInvoiceCount = shiftSummary?.invoiceCount ?? activeInvoices.filter(i => i.payments.some(p => isTodayIso(p.paidAtIso))).length;
+  const shiftMethodTotal = (code: string) =>
+    shiftSummary
+      ? (shiftSummary.byMethod.find(m => m.method === code)?.total ?? 0)
+      : todayPayments.filter(p => p.method === code).reduce((s, p) => s + p.amount, 0);
+  const todayInvoiced = activeInvoices.filter(i => isTodayIso(i.createdAtIso)).reduce((s, i) => s + i.total, 0);
+  const todayDiscounts = activeInvoices.filter(i => isTodayIso(i.createdAtIso)).reduce((s, i) => s + i.discountTotal, 0);
+
+  // Shift reconciliation data load + advisory Jev review of the counted
+  // variance (fail-open: a failed judgment simply leaves no banner).
+  const loadShiftData = (countedCash: number) => {
+    setShiftSummaryLoading(true);
+    fetchShiftSummary()
+      .then(setShiftSummary)
+      .catch(() => setShiftSummary(null))
+      .finally(() => setShiftSummaryLoading(false));
+
+    setShiftReviewLoading(true);
+    requestShiftReview({
+      cashExpected: shiftCashExpected,
+      cashCounted: countedCash,
+      totalCollected: shiftTotalCollected,
+      refundedTotal: shiftRefundedTotal,
+      paymentCount: shiftPaymentCount,
+    })
+      .then(setShiftReview)
+      .catch(() => setShiftReview(null))
+      .finally(() => setShiftReviewLoading(false));
+  };
+
+  // Pull the server ledger (and Jev's advisory judgment) when the
+  // reconciliation window opens — never during render.
+  React.useEffect(() => {
+    if (shiftClosingOpen && !shiftSummary && !shiftSummaryLoading) {
+      loadShiftData(physicalCashCounted);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [shiftClosingOpen]);
 
   // Only the tenant's ACTIVE methods are collectable at the counter.
   const activePaymentMethods = paymentMethods.filter(m => m.isActive);
@@ -171,12 +259,13 @@ export const BillingView: React.FC<BillingViewProps> = ({
     return Array.from(labels.entries()).map(([code, label]) => ({ code, label, total: methodTotal(code) }));
   })();
 
-  // Physical Cash Calculation for Shift Closing
+  // Physical Cash Calculation for Shift Closing — against the SHIFT ledger,
+  // never all-time money.
   const physicalCashCounted = Object.entries(denominations).reduce(
     (sum, [denom, count]) => sum + Number(denom) * (count || 0),
     0
   );
-  const cashDiscrepancy = physicalCashCounted - cashCollected;
+  const cashDiscrepancy = physicalCashCounted - shiftCashExpected;
 
   // Filter Invoices
   const filteredInvoices = invoices.filter((inv) => {
@@ -207,6 +296,7 @@ export const BillingView: React.FC<BillingViewProps> = ({
   const canEditInvoice = canAny(permissions, ['invoice edit']);
   const canCollectPayment = canAny(permissions, ['invoice payment']);
   const canVoidInvoicePerm = canAny(permissions, ['invoice delete']);
+  const canRefundPayment = canAny(permissions, ['invoice refund']);
 
   // Eligible appointments for invoicing
   const existingInvoicedAptIds = new Set(invoices.map(i => i.appointmentId));
@@ -222,15 +312,56 @@ export const BillingView: React.FC<BillingViewProps> = ({
   };
 
   const submitPayment = () => {
-    if (!paymentModalInvoice || payAmount <= 0) return;
+    if (!paymentModalInvoice || submittingPayment) return;
     if (!payMethod) return; // no configured method — nothing collectable
-    onRecordPayment(
-      paymentModalInvoice.id,
-      payAmount,
-      payMethod,
-      payRef || `REC-${Date.now().toString().slice(-6)}`
-    );
-    setPaymentModalInvoice(null);
+    if (!(payAmount > 0)) return; // nothing to collect
+    if (payAmount > paymentModalInvoice.balanceDue + 0.001) return; // server would reject
+    setSubmittingPayment(true);
+    Promise.resolve(
+      onRecordPayment(
+        paymentModalInvoice.id,
+        payAmount,
+        payMethod,
+        payRef || `REC-${Date.now().toString().slice(-6)}`
+      )
+    )
+      .then(() => setPaymentModalInvoice(null))
+      .finally(() => setSubmittingPayment(false));
+  };
+
+  const openRefundModal = (inv: Invoice) => {
+    const collections = inv.payments.filter(p => (p.kind ?? 'payment') === 'payment');
+    if (collections.length === 0) return;
+    setRefundModalInvoice(inv);
+    setRefundPaymentId(collections[0].id);
+    setRefundAmount(collections[0].amount);
+    setRefundReason('Patient cancelled examination — fee returned');
+    setRefundRef('');
+  };
+
+  const selectedRefundCollection = refundModalInvoice
+    ? refundModalInvoice.payments.find(p => p.id === refundPaymentId)
+    : null;
+
+  const alreadyRefundedOnSelected = selectedRefundCollection
+    ? refundModalInvoice!.payments
+        .filter(p => p.kind === 'refund' && p.refundsPaymentId === selectedRefundCollection.id)
+        .reduce((s, r) => s + Math.abs(r.amount), 0)
+    : 0;
+  const refundableOnSelected = selectedRefundCollection
+    ? Math.max(0, selectedRefundCollection.amount - alreadyRefundedOnSelected)
+    : 0;
+
+  const submitRefund = () => {
+    if (!refundModalInvoice || !onRefundPayment || submittingRefund) return;
+    if (!refundPaymentId || !(refundAmount > 0)) return;
+    if (refundAmount > refundableOnSelected + 0.001) return;
+    if (!refundReason.trim()) return;
+    setSubmittingRefund(true);
+    onRefundPayment(refundModalInvoice.id, refundPaymentId, refundAmount, refundReason.trim(), refundRef || undefined)
+      .then(() => setRefundModalInvoice(null))
+      .catch(() => { /* failure already flashed by the shell */ })
+      .finally(() => setSubmittingRefund(false));
   };
 
   const handleOpenThermalReceipt = (inv: Invoice) => {
@@ -242,7 +373,7 @@ export const BillingView: React.FC<BillingViewProps> = ({
   };
 
   const submitNewInvoice = () => {
-    if (!selectedAptId) return;
+    if (!selectedAptId || submittingCreate) return;
     const apt = appointments.find(a => a.id === selectedAptId);
     if (!apt) return;
 
@@ -282,21 +413,24 @@ export const BillingView: React.FC<BillingViewProps> = ({
         }
       : undefined;
 
-    onCreateInvoice(selectedAptId, calculatedDiscount, finalNotes, extraItems, initialPayObj);
-
-    // Reset modal only after the request is dispatched; the app shell flashes
-    // the server-confirmed invoice number on success.
-    setCreateModalOpen(false);
-    setSelectedAptId('');
-    setDiscountValue(0);
-    setInvoiceNotes('');
-    setIsPanelBilling(false);
-    setPanelAuthCode('');
-    setSelectedAddons(prev => prev.map(a => ({ ...a, selected: false })));
+    setSubmittingCreate(true);
+    Promise.resolve(onCreateInvoice(selectedAptId, calculatedDiscount, finalNotes, extraItems, initialPayObj, taxRate))
+      .then(() => {
+        setCreateModalOpen(false);
+        setSelectedAptId('');
+        setDiscountValue(0);
+        setInvoiceNotes('');
+        setIsPanelBilling(false);
+        setPanelAuthCode('');
+        setSelectedAddons(prev => prev.map(a => ({ ...a, selected: false })));
+      })
+      .catch(() => { /* failure already flashed by the shell */ })
+      .finally(() => setSubmittingCreate(false));
   };
 
   const submitAddItem = () => {
-    if (!addItemInvoice || !newItemDesc.trim() || newItemPrice <= 0 || !onAddInvoiceItem) return;
+    if (!addItemInvoice || submittingItem) return;
+    if (!newItemDesc.trim() || newItemPrice <= 0 || !onAddInvoiceItem) return;
     const item: InvoiceItem = {
       id: `item-${Date.now()}`,
       description: newItemDesc.trim(),
@@ -305,24 +439,32 @@ export const BillingView: React.FC<BillingViewProps> = ({
       discount: 0,
       lineTotal: newItemPrice * (newItemQty || 1),
     };
-    onAddInvoiceItem(addItemInvoice.id, item);
-    setAddItemInvoice(null);
-    setNewItemDesc('');
-    setNewItemPrice(1000);
-    setNewItemQty(1);
+    setSubmittingItem(true);
+    Promise.resolve(onAddInvoiceItem(addItemInvoice.id, item))
+      .then(() => {
+        setAddItemInvoice(null);
+        setNewItemDesc('');
+        setNewItemPrice(1000);
+        setNewItemQty(1);
+      })
+      .catch(() => { /* failure already flashed by the shell */ })
+      .finally(() => setSubmittingItem(false));
   };
 
   const submitVoidInvoice = () => {
-    if (!voidInvoiceModal || !onVoidInvoice) return;
-    onVoidInvoice(voidInvoiceModal.id, voidReason);
-    setVoidInvoiceModal(null);
+    if (!voidInvoiceModal || !onVoidInvoice || submittingVoid) return;
+    setSubmittingVoid(true);
+    Promise.resolve(onVoidInvoice(voidInvoiceModal.id, voidReason))
+      .then(() => setVoidInvoiceModal(null))
+      .catch(() => { /* failure already flashed by the shell */ })
+      .finally(() => setSubmittingVoid(false));
   };
 
   const handleExportCsv = () => {
     const headers = ['Invoice #', 'Date', 'Patient Name', 'MRN', 'Token', 'Services', 'Net Total', 'Paid', 'Balance', 'Status', 'Payments'];
     const rows = filteredInvoices.map(i => [
       i.invoiceNumber,
-      i.createdAt,
+      i.createdAtFull ?? i.createdAt,
       `"${i.patient.name}"`,
       i.patient.mrn,
       i.appointmentToken,
@@ -331,10 +473,11 @@ export const BillingView: React.FC<BillingViewProps> = ({
       i.paidTotal,
       i.balanceDue,
       i.status.toUpperCase(),
-      `"${i.payments.map(p => `${p.method}:${p.amount}`).join('; ')}"`,
+      `"${i.payments.map(p => `${p.kind === 'refund' ? 'REFUND' : 'PAYMENT'}:${p.method}:${p.amount}`).join('; ')}"`,
     ]);
 
-    const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map(e => e.join(','))].join('\n');
+    // BOM first — without it Excel mangles non-ASCII patient names (mojibake).
+    const csvContent = 'data:text/csv;charset=utf-8,\uFEFF' + [headers.join(','), ...rows.map(e => e.join(','))].join('\n');
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement('a');
     link.setAttribute('href', encodedUri);
@@ -347,11 +490,9 @@ export const BillingView: React.FC<BillingViewProps> = ({
   const handleGenerateShiftClosingPdf = () => {
     // Real cash-window: the first cash payment received today, not an assumed
     // opening time — the settlement sheet must only state facts.
-    const todayKey = new Date().toDateString();
-    const firstCashToday = invoices
-      .flatMap(inv => inv.payments)
-      .filter(p => p.method === 'cash')
-      .map(p => new Date(`${todayKey} ${p.paidAt}`))
+    const firstCashToday = todayPayments
+      .filter(p => p.method === 'cash' && (p.kind ?? 'payment') === 'payment')
+      .map(p => (p.paidAtIso ? new Date(p.paidAtIso) : new Date(p.paidAt)))
       .filter(d => !isNaN(d.getTime()))
       .sort((a, b) => a.getTime() - b.getTime())[0];
     const shiftData: ShiftClosingData = {
@@ -362,15 +503,16 @@ export const BillingView: React.FC<BillingViewProps> = ({
         ? firstCashToday.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
         : 'No cash collected today',
       closedAt: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      invoicesCount: invoices.filter(i => i.status !== 'void').length,
-      totalInvoiced,
-      totalCollected: totalPaid,
-      totalDiscounts,
-      cashCollected,
-      cardCollected,
-      bankCollected,
-      mobileCollected,
-      insuranceCollected,
+      // SHIFT figures (today's ledger), never all-time sums.
+      invoicesCount: shiftInvoiceCount,
+      totalInvoiced: todayInvoiced,
+      totalCollected: shiftTotalCollected,
+      totalDiscounts: todayDiscounts,
+      cashCollected: shiftCashExpected,
+      cardCollected: shiftMethodTotal('card'),
+      bankCollected: shiftMethodTotal('bank'),
+      mobileCollected: shiftMethodTotal('mobile'),
+      insuranceCollected: shiftMethodTotal('insurance'),
       countedCash: physicalCashCounted,
       discrepancy: cashDiscrepancy,
       cardSettlementRef: cardBatchRef,
@@ -471,12 +613,12 @@ export const BillingView: React.FC<BillingViewProps> = ({
 
         <div className="bg-white p-4.5 rounded-2xl border border-slate-200 shadow-sm">
           <div className="flex items-center justify-between">
-            <span className="text-xs text-cyan-700 font-semibold uppercase tracking-wider">Cash in Counter Drawer</span>
+            <span className="text-xs text-cyan-700 font-semibold uppercase tracking-wider">Cash in Counter Drawer (Today)</span>
             <Wallet className="w-4 h-4 text-cyan-600" />
           </div>
-          <div className="text-2xl font-black text-cyan-600 mt-1.5">Rs. {cashCollected.toLocaleString()}</div>
+          <div className="text-2xl font-black text-cyan-600 mt-1.5">Rs. {shiftCashExpected.toLocaleString()}</div>
           <div className="text-[11px] text-slate-500 mt-1">
-            Card POS: <span className="font-semibold text-slate-800">Rs. {cardCollected.toLocaleString()}</span>
+            Card POS today: <span className="font-semibold text-slate-800">Rs. {shiftMethodTotal('card').toLocaleString()}</span>
           </div>
         </div>
       </div>
@@ -575,6 +717,17 @@ export const BillingView: React.FC<BillingViewProps> = ({
                 filteredInvoices.map((inv) => {
                   const isVoided = inv.status === 'void';
                   const isPanel = inv.notes?.toLowerCase().includes('panel') || inv.payments.some(p => p.method === 'insurance');
+                  // A collection is refundable while any of its money is still
+                  // out: refund rows (negative, pointing at the collection)
+                  // shrink what can still go back.
+                  const refundableTotal = inv.payments
+                    .filter(p => (p.kind ?? 'payment') === 'payment')
+                    .reduce(
+                      (sum, c) => sum + Math.max(0, c.amount - inv.payments
+                        .filter(r => r.kind === 'refund' && r.refundsPaymentId === c.id)
+                        .reduce((s, r) => s + Math.abs(r.amount), 0)),
+                      0
+                    );
 
                   return (
                     <tr
@@ -595,7 +748,7 @@ export const BillingView: React.FC<BillingViewProps> = ({
                         </div>
                         <div className="text-[10px] text-slate-500 flex items-center gap-1 mt-0.5">
                           <Clock className="w-3 h-3 text-slate-400" />
-                          <span>{inv.createdAt}</span>
+                          <span title="Date & time of issue">{inv.createdAtFull ?? inv.createdAt}</span>
                         </div>
                       </td>
 
@@ -687,6 +840,18 @@ export const BillingView: React.FC<BillingViewProps> = ({
                             >
                               <Wallet className="w-3 h-3" />
                               <span>Collect</span>
+                            </button>
+                          )}
+
+                          {/* Refund while any collected money is still out */}
+                          {!isVoided && canRefundPayment && onRefundPayment && refundableTotal > 0 && (
+                            <button
+                              onClick={() => openRefundModal(inv)}
+                              title="Refund collected money (full or partial)"
+                              className="px-2 py-1 rounded bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 font-semibold text-[11px] transition-all cursor-pointer whitespace-nowrap inline-flex items-center gap-1"
+                            >
+                              <RotateCcw className="w-3 h-3" />
+                              <span>Refund</span>
                             </button>
                           )}
 
@@ -915,11 +1080,12 @@ export const BillingView: React.FC<BillingViewProps> = ({
                 Cancel
               </button>
               <button
+                disabled={submittingPayment || !payMethod || !(payAmount > 0) || payAmount > paymentModalInvoice.balanceDue + 0.001}
                 onClick={submitPayment}
-                className="flex-1 flex items-center justify-center space-x-1.5 px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs cursor-pointer shadow-md shadow-emerald-600/20"
+                className="flex-1 flex items-center justify-center space-x-1.5 px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs cursor-pointer shadow-md shadow-emerald-600/20 disabled:opacity-50"
               >
                 <CheckCircle2 className="w-4 h-4" />
-                <span>Confirm Receipt</span>
+                <span>{submittingPayment ? 'Recording…' : 'Confirm Receipt'}</span>
               </button>
             </div>
           </div>
@@ -1111,6 +1277,23 @@ export const BillingView: React.FC<BillingViewProps> = ({
                 </div>
               </div>
 
+              {/* Step 4b: Tax Rate */}
+              <div className="flex items-center justify-between bg-slate-50 border border-slate-200 rounded-xl px-3 py-2">
+                <div className="text-xs">
+                  <span className="font-semibold text-slate-700">Tax Rate (%)</span>
+                  <span className="text-[10px] text-slate-400 ml-2">applied to the discounted total — server recomputes authoritatively</span>
+                </div>
+                <input
+                  type="number"
+                  min={0}
+                  max={100}
+                  step={0.01}
+                  value={taxRate}
+                  onChange={(e) => setTaxRate(Math.min(100, Math.max(0, Number(e.target.value))))}
+                  className="w-20 bg-white text-slate-900 p-1.5 rounded-lg border border-slate-300 text-xs font-mono font-bold text-right"
+                />
+              </div>
+
               {/* Step 5: Remarks / Notes */}
               <div>
                 <label className="block text-xs font-semibold text-slate-700 mb-1">
@@ -1177,12 +1360,12 @@ export const BillingView: React.FC<BillingViewProps> = ({
                 Cancel
               </button>
               <button
-                disabled={!selectedAptId}
+                disabled={!selectedAptId || submittingCreate}
                 onClick={submitNewInvoice}
                 className="flex-1 flex items-center justify-center space-x-1.5 px-4 py-2.5 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white font-bold text-xs cursor-pointer shadow-md disabled:opacity-50"
               >
                 <Receipt className="w-4 h-4" />
-                <span>Generate Official Invoice</span>
+                <span>{submittingCreate ? 'Generating…' : 'Generate Official Invoice'}</span>
               </button>
             </div>
           </div>
@@ -1238,7 +1421,7 @@ export const BillingView: React.FC<BillingViewProps> = ({
                 </div>
                 <div className="flex justify-between text-slate-500">
                   <span>DATE/TIME:</span>
-                  <span>{thermalReceiptInvoice.createdAt}</span>
+                  <span>{thermalReceiptInvoice.createdAtFull ?? thermalReceiptInvoice.createdAt}</span>
                 </div>
               </div>
 
@@ -1375,12 +1558,12 @@ export const BillingView: React.FC<BillingViewProps> = ({
                 Cancel
               </button>
               <button
-                disabled={!newItemDesc.trim() || newItemPrice <= 0}
+                disabled={submittingItem || !newItemDesc.trim() || newItemPrice <= 0}
                 onClick={submitAddItem}
                 className="flex-1 flex items-center justify-center space-x-1.5 px-4 py-2 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white font-bold text-xs cursor-pointer shadow-md disabled:opacity-50"
               >
                 <PlusCircle className="w-4 h-4" />
-                <span>Add to Invoice</span>
+                <span>{submittingItem ? 'Adding…' : 'Add to Invoice'}</span>
               </button>
             </div>
           </div>
@@ -1416,10 +1599,14 @@ export const BillingView: React.FC<BillingViewProps> = ({
                 </div>
               ) : (
                 historyInvoice.payments.map((p, idx) => (
-                  <div key={p.id || idx} className="p-3 rounded-xl bg-slate-50 border border-slate-200 space-y-1 text-xs">
+                  <div key={p.id || idx} className={`p-3 rounded-xl border space-y-1 text-xs ${p.kind === 'refund' ? 'bg-rose-50/60 border-rose-200' : 'bg-slate-50 border-slate-200'}`}>
                     <div className="flex justify-between items-center font-bold">
-                      <span className="text-slate-900">Receipt #{idx + 1}</span>
-                      <span className="text-emerald-700 font-mono text-sm">Rs. {p.amount.toLocaleString()}</span>
+                      <span className={p.kind === 'refund' ? 'text-rose-700' : 'text-slate-900'}>
+                        {p.kind === 'refund' ? 'Refund' : `Receipt #${idx + 1}`}
+                      </span>
+                      <span className={`font-mono text-sm ${p.kind === 'refund' ? 'text-rose-700' : 'text-emerald-700'}`}>
+                        {p.kind === 'refund' ? '-' : ''}Rs. {Math.abs(p.amount).toLocaleString()}
+                      </span>
                     </div>
                     <div className="flex justify-between text-slate-500 text-[11px]">
                       <span>Method: <strong className="text-slate-700 uppercase">{p.method}</strong></span>
@@ -1427,7 +1614,7 @@ export const BillingView: React.FC<BillingViewProps> = ({
                     </div>
                     <div className="flex justify-between text-slate-500 text-[10px]">
                       <span>Ref: <span className="font-mono">{p.reference || 'N/A'}</span></span>
-                      <span>Cashier: {p.receivedBy}</span>
+                      <span>{p.kind === 'refund' ? 'Processed by' : 'Cashier'}: {p.receivedBy}</span>
                     </div>
                   </div>
                 ))
@@ -1451,6 +1638,140 @@ export const BillingView: React.FC<BillingViewProps> = ({
               >
                 <Printer className="w-3.5 h-3.5 text-cyan-400" />
                 <span>Print Invoice</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ------------------------------------------------------------ */}
+      {/* MODAL 6b: REFUND COLLECTED MONEY (money OUT)                 */}
+      {/* ------------------------------------------------------------ */}
+      {refundModalInvoice && (
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white border border-slate-200 rounded-3xl max-w-md w-full p-6 shadow-2xl space-y-4 animate-in fade-in zoom-in-95 duration-150">
+            <div className="flex items-center justify-between border-b border-slate-200 pb-3">
+              <div className="flex items-center space-x-2">
+                <div className="w-8 h-8 rounded-xl bg-rose-100 text-rose-700 flex items-center justify-center font-bold">
+                  <RotateCcw className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-slate-900 text-base">Refund Collected Payment</h3>
+                  <div className="text-[11px] text-slate-500 font-mono">{refundModalInvoice.invoiceNumber}</div>
+                </div>
+              </div>
+              <button
+                onClick={() => setRefundModalInvoice(null)}
+                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="bg-rose-50/70 border border-rose-200 p-3 rounded-2xl text-xs text-rose-800">
+              Money leaves the clinic here. The refund is stored against the
+              collection it reverses and cannot exceed what that payment
+              actually collected. Every refund is audit-logged.
+            </div>
+
+            <div className="space-y-3">
+              <div>
+                <label className="block text-xs font-bold text-slate-800 mb-1">Collection to Refund *</label>
+                <select
+                  value={refundPaymentId}
+                  onChange={(e) => {
+                    setRefundPaymentId(e.target.value);
+                    const c = refundModalInvoice.payments.find(p => p.id === e.target.value);
+                    if (c) {
+                      const already = refundModalInvoice.payments
+                        .filter(r => r.kind === 'refund' && r.refundsPaymentId === c.id)
+                        .reduce((s, r) => s + Math.abs(r.amount), 0);
+                      setRefundAmount(Math.max(0, c.amount - already));
+                    }
+                  }}
+                  className="w-full bg-white text-slate-800 p-2.5 rounded-xl border border-slate-300 text-xs font-semibold"
+                >
+                  {refundModalInvoice.payments
+                    .filter(p => (p.kind ?? 'payment') === 'payment')
+                    .map(p => {
+                      const already = refundModalInvoice.payments
+                        .filter(r => r.kind === 'refund' && r.refundsPaymentId === p.id)
+                        .reduce((s, r) => s + Math.abs(r.amount), 0);
+                      const left = Math.max(0, p.amount - already);
+                      return (
+                        <option key={p.id} value={p.id} disabled={left <= 0}>
+                          {p.paidAt} — {p.method.toUpperCase()} — Rs. {p.amount.toLocaleString()}
+                          {already > 0 ? ` (refunded Rs. ${already.toLocaleString()}, left Rs. ${left.toLocaleString()})` : ''}
+                        </option>
+                      );
+                    })}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-800 mb-1">Refund Amount (PKR) *</label>
+                <div className="relative">
+                  <input
+                    type="number"
+                    min={0.01}
+                    step={0.01}
+                    value={refundAmount}
+                    onChange={(e) => setRefundAmount(Number(e.target.value))}
+                    className="w-full bg-white text-slate-900 font-mono font-bold text-lg p-3 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-rose-400 shadow-xs"
+                  />
+                  <div className="absolute right-2.5 top-1/2 -translate-y-1/2">
+                    <button
+                      type="button"
+                      onClick={() => setRefundAmount(refundableOnSelected)}
+                      className="px-2 py-1 rounded bg-slate-100 hover:bg-slate-200 text-slate-700 text-[10px] font-bold cursor-pointer"
+                    >
+                      Refundable: Rs. {refundableOnSelected.toLocaleString()}
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">Reason for Refund *</label>
+                <select
+                  value={refundReason}
+                  onChange={(e) => setRefundReason(e.target.value)}
+                  className="w-full bg-white text-slate-800 p-2.5 rounded-xl border border-slate-300 text-xs font-semibold"
+                >
+                  <option value="Patient cancelled examination — fee returned">Patient cancelled examination — fee returned</option>
+                  <option value="Study could not be performed (equipment/clinical)">Study could not be performed (equipment/clinical)</option>
+                  <option value="Duplicate / over-collection reversed">Duplicate / over-collection reversed</option>
+                  <option value="Billing error correction">Billing error correction</option>
+                  <option value="Goodwill adjustment approved by management">Goodwill adjustment approved by management</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">Reference (Optional)</label>
+                <input
+                  type="text"
+                  value={refundRef}
+                  onChange={(e) => setRefundRef(e.target.value)}
+                  placeholder="e.g. card reversal slip, cash voucher #"
+                  className="w-full bg-white text-slate-900 p-2.5 rounded-xl border border-slate-300 text-xs font-mono"
+                />
+              </div>
+            </div>
+
+            <div className="border-t border-slate-200 pt-3 flex space-x-2">
+              <button
+                onClick={() => setRefundModalInvoice(null)}
+                className="flex-1 px-4 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-xs border border-slate-300 cursor-pointer shadow-xs"
+              >
+                Cancel
+              </button>
+              <button
+                disabled={submittingRefund || !(refundAmount > 0) || refundAmount > refundableOnSelected + 0.001 || !refundReason.trim()}
+                onClick={submitRefund}
+                className="flex-1 flex items-center justify-center space-x-1.5 px-4 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs cursor-pointer shadow-md disabled:opacity-50"
+              >
+                <RotateCcw className="w-4 h-4" />
+                <span>{submittingRefund ? 'Refunding…' : 'Confirm Refund'}</span>
               </button>
             </div>
           </div>
@@ -1494,10 +1815,11 @@ export const BillingView: React.FC<BillingViewProps> = ({
                 Back
               </button>
               <button
+                disabled={submittingVoid}
                 onClick={submitVoidInvoice}
-                className="flex-1 px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs cursor-pointer shadow-md"
+                className="flex-1 px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs cursor-pointer shadow-md disabled:opacity-50"
               >
-                Confirm Void
+                {submittingVoid ? 'Voiding…' : 'Confirm Void'}
               </button>
             </div>
           </div>
@@ -1507,7 +1829,8 @@ export const BillingView: React.FC<BillingViewProps> = ({
       {/* ------------------------------------------------------------ */}
       {/* MODAL 7: DAILY SHIFT CASH CLOSING & POS RECONCILIATION       */}
       {/* ------------------------------------------------------------ */}
-      {shiftClosingOpen && (
+      {shiftClosingOpen && (() => {
+        return (
         <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
           <div className="bg-white border border-slate-200 rounded-3xl max-w-2xl w-full p-6 shadow-2xl space-y-4 max-h-[92vh] overflow-y-auto animate-in fade-in zoom-in-95 duration-150">
             <div className="flex items-center justify-between border-b border-slate-200 pb-3">
@@ -1559,23 +1882,29 @@ export const BillingView: React.FC<BillingViewProps> = ({
               </div>
             </div>
 
-            {/* System Revenue Summary Box */}
+            {/* System Revenue Summary Box — SHIFT ledger (server-issued) */}
             <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200 space-y-2 text-xs">
               <div className="font-bold text-slate-900 flex justify-between border-b border-slate-200 pb-1.5">
-                <span>System Collections Summary</span>
+                <span>System Collections Summary (Today{shiftSummaryLoading ? ' — syncing…' : ''})</span>
                 <span>PKR Amount</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-slate-600">Total Invoiced (Gross):</span>
-                <span className="font-mono font-semibold">Rs. {totalInvoiced.toLocaleString()}</span>
+                <span className="text-slate-600">Total Invoiced Today (Gross):</span>
+                <span className="font-mono font-semibold">Rs. {todayInvoiced.toLocaleString()}</span>
               </div>
               <div className="flex justify-between text-emerald-700">
-                <span>Total Discounts Given:</span>
-                <span className="font-mono font-semibold">- Rs. {totalDiscounts.toLocaleString()}</span>
+                <span>Total Discounts Given Today:</span>
+                <span className="font-mono font-semibold">- Rs. {todayDiscounts.toLocaleString()}</span>
               </div>
+              {shiftRefundedTotal < 0 && (
+                <div className="flex justify-between text-rose-700">
+                  <span>Refunds Issued Today (money out):</span>
+                  <span className="font-mono font-semibold">Rs. {shiftRefundedTotal.toLocaleString()}</span>
+                </div>
+              )}
               <div className="flex justify-between font-bold text-slate-900 border-t border-slate-200 pt-1">
-                <span>Total Shift Collections Realized:</span>
-                <span className="font-mono text-sm text-emerald-600">Rs. {totalPaid.toLocaleString()}</span>
+                <span>Total Shift Collections Realized ({shiftInvoiceCount} invoices / {shiftPaymentCount} payments):</span>
+                <span className="font-mono text-sm text-emerald-600">Rs. {shiftTotalCollected.toLocaleString()}</span>
               </div>
             </div>
 
@@ -1587,7 +1916,10 @@ export const BillingView: React.FC<BillingViewProps> = ({
                   <span>Physical Cash Drawer Denomination Count</span>
                 </div>
                 <div className="text-[11px] text-cyan-800 font-semibold">
-                  Expected in Drawer: <strong className="font-mono">Rs. {cashCollected.toLocaleString()}</strong>
+                  Expected in Drawer: <strong className="font-mono">Rs. {shiftCashExpected.toLocaleString()}</strong>
+                  {shiftSummary && shiftSummary.byMethod.find(m => m.method === 'cash') && (
+                    <span className="ml-1 text-[9px] text-cyan-600">(server ledger)</span>
+                  )}
                 </div>
               </div>
 
@@ -1635,6 +1967,40 @@ export const BillingView: React.FC<BillingViewProps> = ({
               </div>
             </div>
 
+            {/* Advisory Jev review of the counted variance (fail-open). */}
+            {(shiftReview || shiftReviewLoading) && (
+              <div
+                className={`p-3 rounded-2xl border space-y-1 text-xs ${
+                  shiftReviewLoading
+                    ? 'bg-slate-50 border-slate-200 text-slate-500'
+                    : shiftReview?.verdict === 'investigate'
+                    ? 'bg-rose-50 border-rose-200 text-rose-800'
+                    : 'bg-emerald-50 border-emerald-200 text-emerald-800'
+                }`}
+              >
+                <div className="flex items-center justify-between font-bold">
+                  <span className="inline-flex items-center gap-1.5">
+                    <Sparkles className="w-3.5 h-3.5" />
+                    AI Shift Review (advisory)
+                  </span>
+                  {shiftReview && (
+                    <span className="font-mono text-[10px]">confidence {Math.round(shiftReview.confidence * 100)}%</span>
+                  )}
+                </div>
+                {shiftReviewLoading ? (
+                  <p>Judging the counted variance…</p>
+                ) : shiftReview ? (
+                  <p>
+                    {shiftReview.verdict === 'investigate'
+                      ? shiftReview.note ?? 'The variance pattern warrants a supervisory second look before sign-off.'
+                      : shiftReview.verdict === 'minor'
+                      ? 'Small variance — consistent with counting/rounding noise. No investigation indicated.'
+                      : 'Balanced. No investigation indicated.'}
+                  </p>
+                ) : null}
+              </div>
+            )}
+
             {/* POS Batch Ref & Handover Remarks */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 text-xs">
               <div>
@@ -1675,7 +2041,8 @@ export const BillingView: React.FC<BillingViewProps> = ({
             </div>
           </div>
         </div>
-      )}
+        );
+      })()}
 
       {/* ------------------------------------------------------------ */}
       {/* MODAL 7: FULL PRINT-FRIENDLY INVOICE PREVIEW / PRINT MODAL   */}

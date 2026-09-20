@@ -16,6 +16,40 @@ use Tests\TestCase;
  */
 class BookingMoneyTest extends TestCase
 {
+    public function test_strict_catalog_conversion_preserves_null_and_zero(): void
+    {
+        $this->assertNull(BookingMoney::decimalToMinor(null));
+        $this->assertNull(BookingMoney::minorToDecimal(null));
+        $this->assertSame(0, BookingMoney::decimalToMinor('0.00'));
+        $this->assertSame('0.00', BookingMoney::minorToDecimal(0));
+        $this->assertSame(650001, BookingMoney::decimalToMinor('6500.01'));
+        $this->assertSame('6500.01', BookingMoney::minorToDecimal(650001));
+        $this->assertSame(-29, BookingMoney::decimalToMinor('-0.29'));
+        $this->assertSame('-0.29', BookingMoney::minorToDecimal(-29));
+    }
+
+    public function test_strict_catalog_conversion_uses_declared_currency_precision(): void
+    {
+        $this->assertSame(1234, BookingMoney::decimalToMinor('1234.00', 0));
+        $this->assertSame('1234', BookingMoney::minorToDecimal(1234, 0));
+        $this->assertSame(1234, BookingMoney::decimalToMinor('1.234', 3));
+        $this->assertSame('1.234', BookingMoney::minorToDecimal(1234, 3));
+        $this->assertSame(9007199254740991, BookingMoney::decimalToMinor('90071992547409.91'));
+        $this->assertSame('90071992547409.91', BookingMoney::minorToDecimal(9007199254740991));
+    }
+
+    public function test_strict_catalog_conversion_rejects_rounding_and_malformed_values(): void
+    {
+        foreach (['0.001', '1e3', '', 'not configured', '90071992547409.92', '12,345.00'] as $amount) {
+            try {
+                BookingMoney::decimalToMinor($amount);
+                $this->fail('Invalid money was accepted: '.$amount);
+            } catch (\InvalidArgumentException $exception) {
+                $this->assertNotEmpty($exception->getMessage());
+            }
+        }
+    }
+
     public function test_payable_subtracts_discount_from_price(): void
     {
         $this->assertSame(6500.0, BookingMoney::payable(6500, 0));

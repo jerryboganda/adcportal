@@ -52,7 +52,11 @@ import {
   Referrer,
   ReportTemplate,
   Room,
+  ShiftReview,
+  ShiftSummary,
+  CatalogReview,
   ScreeningForm,
+  ScreeningTriage,
   Service,
   StaffRole,
   StaffUser,
@@ -184,9 +188,10 @@ const normalizeRoom = (r: any): Room => ({
   modalityId: Number(r.modalityId),
   locationId: r.locationId == null ? null : Number(r.locationId),
 });
-const normalizeService = (s: any): Service => ({ ...s, id: Number(s.id), modalityId: Number(s.modalityId) });
+const normalizeService = (s: any): Service => ({ ...s, id: Number(s.id), modalityId: Number(s.modalityId), isBookableOnline: s.isBookableOnline ?? true });
 const normalizePaymentMethod = (m: any): PaymentMethod => ({ ...m, id: Number(m.id) });
-const normalizeReferrer = (r: any): Referrer => ({ ...r, id: Number(r.id) });
+const normalizeReferrer = (r: any): Referrer => ({ ...r, id: Number(r.id), isActive: r.isActive ?? true });
+const normalizeScreeningForm = (f: any): ScreeningForm => ({ ...f, isActive: f.isActive ?? true });
 
 // ==================== auth ====================
 
@@ -485,6 +490,22 @@ export async function submitScreening(
   return normalizeStudy(data.data.study);
 }
 
+/**
+ * Re-run the advisory AI screening triage (TypeSafe System One / Jev).
+ * Returns { triage, study }; `triage` is null when the evaluation could not
+ * run (gateway unreachable / disabled) — the study is always returned so
+ * the caller can refresh its state either way.
+ */
+export async function rerunScreeningTriage(
+  appointmentId: string
+): Promise<{ triage: ScreeningTriage | null; study: Appointment }> {
+  const { data } = await http.post(`/studies/${appointmentId}/screening/triage`);
+  return {
+    triage: (data.data?.triage ?? null) as ScreeningTriage | null,
+    study: normalizeStudy(data.data.study),
+  };
+}
+
 // ==================== reports ====================
 
 export interface ReportInput {
@@ -644,13 +665,32 @@ export async function fetchDictationCapability(): Promise<DictationCapability> {
  * text is inserted into the field the radiologist is editing and still has to
  * be reviewed before the report is signed.
  */
+/**
+ * The file extension for a recording's container.
+ *
+ * Browsers do not agree on one: Chromium and Firefox record WebM/Opus, Safari
+ * records MP4/AAC and cannot produce WebM at all. The extension is derived from
+ * the blob's own type rather than assumed.
+ */
+function dictationFileExtension(mimeType: string): string {
+  const type = (mimeType || '').toLowerCase();
+  if (type.includes('mp4') || type.includes('aac')) return 'mp4';
+  if (type.includes('ogg')) return 'ogg';
+  if (type.includes('wav')) return 'wav';
+  if (type.includes('mpeg')) return 'mp3';
+  return 'webm';
+}
+
 export async function transcribeDictation(
   audio: Blob,
   language: string,
   appointmentId?: string | null
 ): Promise<{ text: string; provider: string; latencyMs: number }> {
   const body = new FormData();
-  body.append('audio', audio, 'dictation.webm');
+  // The filename carries the container, and speech engines routinely demux by
+  // it: a Safari recording uploaded as ".webm" while its bytes are MP4 is a
+  // failure the clinic would read as "the engine rejected valid audio".
+  body.append('audio', audio, `dictation.${dictationFileExtension(audio.type)}`);
   body.append('language', language);
   // Lets the audit trail record which study a dictation session belonged to.
   if (appointmentId) body.append('appointmentId', appointmentId);
@@ -932,6 +972,45 @@ export async function voidInvoice(invoiceId: string, reason: string): Promise<In
   return normalizeInvoice(data.data.invoice);
 }
 
+/** Refund part or all of one recorded collection (money OUT). */
+export async function refundInvoicePayment(
+  invoiceId: string,
+  paymentId: string,
+  amount: number,
+  reason: string,
+  reference?: string,
+): Promise<Invoice> {
+  const { data } = await http.post(`/invoices/${invoiceId}/refunds`, {
+    paymentId: Number(paymentId),
+    amount,
+    reason,
+    reference,
+  });
+  return normalizeInvoice(data.data.invoice);
+}
+
+/** Server-side ledger for one shift day (the reconciliation source of truth). */
+export async function fetchShiftSummary(date?: string): Promise<ShiftSummary> {
+  const { data } = await http.get('/billing/shift-summary', { params: date ? { date } : {} });
+  return data.data.shift;
+}
+
+/** Advisory Jev judgment on a counted shift (fail-open; null when unavailable). */
+export async function requestShiftReview(input: {
+  cashExpected: number;
+  cashCounted: number;
+  totalCollected: number;
+  refundedTotal: number;
+  paymentCount: number;
+}): Promise<ShiftReview | null> {
+  try {
+    const { data } = await http.post('/billing/shift-review', input);
+    return data.data.review ?? null;
+  } catch {
+    return null; // advisory only — never blocks reconciliation
+  }
+}
+
 // ==================== masters ====================
 
 export async function createModality(input: Omit<Modality, 'id'>): Promise<Modality> {
@@ -1040,7 +1119,7 @@ export async function createScreeningForm(input: NewScreeningForm): Promise<Scre
       isRiskBlocking: q.isRiskBlocking,
     })),
   });
-  return data.data.form;
+  return data.data.form as ScreeningForm;
 }
 
 export async function updateScreeningFormQuestions(formId: string, questions: ScreeningForm['questions']): Promise<ScreeningForm> {
@@ -1054,7 +1133,42 @@ export async function updateScreeningFormQuestions(formId: string, questions: Sc
       isRiskBlocking: q.isRiskBlocking,
     })),
   });
-  return data.data.form;
+  return normalizeScreeningForm(data.data.form);
+}
+
+export async function toggleScreeningForm(formId: string): Promise<ScreeningForm> {
+  const { data } = await http.post(`/screening-forms/${formId}/toggle`);
+  return normalizeScreeningForm(data.data.form);
+}
+
+export async function deleteScreeningForm(formId: string): Promise<void> {
+  await http.delete(`/screening-forms/${formId}`);
+}
+
+export async function updateScreeningFormMeta(
+  formId: string,
+  meta: { name?: string; description?: string; modalityId?: number | null; isActive?: boolean }
+): Promise<ScreeningForm> {
+  const { data } = await http.put(`/screening-forms/${formId}`, meta);
+  return normalizeScreeningForm(data.data.form);
+}
+
+export async function reviewScreeningQuestion(
+  questionText: string,
+  siblingQuestions: string[] = []
+): Promise<CatalogReview | null> {
+  const { data } = await http.post('/catalog/review-screening-question', {
+    questionText,
+    siblingQuestions,
+  });
+  return (data.data.review ?? null) as CatalogReview | null;
+}
+
+export async function reviewPreparationInstructions(
+  input: { name: string; requiresContrast?: boolean; requiresScreening?: boolean; instructions: string }
+): Promise<CatalogReview | null> {
+  const { data } = await http.post('/catalog/review-preparation', input);
+  return (data.data.review ?? null) as CatalogReview | null;
 }
 
 export async function createReportTemplate(input: Omit<ReportTemplate, 'id'>): Promise<ReportTemplate> {

@@ -196,12 +196,27 @@ class ReportingController extends BaseApiController
 
         $file = $request->file('audio');
 
+        /*
+         * Prefer the container the browser DECLARED over a sniffed one.
+         *
+         * The declared type is the most specific description available: Safari
+         * reports audio/mp4, Chromium audio/webm. Sniffing the bytes instead is
+         * actively worse here, because an MP4 audio file sniffs as video/mp4 and
+         * engines that route on content type reject it — presenting as "the
+         * engine will not accept valid audio". The value only ever reaches the
+         * clinic's own engine, as a Content-Type header.
+         */
+        $declared = (string) ($file->getClientMimeType() ?: '');
+        $mime = str_starts_with($declared, 'audio/')
+            ? $declared
+            : (string) ($file->getMimeType() ?: 'audio/webm');
+
         try {
             $result = $this->transcription->transcribe(
                 $integration,
                 (string) file_get_contents($file->getRealPath()),
                 (string) ($file->getClientOriginalName() ?: 'dictation.webm'),
-                (string) ($file->getMimeType() ?: 'audio/webm'),
+                $mime,
                 $request->input('language'),
             );
         } catch (TranscriptionException $e) {

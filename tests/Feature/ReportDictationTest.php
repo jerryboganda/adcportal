@@ -124,6 +124,46 @@ class ReportDictationTest extends ApiTestCase
         });
     }
 
+    /**
+     * A recording keeps the container it was actually recorded in.
+     *
+     * Browsers do not agree on one — Chromium and Firefox record WebM/Opus,
+     * Safari records MP4/AAC and cannot produce WebM at all — and engines
+     * commonly demux from the filename and content type. An MP4 recording
+     * presented as ".webm" fails as "invalid audio", which reads to the clinic
+     * as a broken engine rather than a mismatched upload.
+     */
+    public function test_a_recording_is_forwarded_in_the_container_it_was_recorded_in(): void
+    {
+        $this->dictationIntegration($this->businessA);
+        $radiologist = $this->makeStaff($this->businessA, $this->adminA, 'radiologist');
+
+        Http::fake(['stt.alpha.test/*' => Http::response(['text' => 'Normal study.'], 200)]);
+
+        // A real file, typed the way Safari hands one over.
+        $path = (string) tempnam(sys_get_temp_dir(), 'dictation');
+        file_put_contents($path, 'mp4-container-payload');
+
+        try {
+            $this->actingAs($radiologist)
+                ->postJson('/api/v1/reporting/dictation/transcribe', [
+                    'audio' => new UploadedFile($path, 'dictation.mp4', 'audio/mp4', null, true),
+                ])
+                ->assertOk()
+                ->assertJsonPath('data.text', 'Normal study.');
+        } finally {
+            @unlink($path);
+        }
+
+        Http::assertSent(function ($request) {
+            $body = $request->body();
+
+            return str_contains($body, 'dictation.mp4')
+                && str_contains($body, 'audio/mp4')
+                && ! str_contains($body, 'dictation.webm');
+        });
+    }
+
     public function test_a_google_style_response_is_understood(): void
     {
         // Self-hosted engines do not agree on a response shape, so the common

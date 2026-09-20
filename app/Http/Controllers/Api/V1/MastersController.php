@@ -43,6 +43,8 @@ class MastersController extends BaseApiController
             'created_by' => auth()->id(),
         ]);
 
+        $this->audit('catalog_modality_saved', $modality, ['summary' => "Created modality suite \"{$modality->name}\" ({$modality->code})"]);
+
         return response()->json(['data' => ['modality' => ApiShape::modality($modality)]], 201);
     }
 
@@ -54,7 +56,7 @@ class MastersController extends BaseApiController
             abort(404);
         }
 
-        $validated = $this->validateModality($request);
+        $validated = $this->validateModality($request, $modality->id);
 
         $modality->update([
             'name' => $validated['name'],
@@ -63,6 +65,8 @@ class MastersController extends BaseApiController
             'buffer_minutes' => (int) ($validated['bufferMinutes'] ?? $modality->buffer_minutes),
             'is_active' => (bool) ($validated['isActive'] ?? $modality->is_active),
         ]);
+
+        $this->audit('catalog_modality_saved', $modality, ['summary' => "Updated modality suite \"{$modality->name}\" ({$modality->code})"]);
 
         return $this->ok(['modality' => ApiShape::modality($modality->fresh())]);
     }
@@ -81,14 +85,24 @@ class MastersController extends BaseApiController
 
         $modality->delete();
 
+        $this->audit('catalog_modality_deleted', $modality, ['summary' => "Deleted modality suite \"{$modality->name}\" ({$modality->code})"]);
+
         return $this->ok(['deleted' => true]);
     }
 
-    private function validateModality(Request $request): array
+    private function validateModality(Request $request, ?int $ignoreId = null): array
     {
         return $request->validate([
             'name' => ['required', 'string', 'max:255'],
-            'code' => ['required', 'string', 'max:10'],
+            'code' => [
+                'required', 'string', 'max:10',
+                // One code per tenant: booking, reporting and the fee schedule
+                // all key off it. Soft-deleted rows are excluded so a deleted
+                // suite's code can be reused for a fresh one.
+                Rule::unique('modalities', 'code')
+                    ->where(fn ($q) => $q->where('business_id', $this->tenantId())->whereNull('deleted_at'))
+                    ->ignore($ignoreId),
+            ],
             'color' => ['nullable', 'string', 'max:9'],
             'bufferMinutes' => ['nullable', 'integer', 'min:0', 'max:240'],
             'isActive' => ['nullable', 'boolean'],
@@ -114,9 +128,13 @@ class MastersController extends BaseApiController
             'preparation_instructions' => $validated['preparationInstructions'] ?? 'No special preparation needed.',
             'requires_screening' => (bool) ($validated['requiresScreening'] ?? false),
             'contrast_type' => ($validated['requiresContrast'] ?? false) ? 'intravenous' : 'none',
-            'is_bookable_online' => true,
+            'is_bookable_online' => (bool) ($validated['isBookableOnline'] ?? true),
             'business_id' => $this->tenantId(),
             'created_by' => auth()->id(),
+        ]);
+
+        $this->audit('catalog_service_saved', $service, [
+            'summary' => "Created procedure \"{$service->name}\" ({$service->code}) at Rs. {$service->price}",
         ]);
 
         return response()->json(['data' => ['service' => ApiShape::service($service->fresh('modality'))]], 201);
@@ -130,7 +148,11 @@ class MastersController extends BaseApiController
             abort(404);
         }
 
-        $validated = $this->validateService($request);
+        $validated = $this->validateService($request, $service->id);
+
+        // A price change moves money on every future booking and invoice —
+        // record it explicitly so billing disputes are traceable.
+        $priceChanged = (float) $validated['price'] !== (float) $service->price;
 
         $service->update([
             'name' => $validated['name'],
@@ -141,6 +163,13 @@ class MastersController extends BaseApiController
             'preparation_instructions' => $validated['preparationInstructions'] ?? $service->preparation_instructions,
             'requires_screening' => (bool) ($validated['requiresScreening'] ?? $service->requires_screening),
             'contrast_type' => ($validated['requiresContrast'] ?? $service->contrast_type !== 'none') ? 'intravenous' : 'none',
+            'is_bookable_online' => (bool) ($validated['isBookableOnline'] ?? $service->is_bookable_online),
+        ]);
+
+        $this->audit('catalog_service_saved', $service, [
+            'summary' => $priceChanged
+                ? "Updated procedure \"{$service->name}\" — price Rs. {$service->getOriginal('price')} → Rs. {$service->price}"
+                : "Updated procedure \"{$service->name}\" ({$service->code})",
         ]);
 
         return $this->ok(['service' => ApiShape::service($service->fresh('modality'))]);
@@ -163,6 +192,8 @@ class MastersController extends BaseApiController
 
         $service->delete();
 
+        $this->audit('catalog_service_deleted', $service, ['summary' => "Deleted procedure \"{$service->name}\" ({$service->code})"]);
+
         return $this->ok(['deleted' => true]);
     }
 
@@ -176,17 +207,25 @@ class MastersController extends BaseApiController
         ];
     }
 
-    private function validateService(Request $request): array
+    private function validateService(Request $request, ?int $ignoreId = null): array
     {
         return $request->validate([
             'name' => ['required', 'string', 'max:255'],
-            'code' => ['required', 'string', 'max:40'],
+            'code' => [
+                'required', 'string', 'max:40',
+                // Duplicate codes would make booked studies and invoices
+                // ambiguous — one procedure code per tenant (live rows only).
+                Rule::unique('services', 'code')
+                    ->where(fn ($q) => $q->where('business_id', $this->tenantId())->whereNull('deleted_at'))
+                    ->ignore($ignoreId),
+            ],
             'modalityId' => $this->modalityRule(),
             'price' => ['required', 'numeric', 'min:0'],
             'durationMinutes' => ['nullable', 'integer', 'min:5', 'max:480'],
             'preparationInstructions' => ['nullable', 'string', 'max:2000'],
             'requiresScreening' => ['nullable', 'boolean'],
             'requiresContrast' => ['nullable', 'boolean'],
+            'isBookableOnline' => ['nullable', 'boolean'],
         ]);
     }
 
@@ -210,10 +249,12 @@ class MastersController extends BaseApiController
 
         $referrer = Referrer::create([
             ...$this->referrerPayload($validated),
-            'is_active' => true,
+            'is_active' => (bool) ($validated['isActive'] ?? true),
             'business_id' => $this->tenantId(),
             'created_by' => auth()->id(),
         ]);
+
+        $this->audit('catalog_referrer_saved', $referrer, ['summary' => "Added referring doctor \"{$referrer->name}\""]);
 
         return response()->json(['data' => ['referrer' => ApiShape::referrer($referrer)]], 201);
     }
@@ -226,7 +267,13 @@ class MastersController extends BaseApiController
             abort(404);
         }
 
-        $referrer->update($this->referrerPayload($this->validateReferrer($request)));
+        $validated = $this->validateReferrer($request);
+        $referrer->update([
+            ...$this->referrerPayload($validated),
+            'is_active' => (bool) ($validated['isActive'] ?? $referrer->is_active),
+        ]);
+
+        $this->audit('catalog_referrer_saved', $referrer, ['summary' => "Updated referring doctor \"{$referrer->name}\""]);
 
         return $this->ok(['referrer' => ApiShape::referrer($referrer->fresh())]);
     }
@@ -247,7 +294,15 @@ class MastersController extends BaseApiController
             abort(404);
         }
 
+        // Booked studies anchor the referrer_id for the referral trail and
+        // commission reporting — deleting out from under them dangles the FK.
+        if ($referrer->appointments()->exists()) {
+            abort(422, 'Cannot delete a referrer with booked studies. Deactivate them instead.');
+        }
+
         $referrer->delete();
+
+        $this->audit('catalog_referrer_deleted', $referrer, ['summary' => "Removed referring doctor \"{$referrer->name}\""]);
 
         return $this->ok(['deleted' => true]);
     }
@@ -260,6 +315,7 @@ class MastersController extends BaseApiController
             'specialty' => ['nullable', 'string', 'max:255'],
             'phone' => ['nullable', 'string', 'max:50'],
             'email' => ['nullable', 'email', 'max:255'],
+            'isActive' => ['nullable', 'boolean'],
         ]);
     }
 
@@ -267,7 +323,11 @@ class MastersController extends BaseApiController
 
     public function storeScreeningForm(Request $request): JsonResponse
     {
-        $this->denyUnless('report template create');
+        // Screening forms are clinical SAFETY configuration, not reporting
+        // macros — gate them on clinic administration. (The UI previously
+        // showed the button on `setting manage` while the server demanded
+        // `report template create`, so permitted admins were rejected 403.)
+        $this->denyUnlessAny(['setting manage', 'report template create'], 'setting manage');
 
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
@@ -308,6 +368,8 @@ class MastersController extends BaseApiController
             return $form;
         });
 
+        $this->audit('catalog_screening_form_saved', $form, ['summary' => "Created screening form \"{$form->name}\" with {$form->questions()->count()} questions"]);
+
         return response()->json(['data' => ['form' => ApiShape::screeningForm($form->fresh('questions'))]], 201);
     }
 
@@ -320,6 +382,10 @@ class MastersController extends BaseApiController
         }
 
         $validated = $request->validate([
+            'name' => ['sometimes', 'string', 'max:255'],
+            'description' => ['sometimes', 'nullable', 'string', 'max:2000'],
+            'modalityId' => ['sometimes', 'nullable', ...$this->modalityRule(false)],
+            'isActive' => ['sometimes', 'boolean'],
             'questions' => ['sometimes', 'array', 'min:1'],
             'questions.*.questionText' => ['required_with:questions', 'string', 'max:1000'],
             'questions.*.helpText' => ['nullable', 'string', 'max:500'],
@@ -328,6 +394,16 @@ class MastersController extends BaseApiController
             'questions.*.riskValue' => ['nullable', 'string', 'max:50'],
             'questions.*.isRiskBlocking' => ['nullable', 'boolean'],
         ]);
+
+        // Full metadata update: the SPA's lifecycle actions (rename, retarget
+        // modality, activate/deactivate) all land here. `is_active` is mapped
+        // by hand — it is not in the model's $fillable under its camelCase
+        // wire name, so a naive passthrough would silently drop deactivations.
+        $meta = collect($validated)->only(['name', 'description', 'modalityId'])->all();
+        if (array_key_exists('isActive', $validated)) {
+            $meta['is_active'] = (bool) $validated['isActive'];
+        }
+        $form->update($meta);
 
         // Questions are versioned wholesale: replace the active set atomically.
         if (isset($validated['questions'])) {
@@ -347,6 +423,8 @@ class MastersController extends BaseApiController
             });
         }
 
+        $this->audit('catalog_screening_form_saved', $form, ['summary' => "Updated screening form \"{$form->name}\""]);
+
         return $this->ok(['form' => ApiShape::screeningForm($form->fresh('questions'))]);
     }
 
@@ -360,6 +438,10 @@ class MastersController extends BaseApiController
 
         $form->update(['is_active' => ! $form->is_active]);
 
+        $this->audit('catalog_screening_form_saved', $form, [
+            'summary' => ($form->is_active ? 'Activated' : 'Deactivated')." screening form \"{$form->name}\"",
+        ]);
+
         return $this->ok(['form' => ApiShape::screeningForm($form->fresh('questions'))]);
     }
 
@@ -371,7 +453,20 @@ class MastersController extends BaseApiController
             abort(404);
         }
 
+        // A form that has collected PATIENT ANSWERS anchors the safety trail of
+        // booked studies — deactivate instead of deleting. Merely having
+        // questions is not history.
+        $questionIds = $form->questions()->withTrashed()->pluck('id');
+        $hasHistory = $questionIds->isNotEmpty()
+            && \App\Models\StudyScreeningAnswer::whereIn('screening_question_id', $questionIds)->exists();
+
+        if ($hasHistory) {
+            abort(422, 'This form has collected screening answers. Deactivate it instead of deleting.');
+        }
+
         $form->delete();
+
+        $this->audit('catalog_screening_form_deleted', $form, ['summary' => "Deleted screening form \"{$form->name}\""]);
 
         return $this->ok(['deleted' => true]);
     }
@@ -537,6 +632,54 @@ class MastersController extends BaseApiController
         ];
     }
 
+    // ==================== Jev advisory review (TypeSafe System One) ====================
+
+    /**
+     * Advisory judgment on a DRAFTED screening question before the admin
+     * saves it: is this a genuine safety question? Fail-open — a null or
+     * unavailable judgment must never block the form builder.
+     */
+    public function reviewScreeningQuestion(Request $request): JsonResponse
+    {
+        $this->denyUnlessAny(['setting manage', 'report template create', 'report template edit'], 'setting manage');
+
+        $validated = $request->validate([
+            'questionText' => ['required', 'string', 'max:1000'],
+            'siblingQuestions' => ['sometimes', 'array', 'max:50'],
+            'siblingQuestions.*' => ['string', 'max:1000'],
+        ]);
+
+        $review = app(\App\Services\CatalogReviewService::class)
+            ->reviewScreeningQuestion($validated['questionText'], $validated['siblingQuestions'] ?? []);
+
+        return $this->ok(['review' => $review]);
+    }
+
+    /**
+     * Advisory judgment on drafted patient-preparation instructions: is any
+     * clinically required step missing? Fail-open, advisory only.
+     */
+    public function reviewPreparationInstructions(Request $request): JsonResponse
+    {
+        $this->denyUnlessAny(['service create', 'service edit'], 'service edit');
+
+        $validated = $request->validate([
+            'name' => ['required', 'string', 'max:255'],
+            'requiresContrast' => ['sometimes', 'boolean'],
+            'requiresScreening' => ['sometimes', 'boolean'],
+            'instructions' => ['required', 'string', 'max:2000'],
+        ]);
+
+        $review = app(\App\Services\CatalogReviewService::class)->reviewPreparationInstructions(
+            $validated['name'],
+            (bool) ($validated['requiresContrast'] ?? false),
+            (bool) ($validated['requiresScreening'] ?? false),
+            $validated['instructions'],
+        );
+
+        return $this->ok(['review' => $review]);
+    }
+
     // ==================== rooms (imaging suites) ====================
 
     public function storeRoom(Request $request): JsonResponse
@@ -556,6 +699,8 @@ class MastersController extends BaseApiController
             'created_by' => auth()->id(),
         ]);
 
+        $this->audit('catalog_room_saved', $room, ['summary' => "Created imaging suite \"{$room->name}\""]);
+
         return response()->json(['data' => ['room' => ApiShape::room($room->fresh('modality'))]], 201);
     }
 
@@ -567,7 +712,7 @@ class MastersController extends BaseApiController
             abort(404);
         }
 
-        $validated = $this->validateRoom($request);
+        $validated = $this->validateRoom($request, $room->id);
 
         $room->update([
             'name' => $validated['name'],
@@ -577,6 +722,8 @@ class MastersController extends BaseApiController
             'description' => $validated['description'] ?? $room->description,
             'is_active' => (bool) ($validated['isActive'] ?? $room->is_active),
         ]);
+
+        $this->audit('catalog_room_saved', $room, ['summary' => "Updated imaging suite \"{$room->name}\""]);
 
         return $this->ok(['room' => ApiShape::room($room->fresh('modality'))]);
     }
@@ -597,13 +744,22 @@ class MastersController extends BaseApiController
 
         $room->delete();
 
+        $this->audit('catalog_room_deleted', $room, ['summary' => "Deleted imaging suite \"{$room->name}\""]);
+
         return $this->ok(['deleted' => true]);
     }
 
-    private function validateRoom(Request $request): array
+    private function validateRoom(Request $request, ?int $ignoreId = null): array
     {
         return $request->validate([
-            'name' => ['required', 'string', 'max:80'],
+            'name' => [
+                'required', 'string', 'max:80',
+                // Two suites named alike make room bookings ambiguous on the
+                // worklist and the schedule board.
+                Rule::unique('rooms', 'name')
+                    ->where(fn ($q) => $q->where('business_id', $this->tenantId())->whereNull('deleted_at'))
+                    ->ignore($ignoreId),
+            ],
             'modalityId' => $this->modalityRule(),
             'locationId' => ['nullable', 'integer'],
             'capacityPerSlot' => ['nullable', 'integer', 'min:1', 'max:20'],

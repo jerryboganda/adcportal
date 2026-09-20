@@ -93,6 +93,7 @@ class ApiShape
             'preparationInstructions' => (string) ($s->preparation_instructions ?? ''),
             'requiresScreening' => (bool) $s->requires_screening,
             'requiresContrast' => $s->contrast_type !== 'none',
+            'isBookableOnline' => (bool) ($s->is_bookable_online ?? true),
         ];
     }
 
@@ -131,6 +132,7 @@ class ApiShape
             'email' => (string) ($r->email ?? ''),
             'phone' => (string) ($r->phone ?? ''),
             'specialty' => (string) ($r->specialty ?? ''),
+            'isActive' => (bool) ($r->is_active ?? true),
         ];
     }
 
@@ -425,6 +427,9 @@ class ApiShape
             'rejectReason' => $a->reject_reason,
             'screeningRequired' => (bool) $a->screening_required,
             'screeningCleared' => (bool) $a->screening_cleared,
+            // Advisory AI triage (TypeSafe System One). Omitted when absent —
+            // the SPA treats undefined exactly like null.
+            'screeningTriage' => $a->screening_triage,
             'screeningAnswers' => $a->relationLoaded('screeningAnswers')
                 ? $a->screeningAnswers->map(fn ($ans) => self::studyScreeningAnswer($ans))->all()
                 : [],
@@ -521,14 +526,23 @@ class ApiShape
                 ? $inv->payments->map(fn ($p) => [
                     'id' => self::id($p->id),
                     'amount' => (float) $p->amount,
+                    /** Negative = refund reversing `refundsPaymentId`. */
+                    'kind' => (float) $p->amount < 0 ? 'refund' : 'payment',
+                    'refundsPaymentId' => $p->refunds_payment_id !== null ? self::id($p->refunds_payment_id) : null,
                     'method' => $p->method,
                     'reference' => (string) ($p->reference ?? ''),
-                    'paidAt' => self::time($p->paid_at),
+                    // Full timestamp (date + time) — shift reconciliation and
+                    // printed receipts must be able to scope to a DAY.
+                    'paidAt' => self::dateTime($p->paid_at),
+                    'paidAtIso' => $p->paid_at?->toIso8601String(),
                     'receivedBy' => optional($p->receivedBy)->name ?? 'Staff',
                 ])->all()
                 : [],
             'createdAt' => self::time($inv->created_at),
+            'createdAtFull' => self::dateTime($inv->created_at),
+            'createdAtIso' => $inv->created_at?->toIso8601String(),
             'issuedAt' => $inv->issued_at ? self::time($inv->issued_at) : null,
+            'issuedAtFull' => $inv->issued_at ? self::dateTime($inv->issued_at) : null,
             'voidedAt' => $inv->voided_at ? self::time($inv->voided_at) : null,
         ];
     }

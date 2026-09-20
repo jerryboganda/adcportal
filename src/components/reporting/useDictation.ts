@@ -78,6 +78,37 @@ function mediaRecorderSupported(): boolean {
 }
 
 /**
+ * The audio container to record in, in order of preference.
+ *
+ * Not every browser records the same format: Chromium and Firefox produce WebM
+ * (Opus), Safari produces MP4/AAC and cannot produce WebM at all. Naming the
+ * container is what lets a self-hosted engine demux the recording, so the
+ * browser is asked for the first format it actually supports rather than being
+ * left to pick one silently.
+ */
+const RECORDING_FORMATS = [
+  'audio/webm;codecs=opus',
+  'audio/webm',
+  'audio/ogg;codecs=opus',
+  'audio/mp4',
+] as const;
+
+function preferredRecordingFormat(): string | null {
+  if (typeof window === 'undefined') return null;
+
+  const recorder = (window as any).MediaRecorder;
+  if (typeof recorder?.isTypeSupported !== 'function') return null;
+
+  return RECORDING_FORMATS.find(format => {
+    try {
+      return recorder.isTypeSupported(format);
+    } catch {
+      return false;
+    }
+  }) ?? null;
+}
+
+/**
  * Spoken punctuation / structure commands.
  *
  * Deliberately conservative: only a small closed set of unambiguous phrases,
@@ -247,7 +278,12 @@ export function useDictation(options: {
 
     streamRef.current = stream;
 
-    const recorder = new (window as any).MediaRecorder(stream);
+    // Ask for a named container where the browser allows it, so the engine on
+    // the other end is told what it is actually being handed.
+    const format = preferredRecordingFormat();
+    const recorder = format
+      ? new (window as any).MediaRecorder(stream, { mimeType: format })
+      : new (window as any).MediaRecorder(stream);
     recorderRef.current = recorder;
 
     recorder.ondataavailable = (event: any) => {

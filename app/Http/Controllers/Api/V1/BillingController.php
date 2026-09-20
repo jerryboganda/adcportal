@@ -43,6 +43,19 @@ class BillingController extends BaseApiController
         return $this->ok(['invoices' => $invoices->map(fn ($i) => ApiShape::invoice($i))->all()]);
     }
 
+    public function show(Invoice $invoice): JsonResponse
+    {
+        $this->denyUnless('invoice manage');
+
+        if ($invoice->business_id !== $this->tenantId()) {
+            abort(404);
+        }
+
+        return $this->ok(['invoice' => ApiShape::invoice(
+            $invoice->fresh(['items', 'payments.receivedBy', 'appointment'])
+        )]);
+    }
+
     public function store(Request $request, Appointment $appointment): JsonResponse
     {
         $this->denyUnless('invoice create');
@@ -67,6 +80,22 @@ class BillingController extends BaseApiController
             'initialPayment.reference' => ['nullable', 'string', 'max:255'],
             'issueNow' => ['sometimes', 'boolean'],
         ]);
+
+        // The very first collection must already respect the invoice's own
+        // total — an overpayment here would otherwise seed a NEGATIVE balance
+        // on a brand-new invoice (POS payments are capped by the row-locked
+        // check; creation time had no equivalent gate).
+        $itemTotal = 0.0;
+        foreach ($validated['items'] as $item) {
+            $itemTotal += max(0, (float) $item['unitPrice'] * (int) $item['quantity'] - (float) ($item['discount'] ?? 0));
+        }
+        $netTotal = round($itemTotal - (float) ($validated['discountAmount'] ?? 0), 2);
+        $netWithTax = round(max(0, $netTotal) * (1 + ((float) ($validated['taxRate'] ?? 0) / 100)), 2);
+
+        if (isset($validated['initialPayment'])
+            && (float) $validated['initialPayment']['amount'] > $netWithTax + 0.001) {
+            abort(422, 'Initial payment exceeds the invoice total ('.number_format($netWithTax, 2).').');
+        }
 
         $invoice = DB::transaction(function () use ($validated, $appointment) {
             $invoice = Invoice::create([
@@ -243,6 +272,186 @@ class BillingController extends BaseApiController
         ]);
 
         return $this->ok(['invoice' => ApiShape::invoice($invoice->fresh(['items', 'payments.receivedBy', 'appointment']))]);
+    }
+
+    /**
+     * Refund a payment (full or partial) against one recorded collection.
+     *
+     * Money integrity contract:
+     *   - the payment row must belong to this invoice AND this tenant;
+     *   - the running refund total can never exceed the amount actually
+     *     collected on that row (recomputed under a row lock so two
+     *     concurrent terminals cannot double-refund);
+     *   - the refund is stored as a NEGATIVE payment row carrying the id of
+     *     the collection it reverses, so paid_total/status/paid history stay
+     *     a single consistent ledger (sum of one column) with no new concept;
+     *   - the invoice is never re-issued: refunds cannot resurrect a voided
+     *     document of record.
+     */
+    public function refundPayment(Request $request, Invoice $invoice): JsonResponse
+    {
+        $this->denyUnless('invoice refund');
+
+        if ($invoice->business_id !== $this->tenantId()) {
+            abort(404);
+        }
+
+        if ($invoice->status === Invoice::STATUS_VOID) {
+            abort(422, 'Cannot refund against a voided invoice.');
+        }
+
+        $validated = $request->validate([
+            'paymentId' => ['required', 'integer'],
+            'amount' => ['required', 'numeric', 'min:0.01'],
+            'reason' => ['required', 'string', 'min:3', 'max:500'],
+            'method' => ['nullable', 'string', Rule::in($this->tenantMethodCodes())],
+            'reference' => ['nullable', 'string', 'max:255'],
+        ]);
+
+        $refund = DB::transaction(function () use ($validated, $invoice) {
+            $locked = Invoice::whereKey($invoice->id)->lockForUpdate()->first();
+
+            // Tenant guard on the payment row itself — a guessed id from
+            // another clinic must resolve to 404, not to a refund.
+            $payment = $locked->payments()->whereKey((int) $validated['paymentId'])->first();
+
+            if (! $payment) {
+                abort(404);
+            }
+
+            if ((float) $payment->amount <= 0) {
+                abort(422, 'Only a collected payment can be refunded.');
+            }
+
+            $alreadyRefunded = (float) $locked->payments()
+                ->where('refunds_payment_id', $payment->id)
+                ->sum('amount');
+            $refundable = round((float) $payment->amount + (float) $alreadyRefunded, 2); // refund rows are negative
+
+            if ((float) $validated['amount'] > $refundable + 0.001) {
+                abort(422, 'Refund exceeds the collectable amount on this payment ('.number_format($refundable, 2).').');
+            }
+
+            $payment->forceFill(['refunded_at' => $alreadyRefunded < 0 ? $payment->refunded_at : now()])->save();
+
+            return app(InvoicePaymentService::class)->record(
+                $locked,
+                -1 * (float) $validated['amount'],
+                $validated['method'] ?? $payment->method,
+                'REFUND: '.($validated['reason'] !== '' ? $validated['reason'].' — ' : '').($validated['reference'] ?? $payment->reference ?? ''),
+                Auth::id(),
+                (int) $payment->id,
+            );
+        });
+
+        $this->audit('payment_refunded', $invoice, [
+            'summary' => sprintf(
+                'Refunded Rs. %s on invoice %s (%s).',
+                number_format((float) $validated['amount'], 2),
+                $invoice->invoice_number,
+                $validated['reason'],
+            ),
+            'amount' => $validated['amount'],
+            'reason' => $validated['reason'],
+            'refunded_payment_id' => (int) $validated['paymentId'],
+        ]);
+
+        $this->notify([
+            'title' => 'Refund Issued (Rs. '.number_format((float) $validated['amount'], 2).')',
+            'message' => sprintf(
+                'Refund of Rs. %s processed for invoice %s — %s.',
+                number_format((float) $validated['amount'], 2),
+                $invoice->invoice_number,
+                $validated['reason'],
+            ),
+            'category' => 'billing',
+            'priority' => 'low',
+            'appointment_id' => $invoice->appointment_id,
+            'token_number' => $invoice->appointment?->token_number,
+            'patient_name' => $invoice->patient?->customer?->name,
+            'target_tab' => 'billing',
+            'action_label' => 'View Invoices',
+        ]);
+
+        return $this->ok([
+            'invoice' => ApiShape::invoice($invoice->fresh(['items', 'payments.receivedBy', 'appointment'])),
+            'paymentId' => (string) $refund->id,
+        ]);
+    }
+
+    /**
+     * Shift reconciliation: the SYSTEM half of the cash drawer audit — the
+     * exact ledger the cashier counts against. Scope = payments recorded in
+     * the selected window (default: today), grouped by tender, with refund
+     * rows (negative amounts) folded in. This is the number "Expected in
+     * Drawer" must be built from, never all-time sums.
+     */
+    public function shiftSummary(Request $request): JsonResponse
+    {
+        $this->denyUnless('invoice manage');
+
+        $validated = $request->validate([
+            'date' => ['nullable', 'date'],
+        ]);
+
+        $day = $validated['date'] ?? now()->toDateString();
+
+        $payments = InvoicePayment::query()
+            ->where('business_id', $this->tenantId())
+            ->whereDate('paid_at', $day)
+            ->whereHas('invoice', fn ($q) => $q->where('status', '!=', Invoice::STATUS_VOID))
+            ->with('invoice:id,invoice_number,appointment_id')
+            ->orderBy('paid_at')
+            ->get();
+
+        $byMethod = $payments->groupBy('method')
+            ->map(fn ($group) => [
+                'method' => (string) $group->first()->method,
+                'total' => round((float) $group->sum('amount'), 2),
+                'count' => $group->count(),
+            ])
+            ->values()
+            ->all();
+
+        return $this->ok([
+            'shift' => [
+                'date' => $day,
+                'totalCollected' => round((float) $payments->sum('amount'), 2),
+                'refundedTotal' => round((float) $payments->filter(fn ($p) => (float) $p->amount < 0)->sum('amount'), 2),
+                'invoiceCount' => $payments->filter(fn ($p) => (float) $p->amount > 0)->unique('invoice_id')->count(),
+                'paymentCount' => $payments->filter(fn ($p) => (float) $p->amount > 0)->count(),
+                'byMethod' => $byMethod,
+            ],
+        ]);
+    }
+
+    /**
+     * Advisory Jev judgment over a counted shift: is the variance plausibly
+     * explainable, and does anything in the day's money pattern warrant a
+     * second look? Fail-open — null when no judgment is available, and the
+     * deterministic variance arithmetic stays authoritative.
+     */
+    public function reviewShift(Request $request): JsonResponse
+    {
+        $this->denyUnless('invoice manage');
+
+        $validated = $request->validate([
+            'cashExpected' => ['required', 'numeric', 'min:0'],
+            'cashCounted' => ['required', 'numeric', 'min:0'],
+            'totalCollected' => ['required', 'numeric', 'min:0'],
+            'refundedTotal' => ['nullable', 'numeric'],
+            'paymentCount' => ['nullable', 'integer', 'min:0'],
+        ]);
+
+        $review = app(\App\Services\BillingAnomalyService::class)->reviewShift(
+            (float) $validated['cashExpected'],
+            (float) $validated['cashCounted'],
+            (float) $validated['totalCollected'],
+            (float) ($validated['refundedTotal'] ?? 0),
+            (int) ($validated['paymentCount'] ?? 0),
+        );
+
+        return $this->ok(['review' => $review]);
     }
 
     public function downloadPdf(Invoice $invoice)

@@ -118,6 +118,8 @@ Route::middleware(['auth', 'tenant.active', 'throttle:tenant'])->group(function 
     Route::post('/studies/{appointment}/transition', [StudyController::class, 'transition'])->whereNumber('appointment');
     Route::get('/studies/{appointment}/screening', [StudyController::class, 'screeningForm'])->whereNumber('appointment');
     Route::post('/studies/{appointment}/screening', [StudyController::class, 'submitScreening'])->whereNumber('appointment');
+    // AI screening triage (TypeSafe System One via AI Gateway; advisory only).
+    Route::post('/studies/{appointment}/screening/triage', [StudyController::class, 'rerunTriage'])->whereNumber('appointment');
 
     // Radiology reports
     Route::post('/studies/{appointment}/reports', [ReportController::class, 'store'])->whereNumber('appointment');
@@ -168,10 +170,14 @@ Route::middleware(['auth', 'tenant.active', 'throttle:tenant'])->group(function 
 
     // Billing
     Route::get('/invoices', [BillingController::class, 'index']);
+    Route::get('/invoices/{invoice}', [BillingController::class, 'show'])->whereNumber('invoice');
     Route::post('/studies/{appointment}/invoices', [BillingController::class, 'store'])->whereNumber('appointment');
     Route::post('/invoices/{invoice}/items', [BillingController::class, 'addItem'])->whereNumber('invoice');
     Route::post('/invoices/{invoice}/payments', [BillingController::class, 'addPayment'])->whereNumber('invoice');
+    Route::post('/invoices/{invoice}/refunds', [BillingController::class, 'refundPayment'])->whereNumber('invoice');
     Route::post('/invoices/{invoice}/void', [BillingController::class, 'void'])->whereNumber('invoice');
+    Route::get('/billing/shift-summary', [BillingController::class, 'shiftSummary']);
+    Route::post('/billing/shift-review', [BillingController::class, 'reviewShift']);
     Route::get('/invoices/{invoice}/pdf', [BillingController::class, 'downloadPdf'])->whereNumber('invoice');
 
     // Masters
@@ -194,6 +200,8 @@ Route::middleware(['auth', 'tenant.active', 'throttle:tenant'])->group(function 
     Route::put('/screening-forms/{form}', [MastersController::class, 'updateScreeningForm'])->whereNumber('form');
     Route::post('/screening-forms/{form}/toggle', [MastersController::class, 'toggleScreeningForm'])->whereNumber('form');
     Route::delete('/screening-forms/{form}', [MastersController::class, 'destroyScreeningForm'])->whereNumber('form');
+    Route::post('/catalog/review-screening-question', [MastersController::class, 'reviewScreeningQuestion']);
+    Route::post('/catalog/review-preparation', [MastersController::class, 'reviewPreparationInstructions']);
     Route::post('/report-templates', [MastersController::class, 'storeReportTemplate']);
     Route::put('/report-templates/{template}', [MastersController::class, 'updateReportTemplate'])->whereNumber('template');
     Route::delete('/report-templates/{template}', [MastersController::class, 'destroyReportTemplate'])->whereNumber('template');

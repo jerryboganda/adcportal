@@ -16,6 +16,7 @@ use App\Models\User;
 use App\Models\Business;
 use App\Models\UsageCounter;
 use App\Services\EntitlementService;
+use App\Services\ScreeningTriageService;
 use App\Services\StudyWorkflowService;
 use App\Support\BookingMoney;
 use Illuminate\Http\JsonResponse;
@@ -33,10 +34,12 @@ use Illuminate\Validation\ValidationException;
 class StudyController extends BaseApiController
 {
     private StudyWorkflowService $workflow;
+    private ScreeningTriageService $triage;
 
-    public function __construct(StudyWorkflowService $workflow)
+    public function __construct(StudyWorkflowService $workflow, ScreeningTriageService $triage)
     {
         $this->workflow = $workflow;
+        $this->triage = $triage;
     }
 
     // ==================== listing ====================
@@ -549,11 +552,56 @@ class StudyController extends BaseApiController
             ])->save();
         });
 
+        // AI screening triage (TypeSafe System One / Jev, advisory only).
+        // Runs AFTER the deterministic gate is recorded and can never change
+        // it; a failure here must not fail the screening submission.
+        try {
+            $this->triage->evaluateAndStore($appointment);
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::warning('Screening triage failed after submission', [
+                'appointment_id' => $appointment->id,
+                'error' => $e->getMessage(),
+            ]);
+        }
+
         $this->audit('screening_submitted', $appointment, [
             'summary' => "Safety screening recorded for #{$appointment->token_number} ({$appointment->patientDisplayName()}).",
         ]);
 
         return $this->ok(['study' => ApiShape::appointment($appointment->fresh(self::eager()))]);
+    }
+
+    /**
+     * Re-run the AI screening triage (e.g. after the clinician adjusts a
+     * risky answer or records an override). Same advisory contract as the
+     * automatic run at submission: it can never change the deterministic
+     * clearance gate.
+     */
+    public function rerunTriage(Request $request, Appointment $appointment): JsonResponse
+    {
+        $this->denyUnless('study screen');
+
+        if ($appointment->business_id !== $this->tenantId()) {
+            abort(404);
+        }
+
+        if ($appointment->screeningAnswers()->count() === 0) {
+            throw ValidationException::withMessages([
+                'answers' => 'No screening answers recorded for this study yet.',
+            ]);
+        }
+        $result = $this->triage->evaluateAndStore($appointment);
+
+        $this->audit('screening_triage_rerun', $appointment, [
+            'summary' => "AI screening triage re-run for #{$appointment->token_number}.",
+            'decision' => $result['decision'] ?? null,
+            'degraded' => $result === null,
+        ]);
+
+        return $this->ok([
+            'triage' => $result,
+            'study' => ApiShape::appointment($appointment->fresh(self::eager())),
+        ]);
     }
 
     // ==================== shared eager map ====================

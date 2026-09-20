@@ -173,6 +173,7 @@ export const DoctorNetworkView: React.FC<DoctorNetworkViewProps> = ({
         specialty: docSpecialty,
         phone: docPhone,
         email: docEmail,
+        isActive: true,
       });
     }
     setDoctorModalOpen(false);

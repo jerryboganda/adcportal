@@ -91,6 +91,7 @@ final class PermissionCatalog
             'invoice create' => ['label' => 'Create invoices', 'group' => 'Billing', 'dangerous' => false, 'implies' => ['invoice manage']],
             'invoice edit' => ['label' => 'Edit invoices & add line items', 'group' => 'Billing', 'dangerous' => false, 'implies' => ['invoice manage']],
             'invoice payment' => ['label' => 'Collect payments', 'group' => 'Billing', 'dangerous' => false, 'implies' => ['invoice manage']],
+            'invoice refund' => ['label' => 'Issue refunds against collected payments', 'group' => 'Billing', 'dangerous' => true, 'implies' => ['invoice manage']],
             'invoice delete' => ['label' => 'Void invoices', 'group' => 'Billing', 'dangerous' => true, 'implies' => ['invoice manage']],
             'payment method manage' => ['label' => 'View payment methods', 'group' => 'Billing', 'dangerous' => false, 'implies' => []],
             'payment method create' => ['label' => 'Create payment methods', 'group' => 'Billing', 'dangerous' => false, 'implies' => ['payment method manage']],
@@ -208,7 +209,7 @@ final class PermissionCatalog
             ],
             'billing' => [
                 'billing view', 'queue view',
-                'invoice manage', 'invoice create', 'invoice edit', 'invoice delete', 'invoice payment',
+                'invoice manage', 'invoice create', 'invoice edit', 'invoice delete', 'invoice payment', 'invoice refund',
                 'customer manage', 'customer create', 'customer edit',
             ],
         ];

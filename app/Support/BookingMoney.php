@@ -2,6 +2,8 @@
 
 namespace App\Support;
 
+use InvalidArgumentException;
+
 /**
  * Booking financials: the ONE place where price/discount/payable/balance are
  * defined, shared by the booking API (validation + settlement) and covered by
@@ -40,6 +42,49 @@ final class BookingMoney
     public static function fromMinor(int $minor): float
     {
         return round($minor / self::MINOR_UNITS_PER_UNIT, 2);
+    }
+
+    public static function decimalToMinor(?string $amount, int $precision = 2): ?int
+    {
+        if ($precision < 0 || $precision > 4) {
+            throw new InvalidArgumentException('Unsupported minor-unit precision.');
+        }
+        if ($amount === null) {
+            return null;
+        }
+        if (! preg_match('/\A(-?)([0-9]+)(?:\.([0-9]+))?\z/D', $amount, $parts)) {
+            throw new InvalidArgumentException('Money must be a decimal value.');
+        }
+
+        $fraction = $parts[3] ?? '';
+        if (strlen($fraction) > $precision && trim(substr($fraction, $precision), '0') !== '') {
+            throw new InvalidArgumentException('Money exceeds the currency minor-unit precision.');
+        }
+        $digits = ltrim($parts[2].str_pad(substr($fraction, 0, $precision), $precision, '0'), '0');
+        $limit = '9007199254740991';
+        if (strlen($digits) > strlen($limit) || (strlen($digits) === strlen($limit) && strcmp($digits, $limit) > 0)) {
+            throw new InvalidArgumentException('Money exceeds the safe integer limit.');
+        }
+
+        return ($parts[1] === '-' ? -1 : 1) * (int) $digits;
+    }
+
+    public static function minorToDecimal(?int $minor, int $precision = 2): ?string
+    {
+        if ($precision < 0 || $precision > 4) {
+            throw new InvalidArgumentException('Unsupported minor-unit precision.');
+        }
+        if ($minor === null) {
+            return null;
+        }
+        if ($minor < -9007199254740991 || $minor > 9007199254740991) {
+            throw new InvalidArgumentException('Money exceeds the safe integer limit.');
+        }
+
+        $digits = str_pad((string) abs($minor), $precision + 1, '0', STR_PAD_LEFT);
+        $sign = $minor < 0 ? '-' : '';
+
+        return $sign.($precision === 0 ? $digits : substr($digits, 0, -$precision).'.'.substr($digits, -$precision));
     }
 
     /** Final payable: price minus discount, floored at zero. */
