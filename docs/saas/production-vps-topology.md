@@ -7,7 +7,7 @@
 ## Architecture
 
 ```
-Cloudflare (DNS ris.polytronx.com → 185.252.233.186)
+Cloudflare (DNS ris.polytronx.com → VPS origin)
   └─ nginx-proxy-manager  (shared reverse proxy for all polytronx.com sites)
        │   proxy_host 46 → http://adc-portal-app:80
        │   TLS: Let's Encrypt cert #48, expires 2026-12-16 (auto-renew)

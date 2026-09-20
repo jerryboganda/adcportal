@@ -46,7 +46,7 @@ mistake: `php artisan ris:purge-demo --force`.
 
 ## Production deployment
 
-Deployed to the production VPS (ris.polytronx.com, 185.252.233.186) via GitHub
+Deployed to the production VPS (serving ris.polytronx.com) via GitHub
 Actions: CI publishes the GHCR image and the deploy job pulls it on the server
 (`docker compose pull app && docker compose up -d app`).
 See [DEPLOYMENT_GUIDE.md](DEPLOYMENT_GUIDE.md) for the one-time setup.

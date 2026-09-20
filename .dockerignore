@@ -13,3 +13,15 @@
 /uploads
 bootstrap/cache/*
 docker-compose.override.yml
+
+# Internal operations material. The image is what the public registry
+# distributes: it should carry the application, not the infrastructure
+# runbook (server topology, tunnel mechanics, deploy scripts). None of it
+# is referenced at runtime.
+/docs
+/scripts
+/.github
+AGENTS.md
+CLAUDE.md
+DEPLOYMENT_GUIDE.md
+README.md

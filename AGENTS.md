@@ -8,7 +8,7 @@ exposing `/api/v1` (Sanctum cookie sessions) + **React/Vite SPA frontend**.
 ## HARD ENFORCED RULE — Compute Placement (do not violate)
 
 - **ALL heavy compute runs in GitHub Actions, never on the production server
-  (ris.polytronx.com on VPS 185.252.233.186) and never on local dev machines**
+  (ris.polytronx.com on the production VPS) and never on local dev machines**
   unless a human explicitly approves a strict technical requirement.
   - PHP feature tests, SPA typecheck/build, E2E (Playwright) → `.github/workflows/ci.yml`.
   - `composer install`, `npm ci`, `npm run build`, data processing → CI only.
@@ -65,7 +65,7 @@ exposing `/api/v1` (Sanctum cookie sessions) + **React/Vite SPA frontend**.
 
 ## Deployment & Data Safety
 
-- Target: **production VPS 185.252.233.186** (`ris.polytronx.com`): the GHCR
+- Target: **the production VPS** (`ris.polytronx.com`): the GHCR
   image (`ghcr.io/jerryboganda/adcportal:latest`) runs under Docker Compose at
   `/opt/docker/adc-portal` on the shared Postgres (`platform-postgres`). See
   `DEPLOYMENT_GUIDE.md` for the full runbook.

@@ -339,27 +339,68 @@ jobs:
           chmod 600 ~/.ssh/id_ed25519
           SSH_OPTS=(-o StrictHostKeyChecking=accept-new -o UserKnownHostsFile=/dev/null -p "${PORT:-22}")
 
-          ssh "${SSH_OPTS[@]}" "$USER@$HOST" "APP_PATH=${APP_PATH:-/opt/docker/adc-portal} GHCR_USER=${GHCR_USER} GHCR_TOKEN=${GHCR_TOKEN}" 'bash -se' <<'REMOTE'
+          ssh "${SSH_OPTS[@]}" "$USER@$HOST" "APP_PATH=${APP_PATH:-/opt/docker/adc-portal} GHCR_USER=${GHCR_USER} GHCR_TOKEN=${GHCR_TOKEN} IMAGE_TAG=${GITHUB_SHA}" 'bash -se' <<'REMOTE'
             set -e
             cd "${APP_PATH}"
 
-            # The GHCR package is PRIVATE: a stored long-lived VPS credential
-            # can lapse and break every future deploy. Authenticate each pull
-            # with the short-lived workflow token instead — delivered through
-            # the SSH env (never a CLI flag or the remote process list) and
-            # consumed via --password-stdin (never echoed or logged). The
-            # stored login is refreshed for this pull and then cleared.
+            # Deploy the EXACT image this run built and tested (tag = commit
+            # SHA), never the floating :latest — a publish that failed or
+            # raced CI would otherwise redeploy an OLD image while the
+            # pipeline reports green. The manifest check fails BEFORE the
+            # running app is touched.
+            IMAGE="ghcr.io/jerryboganda/adcportal:${IMAGE_TAG}"
+
+            # A stored long-lived VPS credential can lapse and break every
+            # future deploy. Authenticate each pull with the short-lived
+            # workflow token — delivered through the SSH env (never a CLI
+            # flag or the remote process list) and consumed via
+            # --password-stdin (never echoed or logged), then cleared.
             printf '%s' "$GHCR_TOKEN" | docker login ghcr.io --username "$GHCR_USER" --password-stdin
             trap 'docker logout ghcr.io >/dev/null 2>&1 || true' EXIT
 
-            # The GHCR 'latest' image for this commit was published by the
-            # publish workflow; pull it, recreate the app container and let
-            # the entrypoint apply pending migrations + refresh caches.
-            docker compose pull app
+            # Publish is a separate workflow that races this one on push;
+            # retry ~2 min before concluding the image is truly missing.
+            ok=""
+            for i in 1 2 3 4 5 6; do
+              if docker manifest inspect "$IMAGE" >/dev/null 2>&1; then ok=1; break; fi
+              sleep 20
+            done
+            if [ -z "$ok" ]; then
+              echo "::error::Image $IMAGE not in registry — publish failed or raced CI; refusing to redeploy a stale :latest."
+              exit 1
+            fi
+
+            # Pull the pinned image, retag it locally as :latest so the
+            # existing compose file keeps working unchanged, then recreate.
+            # The entrypoint applies pending migrations + refreshes caches.
+            docker pull "$IMAGE"
+            docker tag "$IMAGE" ghcr.io/jerryboganda/adcportal:latest
             docker compose up -d app
 
             sleep 20
             docker logs adc-portal-app --since 2m 2>&1 | grep -iE 'migrat|error' | tail -8 || true
-            curl -fsS http://127.0.0.1:8090/api/v1/health || true
+
+            # ---- post-deploy smoke checks (failure fails the deploy) ----
+            fail() { echo "::error::POST-DEPLOY SMOKE FAILED: $1"; exit 1; }
+
+            # 1. Application health from the VPS itself (no public DNS).
+            curl -fsS http://127.0.0.1:8090/api/v1/health | grep -q '"db":"ok"' \
+              || fail "health endpoint missing or database check failed"
+
+            # 2. Reporting routes exist and stay auth-gated (401, not 404).
+            for path in /api/v1/reporting/worklist /api/v1/reporting/preferences; do
+              code=$(curl -s -o /dev/null -w '%{http_code}' "http://127.0.0.1:8090${path}")
+              [ "$code" = "401" ] || fail "${path} answered ${code} (expected 401 — route missing or unguarded)"
+            done
+
+            # 3. The running container is the image this deploy shipped.
+            running=$(docker inspect adc-portal-app --format '{{.Image}}')
+            shipped=$(docker inspect "$IMAGE" --format '{{.Id}}')
+            [ "$running" = "$shipped" ] || fail "running container is not the deployed image"
+
+            # 4. Public URL through Cloudflare (soft: transient CF issues
+            #    must not fail a deploy whose local checks passed).
+            curl -fsS --max-time 15 https://ris.polytronx.com/api/v1/health >/dev/null \
+              || echo "::warning::public health check soft-failed — local checks passed; investigate if it persists"
             echo DEPLOY_DONE
           REMOTE

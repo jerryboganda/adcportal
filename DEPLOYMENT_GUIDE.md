@@ -2,12 +2,12 @@
 
 Architecture: **Laravel 11 (PHP 8.4) + PostgreSQL 17 + React/Vite SPA**, shipped
 as a single Docker image (`ghcr.io/jerryboganda/adcportal:latest`) running on
-the production VPS **185.252.233.186** at **https://ris.polytronx.com**
-(Cloudflare DNS → VPS). All heavy compute stays in **GitHub Actions**; the
+the production VPS at **https://ris.polytronx.com**
+(Cloudflare DNS → VPS origin). All heavy compute stays in **GitHub Actions**; the
 server only pulls the published image and serves the live app.
 
 ```
-Browser ──> Cloudflare ──> VPS 185.252.233.186
+Browser ──> Cloudflare ──> VPS origin
                              |-- nginx-proxy-manager (TLS, ris.polytronx.com)
                              |-- adc-portal-app   (GHCR image, Apache + PHP 8.4)
                              |     |-- /api/v1/*  -> Laravel API (Sanctum cookies)
@@ -46,7 +46,7 @@ Browser ──> Cloudflare ──> VPS 185.252.233.186
 
 | Secret | Value |
 |---|---|
-| `VPS_SSH_HOST` | `185.252.233.186` |
+| `VPS_SSH_HOST` | the origin VPS address — kept out of this public repo, stored only as a repository secret |
 | `VPS_SSH_USER` | `root` |
 | `VPS_SSH_PORT` | `22` |
 | `VPS_SSH_KEY` | private SSH key allowed to log in as `root` |
