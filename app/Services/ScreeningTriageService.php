@@ -46,7 +46,11 @@ class ScreeningTriageService
      */
     public function evaluateAndStore(Appointment $appointment): ?array
     {
-        if (! config('ris.typesafe.enabled')) {
+        // Zero queries when the AI layer is off: both the feature flag and the
+        // key are checked BEFORE any database access, so a clinic running with
+        // triage disabled (and every CI run with the empty test key) pays
+        // nothing for the hook.
+        if (! config('ris.typesafe.enabled') || ! $this->typesafe->enabled()) {
             return null;
         }
 

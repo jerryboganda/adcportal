@@ -171,7 +171,7 @@ class AccessControlApiTest extends ApiTestCase
 
         $roleId = $this->systemRoleId($this->adminA, 'billing');
         $remaining = collect(PermissionCatalog::defaultBundles()['billing'])
-            ->reject(fn ($p) => in_array($p, ['invoice manage', 'invoice create', 'invoice edit', 'invoice delete', 'invoice payment', 'billing view', 'customer manage', 'customer create', 'customer edit'], true))
+            ->reject(fn ($p) => in_array($p, ['invoice manage', 'invoice create', 'invoice edit', 'invoice delete', 'invoice payment', 'invoice refund', 'billing view', 'customer manage', 'customer create', 'customer edit'], true))
             ->values()
             ->all();
 
