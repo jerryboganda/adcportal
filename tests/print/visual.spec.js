@@ -26,25 +26,55 @@ import { join } from 'node:path';
 
 const EMAIL = process.env.E2E_EMAIL ?? 'admin@polytronx-e2e.test';
 const PASSWORD = process.env.E2E_PASSWORD ?? 'E2eDemo#2026';
-const BASE_URL = process.env.E2E_BASE_URL ?? 'http://127.0.0.1:8000';
 
 /**
- * The API is guarded by Sanctum's stateful (cookie) session, and that guard only
- * applies to requests whose Origin/Referer is a stateful domain. The SPA is
- * served from the same origin, so it never has to think about this — a test
- * driving the API directly must send those headers explicitly, or every request
- * is judged anonymous and answered 401.
+ * Requests are made FROM THE PAGE, not from the test runner.
+ *
+ * The API is behind Sanctum's stateful (cookie) guard, which only treats a
+ * request as authenticated when it arrives like the application's own calls do
+ * (same origin, cookie, XSRF token on writes). A request made from the runner
+ * process has to reproduce all of that by hand, and getting it subtly wrong
+ * reads as "the route is broken" — an afternoon spent debugging the test rather
+ * than the product. Driving `fetch` inside the page is what the SPA does, so it
+ * is the most faithful client available and cannot drift from the app.
  */
-function stateful(options = {}) {
-    return {
-        ...options,
-        headers: {
-            Accept: 'application/json',
-            Origin: BASE_URL,
-            Referer: `${BASE_URL}/`,
-            ...(options.headers ?? {}),
-        },
-    };
+/** GET JSON through the page's own session. */
+async function jsonFromPage(page, path) {
+    const result = await page.evaluate(async (target) => {
+        const response = await fetch(target, {
+            credentials: 'same-origin',
+            headers: { Accept: 'application/json' },
+        });
+
+        return { status: response.status, body: await response.text() };
+    }, path);
+
+    expect(result.status, `${path} answered ${result.status} — the session or the route is broken`).toBe(200);
+
+    return JSON.parse(result.body).data;
+}
+
+/** GET binary content (a PDF) through the page's own session. */
+async function binaryFromPage(page, path) {
+    const result = await page.evaluate(async (target) => {
+        const response = await fetch(target, { credentials: 'same-origin' });
+        const bytes = new Uint8Array(await response.arrayBuffer());
+        let binary = '';
+
+        // A PDF has to cross the evaluate boundary as text; the head of the file
+        // and its MediaBox are ASCII, so latin1 is lossless for what is asserted.
+        for (let index = 0; index < bytes.length; index += 1) {
+            binary += String.fromCharCode(bytes[index]);
+        }
+
+        return {
+            status: response.status,
+            headers: Object.fromEntries(response.headers.entries()),
+            content: binary,
+        };
+    }, path);
+
+    return { ...result, buffer: Buffer.from(result.content, 'latin1') };
 }
 
 /** 1 mm in CSS pixels (96 dpi) and in PDF points. */
@@ -63,13 +93,7 @@ async function login(page) {
 
 /** GET a JSON API path with the session cookie, failing with the status. */
 async function api(page, path) {
-    const response = await page.request.get(path, stateful());
-    expect(
-        response.status(),
-        `${path} answered ${response.status()} — the session or the route is broken`,
-    ).toBe(200);
-
-    return (await response.json()).data;
+    return jsonFromPage(page, path);
 }
 
 /**
@@ -542,21 +566,21 @@ test.describe('print subsystem', () => {
         ];
 
         for (const fixture of cases) {
-            const response = await page.request.get(
+            const response = await binaryFromPage(
+                page,
                 `/api/v1/print/${fixture.artifact}/${fixture.id}/pdf?paper=${fixture.paper}&download=1`,
-                stateful(),
             );
 
-            expect(response.status(), `${fixture.artifact} PDF status`).toBe(200);
-            expect(response.headers()['content-type']).toContain('application/pdf');
-            expect(response.headers()['x-print-paper']).toBe(fixture.paper);
+            expect(response.status, `${fixture.artifact} PDF status`).toBe(200);
+            expect(response.headers['content-type']).toContain('application/pdf');
+            expect(response.headers['x-print-paper']).toBe(fixture.paper);
 
-            const driver = response.headers()['x-print-driver'];
+            const driver = response.headers['x-print-driver'];
             expect(driver, `${fixture.artifact} did not report its engine`).toBeTruthy();
-            const fallback = response.headers()['x-print-fallback'];
+            const fallback = response.headers['x-print-fallback'];
             drivers.push(`${fixture.artifact}:${driver}${fallback ? ` (fell back: ${fallback})` : ''}`);
 
-            const buffer = await response.body();
+            const buffer = response.buffer;
             const box = mediaBox(buffer);
 
             // The PDF's own page box is the physical paper — a receipt cannot be
@@ -694,7 +718,7 @@ test.describe('print subsystem', () => {
         for (let round = 0; round < 2; round += 1) {
             await api(page, `/api/v1/print/invoice/${invoice.id}`);
             await api(page, `/api/v1/print/invoice/${invoice.id}?reprint=1`);
-            await page.request.get(`/api/v1/print/invoice/${invoice.id}/pdf?paper=a4`, stateful());
+            await binaryFromPage(page, `/api/v1/print/invoice/${invoice.id}/pdf?paper=a4`);
 
             const event = await mutate(page, 'POST', `/api/v1/print/invoice/${invoice.id}/events`, {
                 event: round === 0 ? 'printed' : 'reprinted',
@@ -713,30 +737,35 @@ test.describe('print subsystem', () => {
         expect(reprint.document.marks.map((mark) => mark.code)).toContain('REPRINT');
     });
 
-    test('an anonymous browser can neither read nor render a print document', async ({ page, playwright }) => {
+    test('an anonymous browser can neither read nor render a print document', async ({ page, browser }) => {
         await login(page);
         const invoice = await invoiceFixture(page);
 
-        // A fresh context with no session: the print payload and the PDF of
-        // record must both be closed, and a document must not be reachable by
-        // guessing an id.
-        const anonymous = await playwright.request.newContext({
-            baseURL: BASE_URL,
-            extraHTTPHeaders: { Accept: 'application/json', Origin: BASE_URL, Referer: `${BASE_URL}/` },
-        });
+        // A real second browser with no session at all: the print payload, the
+        // PDF of record, the registry and the settings endpoint must all be
+        // closed, and a document must not be reachable by guessing an id.
+        const anonymous = await browser.newContext();
 
         try {
+            const stranger = await anonymous.newPage();
+            await stranger.goto('/');
+
             for (const path of [
+                '/api/v1/print/registry',
+                '/api/v1/settings/printing',
                 `/api/v1/print/invoice/${invoice.id}`,
                 `/api/v1/print/invoice/${invoice.id}/pdf`,
-                `/api/v1/print/registry`,
-                '/api/v1/settings/printing',
+                '/api/v1/print/report/1',
             ]) {
-                const response = await anonymous.get(path);
-                expect(response.status(), `${path} must be closed to an anonymous browser`).toBe(401);
+                const status = await stranger.evaluate(
+                    async (target) => (await fetch(target, { credentials: 'same-origin' })).status,
+                    path,
+                );
+
+                expect(status, `${path} must be closed to an anonymous browser`).toBe(401);
             }
         } finally {
-            await anonymous.dispose();
+            await anonymous.close();
         }
     });
 });

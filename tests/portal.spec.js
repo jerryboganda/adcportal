@@ -464,15 +464,23 @@ test('radiologist creates, autosaves, signs and prints an external report', asyn
     await expect(page.getByTestId('report-impression')).toHaveValue(/E2E IMPRESSION/);
 
     // ---- print preview renders the filed document -----------------------
+    // The proof print is the print SUBSYSTEM's document (the same payload the
+    // PDF is rendered from), not a private copy of the report layout: it is
+    // portalled to <body> and announces its own readiness.
     await page.getByTestId('report-print').click();
-    const sheet = page.getByTestId('report-print-sheet');
-    await expect(sheet).toBeVisible({ timeout: 15000 });
-    await expect(sheet).toContainText('Radiology Report');
+    const printHost = page.locator('body > .pd-print-host');
+    await expect(printHost).toBeVisible({ timeout: 20000 });
+    await expect(printHost).toHaveAttribute('data-print-ready', 'true');
+    await expect(printHost).toHaveAttribute('data-print-artifact', 'report');
+
+    const sheet = page.locator('.pd-doc');
+    await expect(sheet).toContainText('DRAFT REPORT');
     await expect(sheet).toContainText(patientName);
     await expect(sheet).toContainText('E2E IMPRESSION');
     // An unsigned working copy is never presented as a filed report.
     await expect(sheet).toContainText('DRAFT');
     await page.locator('button[aria-label="Close print preview"]').click();
+    await expect(page.locator('body > .pd-print-host')).toHaveCount(0);
 
     // ---- finalize (explicit human sign-off) -----------------------------
     await page.getByTestId('report-finalize').click();

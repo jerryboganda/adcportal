@@ -204,6 +204,20 @@ export const ReportingView: React.FC<ReportingViewProps> = ({
   const canBrowseTemplates = canAny(permissions, ['report template manage', 'report create', 'report edit']);
 
   const [tab, setTab] = useState<ReportingTab>('unreported');
+
+  /**
+   * Has the radiologist chosen a tab themselves?
+   *
+   * The stored default tab arrives with the preferences request, which resolves
+   * asynchronously — so without this flag a click made while that request is in
+   * flight is silently undone a moment later ("the tab jumps back"). Applying a
+   * stored default is a first-paint concern; it must never override a human.
+   */
+  const tabChosenByUser = useRef(false);
+  const chooseTab = useCallback((next: ReportingTab) => {
+    tabChosenByUser.current = true;
+    setTab(next);
+  }, []);
   const [filters, setFilters] = useState<WorklistFilters>(emptyWorklistFilters);
   const [page, setPage] = useState(1);
   const [studies, setStudies] = useState<WorklistStudy[]>([]);
@@ -302,7 +316,10 @@ export const ReportingView: React.FC<ReportingViewProps> = ({
 
         setPreferences(result.preferences);
         writeCache(PREFERENCES_CACHE_KEY, result.preferences);
-        setTab(result.preferences.defaultTab);
+
+        if (!tabChosenByUser.current) {
+          setTab(result.preferences.defaultTab);
+        }
 
         const views = result.views.map(toWorklistView);
         setSavedViews(views);
@@ -670,7 +687,7 @@ export const ReportingView: React.FC<ReportingViewProps> = ({
             canAssignSelf={canAuthor}
             canReassign={canReassign}
             onTabChange={next => {
-              setTab(next);
+              chooseTab(next);
               setPage(1);
             }}
             onFiltersChange={next => {
