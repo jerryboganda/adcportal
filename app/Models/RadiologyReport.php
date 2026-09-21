@@ -4,7 +4,6 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
-use Barryvdh\DomPDF\Facade\Pdf as PdfFacade;
 
 class RadiologyReport extends Model
 {
@@ -110,24 +109,47 @@ class RadiologyReport extends Model
         return \Illuminate\Support\Str::limit($text, $length);
     }
 
+    /**
+     * The report PDF, rendered by the shared print pipeline.
+     *
+     * `storePdf()` keeps its original path semantics (the patient portal serves
+     * `pdf_path` directly), but the bytes now come from the ONE print document
+     * model and layout. Which engine painted them — headless Chromium when the
+     * deployment has it, DomPDF otherwise — is recorded on the archive row
+     * rather than assumed.
+     */
     public function renderPdf(): string
     {
-        $pdf = PdfFacade::loadView('reports.pdf', ['report' => $this->loadMissing(['appointment.ServiceData', 'author'])])
-            ->setPaper('a4');
+        $service = app(\App\Services\Print\PrintPdfService::class);
+        $document = $service->documentFor('report', $this);
+        $rendered = $service->render($document);
 
-        return $pdf->output();
+        return $rendered['bytes'];
     }
 
     public function storePdf(): string
     {
+        // A signed report is frozen: the stored file IS the document of record
+        // and is never regenerated from today's branding.
         if ($this->pdf_path && \Storage::disk('public')->exists($this->pdf_path)) {
             return $this->pdf_path;
         }
 
         $path = "radiology_reports/{$this->appointment_id}/report_v{$this->version}_{$this->id}.pdf";
-        \Storage::disk('public')->put($path, $this->renderPdf());
+        $service = app(\App\Services\Print\PrintPdfService::class);
+        $document = $service->documentFor('report', $this);
+        $rendered = $service->render($document);
+
+        \Storage::disk('public')->put($path, $rendered['bytes']);
 
         $this->forceFill(['pdf_path' => $path])->save();
+
+        $service->store((int) $this->business_id, $document, [
+            'finalized' => $this->isSigned(),
+            'force' => true,
+            'path' => $path,
+            'rendered' => $rendered,
+        ]);
 
         return $path;
     }

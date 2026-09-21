@@ -27,7 +27,8 @@ import {
   Clock,
   Sparkles,
   Info,
-  Paintbrush
+  Paintbrush,
+  Printer
 } from 'lucide-react';
 import {
   StaffUser,
@@ -41,6 +42,7 @@ import {
 import { SessionUser } from '../services/apiService';
 import { allowedSettingsSections, canAny } from '../services/permissions';
 import { AccessManager } from './access/AccessManager';
+import { PrintSettingsPanel } from './PrintSettingsPanel';
 
 interface SettingsViewProps {
   currentUser: SessionUser;
@@ -72,7 +74,7 @@ interface SettingsViewProps {
   onLoadBrandingView: () => void;
 }
 
-type SettingsSection = 'users' | 'clinic' | 'branding' | 'dicom' | 'notifications' | 'audit' | 'database';
+type SettingsSection = 'users' | 'clinic' | 'branding' | 'dicom' | 'notifications' | 'printing' | 'audit' | 'database';
 
 
 /**
@@ -461,6 +463,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
             { id: 'branding', label: 'Branding (view only)', icon: Paintbrush, module: ['setting manage'] },
             { id: 'dicom', label: 'PACS & DICOM Nodes', icon: Server, count: dicomNodes.length, module: ['setting manage'] },
             { id: 'notifications', label: 'SMS & WhatsApp Gateway', icon: Bell, count: notificationTemplates.length, module: ['setting manage'] },
+            { id: 'printing', label: 'Printing & Documents', icon: Printer, module: ['print settings manage', 'setting manage'] },
             { id: 'audit', label: 'System Audit Logs', icon: History, count: auditLogs.length, module: ['user logs history'] },
             { id: 'database', label: 'Data & Maintenance', icon: Database, module: ['setting manage'] },
           ].filter(tab => allowedSections.includes(tab.id as SettingsSection)).map(tab => {
@@ -891,6 +894,8 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
       )}
 
       {/* SECTION 3: PACS & DICOM NODES */}
+      {activeSection === 'printing' && <PrintSettingsPanel />}
+
       {activeSection === 'branding' && <BrandingPanel view={brandingView} />}
 
       {activeSection === 'dicom' && (

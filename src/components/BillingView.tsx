@@ -27,10 +27,9 @@ import {
 } from 'lucide-react';
 import { Invoice, Appointment, Patient, InvoiceItem, InvoicePayment, ClinicProfileSettings, PaymentMethod, ShiftSummary, ShiftReview } from '../types';
 import { canAny } from '../services/permissions';
-import { generateShiftClosingPdf, ShiftClosingData } from '../utils/pdfGenerator';
+
 import { invoicePdfUrl, fetchShiftSummary, requestShiftReview } from '../services/apiService';
-import { PrintableInvoiceModal } from './PrintableInvoiceModal';
-import { Barcode } from './Barcode';
+import { openPrintPreview } from '../print/printDocument';
 
 interface BillingViewProps {
   invoices: Invoice[];
@@ -92,12 +91,6 @@ export const BillingView: React.FC<BillingViewProps> = ({
   const [payMethod, setPayMethod] = useState<string>('');
   const [payRef, setPayRef] = useState('');
   const [cashTendered, setCashTendered] = useState<number>(0);
-
-  // Full A4 Clean Printable Invoice Modal
-  const [printableInvoice, setPrintableInvoice] = useState<Invoice | null>(null);
-
-  // Thermal Slip Modal
-  const [thermalReceiptInvoice, setThermalReceiptInvoice] = useState<Invoice | null>(null);
 
   // History Ledger Modal
   const [historyInvoice, setHistoryInvoice] = useState<Invoice | null>(null);
@@ -297,6 +290,10 @@ export const BillingView: React.FC<BillingViewProps> = ({
   const canCollectPayment = canAny(permissions, ['invoice payment']);
   const canVoidInvoicePerm = canAny(permissions, ['invoice delete']);
   const canRefundPayment = canAny(permissions, ['invoice refund']);
+  // Printing is its own grant: a cashier may collect money without being able to
+  // reproduce a financial document, and vice versa.
+  const canPrintInvoice = canAny(permissions, ['invoice print']);
+  const canPrintReceipt = canAny(permissions, ['receipt print']);
 
   // Eligible appointments for invoicing
   const existingInvoicedAptIds = new Set(invoices.map(i => i.appointmentId));
@@ -364,13 +361,20 @@ export const BillingView: React.FC<BillingViewProps> = ({
       .finally(() => setSubmittingRefund(false));
   };
 
-  const handleOpenThermalReceipt = (inv: Invoice) => {
-    setThermalReceiptInvoice(inv);
-  };
-
-  const handlePrintReceipt = () => {
-    window.print();
-  };
+  /*
+   * Printing goes through the print engine — one preview surface for every
+   * document, one paper profile decided by the artifact registry. The thermal
+   * slip and the A4 invoice are the SAME invoice document on two papers; the
+   * operator switches format inside the preview instead of choosing between two
+   * separately maintained designs.
+   */
+  const openInvoiceDocument = (inv: Invoice, paper: 'a4' | 'thermal80') =>
+    void openPrintPreview({
+      artifact: paper === 'a4' ? 'invoice' : 'receipt',
+      id: inv.id,
+      paper,
+      options: { reprint: inv.status === 'paid' },
+    });
 
   const submitNewInvoice = () => {
     if (!selectedAptId || submittingCreate) return;
@@ -487,39 +491,29 @@ export const BillingView: React.FC<BillingViewProps> = ({
     document.body.removeChild(link);
   };
 
-  const handleGenerateShiftClosingPdf = () => {
-    // Real cash-window: the first cash payment received today, not an assumed
-    // opening time — the settlement sheet must only state facts.
-    const firstCashToday = todayPayments
-      .filter(p => p.method === 'cash' && (p.kind ?? 'payment') === 'payment')
-      .map(p => (p.paidAtIso ? new Date(p.paidAtIso) : new Date(p.paidAt)))
-      .filter(d => !isNaN(d.getTime()))
-      .sort((a, b) => a.getTime() - b.getTime())[0];
-    const shiftData: ShiftClosingData = {
-      shiftDate: new Date().toISOString().split('T')[0],
-      shiftName,
-      cashierName: shiftCashier,
-      openedAt: firstCashToday
-        ? firstCashToday.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-        : 'No cash collected today',
-      closedAt: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      // SHIFT figures (today's ledger), never all-time sums.
-      invoicesCount: shiftInvoiceCount,
-      totalInvoiced: todayInvoiced,
-      totalCollected: shiftTotalCollected,
-      totalDiscounts: todayDiscounts,
-      cashCollected: shiftCashExpected,
-      cardCollected: shiftMethodTotal('card'),
-      bankCollected: shiftMethodTotal('bank'),
-      mobileCollected: shiftMethodTotal('mobile'),
-      insuranceCollected: shiftMethodTotal('insurance'),
-      countedCash: physicalCashCounted,
-      discrepancy: cashDiscrepancy,
-      cardSettlementRef: cardBatchRef,
-      notes: shiftNotes,
-      supervisorName,
-    };
-    generateShiftClosingPdf(shiftData);
+  /**
+   * The shift closing statement is a financial document.
+   *
+   * Every figure on it — collections per channel, refunds, the expected drawer —
+   * comes from the server's shift ledger. The ONLY things this screen sends are
+   * the facts only the cashier can know: the drawer she counted and the notes she
+   * hands over with it. The locally assembled `ShiftClosingData` object that used
+   * to be built here (and fed to a client-side jsPDF renderer) was a second,
+   * unverified set of arithmetic that never reached paper anyway.
+   */
+  const handleOpenShiftClosingDocument = () => {
+    void openPrintPreview({
+      artifact: 'shift-closing',
+      id: new Date().toISOString().slice(0, 10),
+      options: {
+        countedCash: physicalCashCounted,
+        supervisor: supervisorName,
+        cashier: shiftCashier,
+        shiftName,
+        notes: shiftNotes,
+      },
+    });
+    setShiftClosingOpen(false);
   };
 
   return (
@@ -856,32 +850,40 @@ export const BillingView: React.FC<BillingViewProps> = ({
                           )}
 
                           {/* Print Standard Clean Invoice */}
-                          <button
-                            onClick={() => setPrintableInvoice(inv)}
-                            title="Print Clean Tax Invoice (A4 / Letter)"
-                            className="px-2 py-1 rounded bg-slate-800 hover:bg-slate-900 text-white font-medium text-[11px] border border-slate-700 transition-all shadow-xs cursor-pointer whitespace-nowrap inline-flex items-center gap-1"
-                          >
-                            <Printer className="w-3 h-3 text-cyan-400" />
-                            <span>Print</span>
-                          </button>
+                          {/* Print the tax invoice (opens the engine preview: A4 by
+                              default, and the 80 mm receipt is one switch away). */}
+                          {canPrintInvoice && (
+                            <button
+                              onClick={() => openInvoiceDocument(inv, 'a4')}
+                              title="Print / preview the tax invoice"
+                              className="px-2 py-1 rounded bg-slate-800 hover:bg-slate-900 text-white font-medium text-[11px] border border-slate-700 transition-all shadow-xs cursor-pointer whitespace-nowrap inline-flex items-center gap-1"
+                            >
+                              <Printer className="w-3 h-3 text-cyan-400" />
+                              <span>Print</span>
+                            </button>
+                          )}
 
-                          {/* Thermal POS Slip (80mm) */}
-                          <button
-                            onClick={() => handleOpenThermalReceipt(inv)}
-                            title="Print 80mm Thermal Receipt"
-                            className="p-1.5 rounded bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 transition-colors cursor-pointer"
-                          >
-                            <Receipt className="w-3.5 h-3.5" />
-                          </button>
+                          {/* Straight to the 80mm counter slip */}
+                          {canPrintReceipt && (
+                            <button
+                              onClick={() => openInvoiceDocument(inv, 'thermal80')}
+                              title="Print 80 mm thermal receipt"
+                              className="p-1.5 rounded bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 transition-colors cursor-pointer"
+                            >
+                              <Receipt className="w-3.5 h-3.5" />
+                            </button>
+                          )}
 
                           {/* Download PDF Invoice — the server-rendered document of record */}
-                          <a
-                            href={invoicePdfUrl(inv.id)}
-                            title="Download Official A4 Tax Invoice (PDF of record)"
-                            className="p-1.5 rounded bg-slate-100 hover:bg-slate-200 text-cyan-700 border border-slate-200 transition-colors cursor-pointer inline-flex"
-                          >
-                            <Download className="w-3.5 h-3.5" />
-                          </a>
+                          {canPrintInvoice && (
+                            <a
+                              href={invoicePdfUrl(inv.id)}
+                              title="Download Official A4 Tax Invoice (PDF of record)"
+                              className="p-1.5 rounded bg-slate-100 hover:bg-slate-200 text-cyan-700 border border-slate-200 transition-colors cursor-pointer inline-flex"
+                            >
+                              <Download className="w-3.5 h-3.5" />
+                            </a>
+                          )}
 
                           {/* Add Item */}
                           {!isVoided && canEditInvoice && onAddInvoiceItem && (
@@ -1372,131 +1374,18 @@ export const BillingView: React.FC<BillingViewProps> = ({
         </div>
       )}
 
-      {/* ------------------------------------------------------------ */}
-      {/* MODAL 3: 80MM THERMAL RECEIPT PREVIEW (PRINT)                */}
-      {/* ------------------------------------------------------------ */}
-      {thermalReceiptInvoice && (
-        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white border border-slate-200 rounded-3xl max-w-sm w-full p-5 shadow-2xl space-y-4 animate-in fade-in zoom-in-95 duration-150">
-            <div className="flex items-center justify-between border-b border-slate-200 pb-2.5">
-              <div className="flex items-center space-x-2">
-                <Printer className="w-4 h-4 text-slate-700" />
-                <h3 className="font-bold text-slate-900 text-sm">80mm POS Thermal Slip Preview</h3>
-              </div>
-              <button
-                onClick={() => setThermalReceiptInvoice(null)}
-                className="p-1 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 cursor-pointer text-xs"
-              >
-                ✕
-              </button>
-            </div>
-
-            {/* Thermal Slip Print View */}
-            <div className="bg-slate-50 border border-dashed border-slate-300 p-4 rounded-xl font-mono text-[11px] text-slate-800 space-y-2 shadow-inner">
-              {/* Slip Header */}
-              <div className="text-center space-y-0.5 border-b border-dashed border-slate-300 pb-2">
-                <div className="font-bold text-xs text-slate-900">{(clinicSettings?.name?.trim() || 'POLYTRONX - RIS').toUpperCase()}</div>
-                {clinicSettings?.headerTagline?.trim() && <div className="text-[10px] text-slate-500">{clinicSettings.headerTagline.trim()}</div>}
-                {(clinicSettings?.city?.trim() || clinicSettings?.phone?.trim()) && (
-                  <div className="text-[9px] text-slate-400">
-                    {[clinicSettings?.city?.trim(), clinicSettings?.phone?.trim() ? `Phone: ${clinicSettings.phone.trim()}` : ''].filter(Boolean).join(' | ')}
-                  </div>
-                )}
-                {clinicSettings?.taxId?.trim() && <div className="text-[9px] text-slate-400">Tax ID: {clinicSettings.taxId.trim()}</div>}
-              </div>
-
-              {/* Patient & Token Info */}
-              <div className="border-b border-dashed border-slate-300 py-1.5 space-y-0.5 text-[10px]">
-                <div className="flex justify-between">
-                  <span>INVOICE #:</span>
-                  <span className="font-bold">{thermalReceiptInvoice.invoiceNumber}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>TOKEN #:</span>
-                  <span className="font-bold text-cyan-700">#{thermalReceiptInvoice.appointmentToken}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>MRN / PATIENT:</span>
-                  <span className="font-bold truncate max-w-[130px]">{thermalReceiptInvoice.patient.name}</span>
-                </div>
-                <div className="flex justify-between text-slate-500">
-                  <span>DATE/TIME:</span>
-                  <span>{thermalReceiptInvoice.createdAtFull ?? thermalReceiptInvoice.createdAt}</span>
-                </div>
-              </div>
-
-              {/* Items List */}
-              <div className="border-b border-dashed border-slate-300 py-1.5 space-y-1 text-[10px]">
-                {thermalReceiptInvoice.items.map((it, idx) => (
-                  <div key={idx} className="flex justify-between">
-                    <span className="truncate max-w-[150px]">{it.description}</span>
-                    <span className="font-bold">Rs. {it.lineTotal.toLocaleString()}</span>
-                  </div>
-                ))}
-              </div>
-
-              {/* Totals */}
-              <div className="py-1 space-y-0.5 text-[11px]">
-                <div className="flex justify-between">
-                  <span>SUBTOTAL:</span>
-                  <span>Rs. {thermalReceiptInvoice.subtotal.toLocaleString()}</span>
-                </div>
-                {thermalReceiptInvoice.discountTotal > 0 && (
-                  <div className="flex justify-between text-emerald-700">
-                    <span>DISCOUNT:</span>
-                    <span>-Rs. {thermalReceiptInvoice.discountTotal.toLocaleString()}</span>
-                  </div>
-                )}
-                <div className="flex justify-between font-bold text-slate-900 text-xs pt-1 border-t border-slate-300">
-                  <span>TOTAL AMOUNT:</span>
-                  <span>Rs. {thermalReceiptInvoice.total.toLocaleString()}</span>
-                </div>
-                <div className="flex justify-between font-bold text-emerald-700">
-                  <span>PAID TOTAL:</span>
-                  <span>Rs. {thermalReceiptInvoice.paidTotal.toLocaleString()}</span>
-                </div>
-                {thermalReceiptInvoice.balanceDue > 0 ? (
-                  <div className="flex justify-between font-bold text-amber-700">
-                    <span>BALANCE DUE:</span>
-                    <span>Rs. {thermalReceiptInvoice.balanceDue.toLocaleString()}</span>
-                  </div>
-                ) : (
-                  <div className="text-center font-bold text-emerald-700 py-0.5 text-[10px] bg-emerald-50 rounded">
-                    *** PAID IN FULL ***
-                  </div>
-                )}
-              </div>
-
-              {/* Scannable Code128 barcode of the invoice number */}
-              <div className="text-center pt-2 border-t border-dashed border-slate-300 space-y-1 flex justify-center">
-                <Barcode value={thermalReceiptInvoice.invoiceNumber} height={34} width={1} />
-              </div>
-              <div className="text-[9px] text-slate-400 font-sans text-center">
-                Keep receipt for report dispatch. Reports available on portal with MRN.
-              </div>
-            </div>
-
-            <div className="flex space-x-2 pt-1">
-              <button
-                onClick={() => setThermalReceiptInvoice(null)}
-                className="flex-1 px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-xs border border-slate-300 cursor-pointer"
-              >
-                Close
-              </button>
-              <button
-                onClick={handlePrintReceipt}
-                className="flex-1 flex items-center justify-center space-x-1.5 px-3 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs cursor-pointer shadow-md"
-              >
-                <Printer className="w-3.5 h-3.5" />
-                <span>Print Slip</span>
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ------------------------------------------------------------ */}
-      {/* MODAL 4: ADD EXTRA BILLABLE ITEM / CONSUMABLE                 */}
+      {/*
+        * The 80 mm thermal slip and the print-ready tax invoice used to be two
+        * hand-built modals here, each with its own clinic header, its own money
+        * formatting and its own `window.print()` — and both printed blank
+        * because the global print stylesheet hid everything outside one overlay.
+        *
+        * They are now the invoice document rendered by the print engine on two
+        * papers: `openInvoiceDocument(inv, 'thermal80' | 'a4')` opens the shared
+        * preview, whose toolbar switches format and offers Print / Download PDF.
+        *
+        * MODAL 4: ADD EXTRA BILLABLE ITEM / CONSUMABLE
+        */}
       {/* ------------------------------------------------------------ */}
       {addItemInvoice && (
         <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
@@ -1628,17 +1517,19 @@ export const BillingView: React.FC<BillingViewProps> = ({
               >
                 Close Ledger
               </button>
-              <button
-                onClick={() => {
-                  const inv = historyInvoice;
-                  setHistoryInvoice(null);
-                  setPrintableInvoice(inv);
-                }}
-                className="flex-1 flex items-center justify-center space-x-1.5 px-4 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs cursor-pointer shadow-md"
-              >
-                <Printer className="w-3.5 h-3.5 text-cyan-400" />
-                <span>Print Invoice</span>
-              </button>
+              {canPrintInvoice && (
+                <button
+                  onClick={() => {
+                    const inv = historyInvoice;
+                    setHistoryInvoice(null);
+                    openInvoiceDocument(inv, 'a4');
+                  }}
+                  className="flex-1 flex items-center justify-center space-x-1.5 px-4 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs cursor-pointer shadow-md"
+                >
+                  <Printer className="w-3.5 h-3.5 text-cyan-400" />
+                  <span>Print Invoice</span>
+                </button>
+              )}
             </div>
           </div>
         </div>
@@ -2032,29 +1923,17 @@ export const BillingView: React.FC<BillingViewProps> = ({
                 Close
               </button>
               <button
-                onClick={handleGenerateShiftClosingPdf}
+                onClick={handleOpenShiftClosingDocument}
                 className="flex-1 flex items-center justify-center space-x-1.5 px-4 py-2.5 rounded-xl bg-cyan-700 hover:bg-cyan-600 text-white font-bold text-xs cursor-pointer shadow-md"
               >
-                <Download className="w-4 h-4" />
-                <span>Download Shift Settlement PDF</span>
+                <Printer className="w-4 h-4" />
+                <span>Open Shift Closing Statement</span>
               </button>
             </div>
           </div>
         </div>
         );
       })()}
-
-      {/* ------------------------------------------------------------ */}
-      {/* MODAL 7: FULL PRINT-FRIENDLY INVOICE PREVIEW / PRINT MODAL   */}
-      {/* ------------------------------------------------------------ */}
-      {printableInvoice && (
-        <PrintableInvoiceModal
-          invoice={printableInvoice}
-          appointments={appointments}
-          clinicSettings={clinicSettings}
-          onClose={() => setPrintableInvoice(null)}
-        />
-      )}
     </div>
   );
 };

@@ -15,7 +15,7 @@
   height: 6px;
 }
 ::-webkit-scrollbar-track {
-  background: rgba(241, 245, 249, 0.8);
+  background: rgba(241, 245, 248, 0.8);
 }
 ::-webkit-scrollbar-thumb {
   background: rgba(148, 163, 184, 0.5);
@@ -25,139 +25,329 @@
   background: rgba(100, 116, 139, 0.7);
 }
 
+/*
+ * ============================================================================
+ * PRINT SUBSYSTEM — application chrome
+ * ============================================================================
+ *
+ * These rules style the SHELL (the preview around a document). The document's own
+ * stylesheet is not here: it arrives inside the print payload, rendered by the
+ * server from the same blade partial the PDF engines use, and is injected into
+ * <head> by `useDocumentStyles`. That separation is deliberate — application CSS
+ * (including Tailwind's responsive variants) must never be able to change printed
+ * geometry.
+ *
+ * The rule that matters most is in the print block at the bottom: exactly ONE
+ * element goes on paper. The previous stylesheet hid everything except a single
+ * `.print-overlay` class, which only one of the eight print surfaces applied —
+ * so the other seven printed blank pages.
+ */
+
+.pd-preview-scale {
+  transform-origin: top center;
+  will-change: transform;
+}
+
+.pd-print-surface {
+  display: flex;
+  justify-content: center;
+  padding: 16px;
+}
+
+/* Quick print: laid out and painted (so fonts/images/layout are real) but out of
+   sight, and never covering the operator's screen while the dialog is open. */
+.pd-print-surface--offscreen {
+  position: absolute;
+  left: -20000px;
+  top: 0;
+  padding: 0;
+  z-index: 0;
+}
+
+.pd-print-host {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  overflow: auto;
+  background: rgba(15, 23, 42, 0.62);
+}
+
+.pd-print-host--print {
+  background: transparent;
+  pointer-events: none;
+}
+
+.pd-print-host--error {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+
+/* ---- preview shell ------------------------------------------------------- */
+
+.pd-shell {
+  background: #0f172a;
+  color: #e2e8f0;
+  border-bottom: 1px solid #1e293b;
+}
+
+.pd-shell-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 16px;
+}
+
+.pd-shell-title,
+.pd-shell-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+
+.pd-shell-badge {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  padding: 3px 8px;
+  border: 1px solid #334155;
+  border-radius: 6px;
+  background: #1e293b;
+}
+
+.pd-shell-key {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  font-weight: 700;
+  color: #7dd3fc;
+}
+
+.pd-shell-status,
+.pd-shell-meta,
+.pd-shell-note,
+.pd-shell-scale-note {
+  font-size: 11px;
+  color: #94a3b8;
+}
+
+.pd-shell-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 8px;
+  border: 1px solid #334155;
+  background: #1e293b;
+  color: #e2e8f0;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  text-decoration: none;
+}
+
+.pd-shell-btn:hover {
+  background: #334155;
+}
+
+.pd-shell-btn--primary {
+  background: #0891b2;
+  border-color: #0891b2;
+  color: #ffffff;
+}
+
+.pd-shell-btn--primary:hover {
+  background: #06b6d4;
+}
+
+.pd-shell-icon {
+  width: 14px;
+  height: 14px;
+}
+
+.pd-shell-select {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: #94a3b8;
+}
+
+.pd-shell-select select {
+  background: #1e293b;
+  border: 1px solid #334155;
+  border-radius: 8px;
+  color: #e2e8f0;
+  font-size: 12px;
+  padding: 5px 8px;
+}
+
+.pd-shell-calibration {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: flex-end;
+  padding: 12px 16px;
+  border-top: 1px solid #1e293b;
+  background: #111c30;
+}
+
+.pd-shell-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 11px;
+  color: #94a3b8;
+}
+
+.pd-shell-field input {
+  background: #0b1220;
+  border: 1px solid #334155;
+  border-radius: 8px;
+  color: #e2e8f0;
+  font-size: 12px;
+  padding: 6px 8px;
+  width: 140px;
+}
+
+.pd-shell-preview {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 16px 0;
+}
+
+.pd-shell-hint {
+  padding: 10px 16px 20px;
+  text-align: center;
+  font-size: 11px;
+  color: #94a3b8;
+}
+
+.pd-shell-error,
+.pd-route-state {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  max-width: 520px;
+  padding: 16px 20px;
+  border-radius: 14px;
+  border: 1px solid #fca5a5;
+  background: #fef2f2;
+  color: #991b1b;
+}
+
+.pd-route-state {
+  margin: 48px auto;
+}
+
+.pd-route-state-title {
+  font-weight: 700;
+  font-size: 13px;
+}
+
+.pd-route-state-body {
+  font-size: 12px;
+}
+
+.pd-shell-error-title {
+  font-weight: 700;
+  font-size: 13px;
+  color: #991b1b;
+}
+
+.pd-shell-error-body {
+  font-size: 12px;
+}
+
+/* ---- standalone print route --------------------------------------------- */
+
+.pd-route {
+  min-height: 100vh;
+  background: #e2e8f0;
+}
+
+.pd-route .pd-shell-bar {
+  background: #0f172a;
+}
+
+.pd-route-paper {
+  display: flex;
+  justify-content: center;
+  padding: 20px;
+}
+
+/* ============================================================================
+ * Paper
+ * ============================================================================
+ */
+
 @media print {
-  /* Hide all app chrome, navigation, headers, and backgrounds by default during print */
+  html,
   body {
+    margin: 0 !important;
+    padding: 0 !important;
     background: #ffffff !important;
-    color: #000000 !important;
-    font-size: 12pt;
   }
-  
-  header, nav, aside, footer, .no-print, .print\\:hidden {
+
+  /* Default: the injected print host is the paper, and nothing else is. */
+  body:not(.pd-route-active) > *:not(.pd-print-host) {
     display: none !important;
   }
 
-  .print\\:block {
+  /* On the standalone route the document lives in #root, so #root is the paper. */
+  body.pd-route-active > *:not(#root) {
+    display: none !important;
+  }
+
+  body.pd-route-active .pd-route-paper {
     display: block !important;
-  }
-
-  .print\\:flex {
-    display: flex !important;
-  }
-
-  .print\\:p-0 {
     padding: 0 !important;
-  }
-
-  .print\\:m-0 {
     margin: 0 !important;
   }
 
-  .print\\:border-none {
-    border: none !important;
-  }
-
-  .print\\:shadow-none {
-    box-shadow: none !important;
-  }
-
-  .print\\:w-full {
-    width: 100% !important;
-    max-width: 100% !important;
-  }
-
-  /*
-   * The report document is the only thing on the paper, and it may run to
-   * several pages.
-   *
-   * The sheet is portalled to <body>, so every other top-level element can
-   * simply be dropped — and crucially the document is returned to NORMAL FLOW.
-   * A fixed- or absolutely-positioned sheet cannot paginate: Chromium prints
-   * the first page and silently discards the rest, which truncates a long
-   * report without any error.
-   */
-  body > *:not(.print-overlay) {
+  .pd-no-print,
+  .pd-shell,
+  .pd-shell-hint,
+  .pd-shell-bar,
+  .pd-shell-preview,
+  .pd-shell-calibration {
     display: none !important;
   }
 
-  .print-overlay {
+  .pd-print-host {
     position: static !important;
     inset: auto !important;
     display: block !important;
     overflow: visible !important;
-    max-height: none !important;
-    padding: 0 !important;
     background: transparent !important;
     backdrop-filter: none !important;
+    z-index: auto !important;
   }
 
-  .print-overlay > * {
-    overflow: visible !important;
-    max-width: none !important;
-    max-height: none !important;
-    border: none !important;
-    border-radius: 0 !important;
-    box-shadow: none !important;
-  }
-
-  .print-report-page {
+  .pd-print-surface,
+  .pd-print-surface--offscreen {
     position: static !important;
-    width: 100% !important;
-    height: auto !important;
-    margin: 0 !important;
-    padding: 0 !important;
-    background: #ffffff !important;
-  }
-
-  .print-report-page .line-clamp-2 {
+    left: auto !important;
+    top: auto !important;
     display: block !important;
+    padding: 0 !important;
   }
 
-  /*
-   * Break control.
-   *
-   * Deliberately conservative: a section is NOT forced onto one page, because a
-   * long Findings section legitimately spans pages and `break-inside: avoid`
-   * there would either overflow or produce a blank page. Only small, indivisible
-   * blocks are kept whole, and a heading is never left stranded at the foot of a
-   * page away from its text.
-   */
-  .print-whole {
-    break-inside: avoid;
-    page-break-inside: avoid;
+  /* The preview's scale is presentation only: it must never reach paper. */
+  .pd-preview-scale {
+    transform: none !important;
   }
 
-  .print-keep-next {
-    break-after: avoid;
-    page-break-after: avoid;
-  }
-
-  .print-report-page tr,
-  .print-report-page td {
-    break-inside: avoid;
-    page-break-inside: avoid;
-  }
-
-  /* A table split over pages repeats its header row rather than losing it. */
-  .print-report-page thead {
-    display: table-header-group;
-  }
-
-  .print-report-page p {
-    orphans: 3;
-    widows: 3;
-  }
-
-  .print-invoice-page {
-    position: fixed !important;
-    top: 0 !important;
-    left: 0 !important;
-    width: 100% !important;
-    height: 100% !important;
+  .pd-paper {
+    box-shadow: none !important;
+    border: 0 !important;
     margin: 0 !important;
-    padding: 20px !important;
-    background: #ffffff !important;
-    z-index: 99999 !important;
   }
 }
-

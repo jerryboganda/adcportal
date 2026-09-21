@@ -48,6 +48,7 @@ import { NotificationCenter } from './components/NotificationCenter';
 import { TerminalLockModal } from './components/TerminalLockModal';
 import { StepUpModal } from './components/StepUpModal';
 import { SubscriptionGateView } from './components/SubscriptionGateView';
+import { PrintHost } from './print/PrintHost';
 
 import * as api from './services/apiService';
 import { SessionUser } from './services/apiService';
@@ -1198,6 +1199,15 @@ export const App: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 flex flex-col antialiased selection:bg-cyan-500 selection:text-white">
+      {/*
+        * The one surface that goes on paper.
+        *
+        * Mounted once, outside every module's layout: printing is not a feature of
+        * the billing screen or the reporting workspace, and a document must never
+        * be clipped by whatever scrolling container happens to host the button.
+        */}
+      <PrintHost />
+
       {flash && (
         <div
           role="status"

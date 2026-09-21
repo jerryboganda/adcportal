@@ -396,32 +396,11 @@ class BillingController extends BaseApiController
 
         $day = $validated['date'] ?? now()->toDateString();
 
-        $payments = InvoicePayment::query()
-            ->where('business_id', $this->tenantId())
-            ->whereDate('paid_at', $day)
-            ->whereHas('invoice', fn ($q) => $q->where('status', '!=', Invoice::STATUS_VOID))
-            ->with('invoice:id,invoice_number,appointment_id')
-            ->orderBy('paid_at')
-            ->get();
-
-        $byMethod = $payments->groupBy('method')
-            ->map(fn ($group) => [
-                'method' => (string) $group->first()->method,
-                'total' => round((float) $group->sum('amount'), 2),
-                'count' => $group->count(),
-            ])
-            ->values()
-            ->all();
-
+        // One ledger arithmetic for the screen AND the printed closing
+        // statement: a reconciliation that computes its own totals can certify
+        // a number the register never showed.
         return $this->ok([
-            'shift' => [
-                'date' => $day,
-                'totalCollected' => round((float) $payments->sum('amount'), 2),
-                'refundedTotal' => round((float) $payments->filter(fn ($p) => (float) $p->amount < 0)->sum('amount'), 2),
-                'invoiceCount' => $payments->filter(fn ($p) => (float) $p->amount > 0)->unique('invoice_id')->count(),
-                'paymentCount' => $payments->filter(fn ($p) => (float) $p->amount > 0)->count(),
-                'byMethod' => $byMethod,
-            ],
+            'shift' => app(\App\Services\ShiftLedgerService::class)->forDay($this->tenantId(), $day),
         ]);
     }
 
@@ -460,14 +439,28 @@ class BillingController extends BaseApiController
             abort(404);
         }
 
-        $this->denyUnless('invoice manage');
+        // Printing is its own capability (revocable on its own) with the legacy
+        // manage permission kept as an equivalent so existing roles are
+        // unaffected.
+        $this->denyUnlessAny(['invoice print', 'invoice manage'], 'invoice print');
 
-        $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView(
-            'invoices.pdf',
-            ['invoice' => $invoice->load(['items', 'payments', 'patient'])]
-        )->setPaper('a4');
+        $pdf = app(\App\Services\Print\PrintPdfService::class);
+        $document = $pdf->documentFor('invoice', $invoice, \App\Support\Print\PaperProfile::A4);
+        $rendered = $pdf->render($document);
 
-        return $pdf->download(str_replace('-', '', $invoice->invoice_number).'.pdf');
+        $this->audit('document_pdf_downloaded', auth()->user(), [
+            'artifact' => 'invoice',
+            'document' => (string) $invoice->invoice_number,
+            'paper' => 'a4',
+            'driver' => $rendered['driver'],
+        ]);
+
+        return response($rendered['bytes'], 200, [
+            'Content-Type' => 'application/pdf',
+            'Content-Disposition' => 'attachment; filename="'.str_replace('-', '', (string) $invoice->invoice_number).'.pdf"',
+            'X-Print-Driver' => $rendered['driver'],
+            'X-Print-Paper' => 'a4',
+        ]);
     }
 
     // ==================== internals ====================

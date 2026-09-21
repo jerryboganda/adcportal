@@ -19,8 +19,14 @@ docker-compose.override.yml
 # runbook (server topology, tunnel mechanics, deploy scripts). None of it
 # is referenced at runtime.
 /docs
-/scripts
 /.github
+
+# scripts/ IS shipped: the pixel-true PDF engine shells out to
+# scripts/print-pdf.mjs at runtime. Only the operator-only dev helpers are
+# left out of the image.
+/scripts/dev-*.sh
+/scripts/dev-*.py
+/scripts/windows
 AGENTS.md
 CLAUDE.md
 DEPLOYMENT_GUIDE.md

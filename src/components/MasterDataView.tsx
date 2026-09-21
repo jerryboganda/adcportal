@@ -34,6 +34,7 @@ import {
 } from 'lucide-react';
 import { Modality, Service, Referrer, ScreeningForm, ReportTemplate, ScreeningQuestion, Room, PaymentMethod, CatalogReview } from '../types';
 import { canAny } from '../services/permissions';
+import { openPrintPreview } from '../print/printDocument';
 import * as api from '../services/apiService';
 
 interface MasterDataViewProps {
@@ -333,12 +334,21 @@ export const MasterDataView: React.FC<MasterDataViewProps> = ({
           )}
 
           <button
-            onClick={() => setPrintCatalogModalOpen(true)}
+            onClick={() => void openPrintPreview({ artifact: 'fee-schedule', id: 'current', paper: 'a4' })}
             className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-semibold flex items-center space-x-1.5 border border-slate-300 transition-colors cursor-pointer"
-            title="Print Official Procedure Fee Schedule"
+            title="Open the official procedure fee schedule (A4)"
           >
             <Printer className="w-3.5 h-3.5 text-slate-600" />
-            <span>Print Catalog</span>
+            <span>Fee Schedule</span>
+          </button>
+
+          <button
+            onClick={() => setPrintCatalogModalOpen(true)}
+            className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-semibold flex items-center space-x-1.5 border border-slate-300 transition-colors cursor-pointer"
+            title="Browse the procedure catalog"
+          >
+            <Search className="w-3.5 h-3.5 text-slate-600" />
+            <span>Browse Catalog</span>
           </button>
           
           <button
@@ -1722,18 +1732,27 @@ export const MasterDataView: React.FC<MasterDataViewProps> = ({
       {printCatalogModalOpen && (
         <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl max-w-4xl w-full max-h-[90vh] flex flex-col shadow-2xl border border-slate-200">
-            <div className="p-4 border-b border-slate-200 flex items-center justify-between print:hidden">
+            <div className="p-4 border-b border-slate-200 flex items-center justify-between">
               <div className="flex items-center space-x-2">
                 <Printer className="w-5 h-5 text-cyan-600" />
-                <h3 className="font-bold text-slate-900 text-sm">Official Diagnostic Fee Schedule — Print View</h3>
+                <h3 className="font-bold text-slate-900 text-sm">Diagnostic Procedure Catalog</h3>
               </div>
               <div className="flex items-center space-x-2">
+                {/*
+                  * Browsing is a screen activity; the official fee schedule is the
+                  * engine's `fee-schedule` document (A4, tenant letterhead, server
+                  * formatting). `window.print()` from here used to print the whole
+                  * application shell, because this modal was never a document.
+                  */}
                 <button
-                  onClick={() => window.print()}
+                  onClick={() => {
+                    void openPrintPreview({ artifact: 'fee-schedule', id: 'current', paper: 'a4' });
+                    setPrintCatalogModalOpen(false);
+                  }}
                   className="px-3 py-1.5 bg-cyan-600 hover:bg-cyan-700 text-white rounded-lg text-xs font-semibold flex items-center space-x-1"
                 >
                   <Printer className="w-3.5 h-3.5" />
-                  <span>Print Document</span>
+                  <span>Open Fee Schedule</span>
                 </button>
                 <button
                   onClick={() => setPrintCatalogModalOpen(false)}
@@ -1743,7 +1762,7 @@ export const MasterDataView: React.FC<MasterDataViewProps> = ({
                 </button>
               </div>
             </div>
-            <div className="p-6 overflow-y-auto space-y-6 text-xs text-slate-800 print:p-0">
+            <div className="p-6 overflow-y-auto space-y-6 text-xs text-slate-800">
               <div className="text-center border-b border-slate-200 pb-4">
                 <h2 className="text-lg font-black text-slate-900 tracking-tight">{(clinicName || 'POLYTRONX - RIS').toUpperCase()}</h2>
                 <p className="text-slate-600 font-medium">Radiology & Clinical Imaging Department</p>

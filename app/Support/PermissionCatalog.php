@@ -85,6 +85,11 @@ final class PermissionCatalog
             'report edit' => ['label' => 'Edit reports', 'group' => 'Reporting', 'dangerous' => false, 'implies' => ['report manage']],
             'report sign' => ['label' => 'Sign / finalize reports', 'group' => 'Reporting', 'dangerous' => false, 'implies' => ['report edit']],
             'report release' => ['label' => 'Release reports to patients & referrers', 'group' => 'Reporting', 'dangerous' => false, 'implies' => ['report manage']],
+            // Printing is its own grant and implies nothing: a receptionist who may
+            // reprint a study slip must not thereby acquire the right to read
+            // invoices, and a billing clerk who may print a receipt must not
+            // silently gain access to the ledger behind it.
+            'report print' => ['label' => 'Print reports', 'group' => 'Reporting', 'dangerous' => false, 'implies' => []],
 
             // ==================== Billing ====================
             'invoice manage' => ['label' => 'View invoices', 'group' => 'Billing', 'dangerous' => false, 'implies' => []],
@@ -93,6 +98,9 @@ final class PermissionCatalog
             'invoice payment' => ['label' => 'Collect payments', 'group' => 'Billing', 'dangerous' => false, 'implies' => ['invoice manage']],
             'invoice refund' => ['label' => 'Issue refunds against collected payments', 'group' => 'Billing', 'dangerous' => true, 'implies' => ['invoice manage']],
             'invoice delete' => ['label' => 'Void invoices', 'group' => 'Billing', 'dangerous' => true, 'implies' => ['invoice manage']],
+            'invoice print' => ['label' => 'Print invoices, fee schedules & financial statements', 'group' => 'Billing', 'dangerous' => false, 'implies' => []],
+            'receipt print' => ['label' => 'Print payment receipts & token slips', 'group' => 'Billing', 'dangerous' => false, 'implies' => []],
+            'label print' => ['label' => 'Print patient wristband & film labels', 'group' => 'Study Workflow', 'dangerous' => false, 'implies' => []],
             'payment method manage' => ['label' => 'View payment methods', 'group' => 'Billing', 'dangerous' => false, 'implies' => []],
             'payment method create' => ['label' => 'Create payment methods', 'group' => 'Billing', 'dangerous' => false, 'implies' => ['payment method manage']],
             'payment method edit' => ['label' => 'Edit payment methods', 'group' => 'Billing', 'dangerous' => false, 'implies' => ['payment method manage']],
@@ -127,6 +135,7 @@ final class PermissionCatalog
             'user edit' => ['label' => 'Edit staff users', 'group' => 'Administration', 'dangerous' => false, 'implies' => ['user manage']],
             'user delete' => ['label' => 'Delete staff users', 'group' => 'Administration', 'dangerous' => true, 'implies' => ['user manage']],
             'setting manage' => ['label' => 'Manage clinic settings, PACS & gateways', 'group' => 'Administration', 'dangerous' => false, 'implies' => []],
+            'print settings manage' => ['label' => 'Manage printing & document settings', 'group' => 'Administration', 'dangerous' => false, 'implies' => ['setting manage']],
             'user logs history' => ['label' => 'View audit logs', 'group' => 'Administration', 'dangerous' => false, 'implies' => []],
 
             // ==================== Access control ====================
@@ -193,11 +202,11 @@ final class PermissionCatalog
             'admin' => self::names(),
             'radiologist' => [
                 'reports view', 'queue view',
-                'appointment manage', 'report manage', 'report create', 'report edit', 'report sign', 'report release',
+                'appointment manage', 'report manage', 'report create', 'report edit', 'report sign', 'report release', 'report print',
             ],
             'technician' => [
                 'technologist view', 'queue view',
-                'appointment manage', 'study checkin', 'study screen', 'study acquire', 'report manage',
+                'appointment manage', 'study checkin', 'study screen', 'study acquire', 'report manage', 'label print',
             ],
             'receptionist' => [
                 'reception view', 'billing view', 'queue view',
@@ -206,11 +215,13 @@ final class PermissionCatalog
                 'customer manage', 'customer create', 'customer edit',
                 'referrer manage', 'referrer create', 'referrer edit',
                 'invoice create', 'invoice payment', 'report release',
+                'receipt print', 'label print',
             ],
             'billing' => [
                 'billing view', 'queue view',
                 'invoice manage', 'invoice create', 'invoice edit', 'invoice delete', 'invoice payment', 'invoice refund',
                 'customer manage', 'customer create', 'customer edit',
+                'invoice print', 'receipt print',
             ],
         ];
     }

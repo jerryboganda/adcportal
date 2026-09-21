@@ -159,7 +159,7 @@ jobs:
           # locks for token allocation) — dialect bugs there would corrupt or
           # block a signed report in production. Widen to --testsuite=Feature
           # once the rest of the suite is proven dialect-clean.
-          php artisan test --filter='RadiologyCatalog|MastersConfigTest|BookingMoneyTest|WalkInBookingFinancialsTest|StudyBookingPaymentTest|StudyBookingTokenTest|StudyTokenAllocatorTest|StudyTokenConcurrencyTest|StudyFactAtomicityTest|StudyWorkflowTest|BookingRoomTest|BillingTest|TenantIsolationTest|ReportingWorklistTest|ReportingPreferencesTest|ReportTemplateResolutionTest|ReportDraftConcurrencyTest|ReportManualCreationTest|ReportMacrosTest|ReportDictationTest|ReportPdfTest|CriticalFindingLogTest' 2>&1 | tee /tmp/phpunit-pg.log
+          php artisan test --filter='RadiologyCatalog|MastersConfigTest|BookingMoneyTest|WalkInBookingFinancialsTest|StudyBookingPaymentTest|StudyBookingTokenTest|StudyTokenAllocatorTest|StudyTokenConcurrencyTest|StudyFactAtomicityTest|StudyWorkflowTest|BookingRoomTest|BillingTest|TenantIsolationTest|ReportingWorklistTest|ReportingPreferencesTest|ReportTemplateResolutionTest|ReportDraftConcurrencyTest|ReportManualCreationTest|ReportMacrosTest|ReportDictationTest|ReportPdfTest|PrintDocumentTest|PrintPdfTest|CriticalFindingLogTest' 2>&1 | tee /tmp/phpunit-pg.log
 
       # GitHub publishes at most ~10 `::error::` annotations PER STEP, so the
       # summary and every failing test name get their own step (fresh budget)
@@ -301,10 +301,131 @@ jobs:
           name: playwright-report
           path: playwright-report/
 
+  print-visual:
+    # Printing is verified against a REAL browser and a REAL renderer per browser
+    # engine: paper geometry, print-media CSS, calibration, PDF page size, and the
+    # PDF compared to the page the browser actually laid out. The server-side PDF
+    # engine is asserted to be Chromium (the pixel-true path) — a silent fallback
+    # to another renderer is a FAILURE here, because that is exactly the drift
+    # that reaches paper unnoticed.
+    name: Print — visual regression & PDF page QA (${{ matrix.browser }})
+    runs-on: ubuntu-latest
+    needs: [api-tests, spa-build]
+    strategy:
+      fail-fast: false
+      matrix:
+        browser: [chromium, msedge]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          extensions: mbstring, pdo_sqlite, sqlite3, gd, zip, intl, fileinfo, curl, openssl
+          coverage: none
+
+      - name: Install PHP dependencies
+        run: composer install --prefer-dist --no-interaction --no-progress
+
+      - name: Install PDF rasteriser (poppler)
+        # The PDF is rendered BACK TO PIXELS so its paper can be compared with the
+        # browser's own measurement. "A file exists" is not proof of a layout.
+        run: sudo apt-get update && sudo apt-get install -y poppler-utils
+
+      - name: Download SPA bundle
+        uses: actions/download-artifact@v4
+        with:
+          name: spa-dist
+          path: public/
+
+      - name: Prepare application (SQLite + seed)
+        env:
+          RIS_DEMO_MODE: 'true'
+          RIS_DEMO_TENANT_CODE: DEMO-2026
+          RIS_DEMO_ADMIN_EMAIL: admin@polytronx-e2e.test
+          RIS_DEMO_PASSWORD: E2eDemo#2026
+          RIS_SUPER_ADMIN_EMAIL: platform@polytronx-e2e.test
+          RIS_SUPER_ADMIN_PASSWORD: Platform#E2e2026
+        run: |
+          set -o pipefail
+          {
+            php -r "file_exists('.env') || copy('.env.example', '.env');"
+            sed -i 's|^APP_ENV=.*|APP_ENV=local|' .env
+            sed -i 's|^APP_URL=.*|APP_URL=http://127.0.0.1:8000|' .env
+            sed -i 's|^DB_CONNECTION=.*|DB_CONNECTION=sqlite|' .env
+            sed -i '/^DB_DATABASE=/d' .env
+            grep -q '^SANCTUM_STATEFUL_DOMAINS=' .env || echo 'SANCTUM_STATEFUL_DOMAINS=localhost:3000,127.0.0.1:3000,localhost:8000,127.0.0.1:8000' >> .env
+            sed -i 's|^SANCTUM_STATEFUL_DOMAINS=.*|SANCTUM_STATEFUL_DOMAINS=localhost:3000,127.0.0.1:3000,localhost:8000,127.0.0.1:8000|' .env
+            php artisan key:generate --force
+            php artisan migrate --force
+            php artisan db:seed --force
+          } 2>&1 | tee /tmp/prepare-print.log
+
+      - name: Start Laravel (API + SPA on one origin)
+        run: php artisan serve --host=127.0.0.1 --port=8000 &
+
+      - name: Setup Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install Playwright browsers
+        run: |
+          npm ci --legacy-peer-deps || npm install --legacy-peer-deps
+          npx playwright install chromium --with-deps
+
+      - name: Install Microsoft Edge (second engine, same Chromium family)
+        if: matrix.browser == 'msedge'
+        run: |
+          # Edge is a channel of Chromium with its own print/PDF pipeline, which is
+          # why printing is verified on it rather than assumed from Chrome.
+          npx playwright install msedge --with-deps || {
+            curl -fsSL https://packages.microsoft.com/keys/microsoft.asc \
+              | sudo gpg --dearmor -o /usr/share/keyrings/microsoft-edge.gpg
+            echo "deb [arch=amd64 signed-by=/usr/share/keyrings/microsoft-edge.gpg] https://packages.microsoft.com/repos/edge stable main" \
+              | sudo tee /etc/apt/sources.list.d/microsoft-edge.list > /dev/null
+            sudo apt-get update && sudo apt-get install -y microsoft-edge-stable
+          }
+          # A missing browser must fail HERE, with this message, not as a
+          # confusing locator timeout three steps later.
+          npx playwright install --list 2>/dev/null | grep -qi msedge || ls /usr/bin/microsoft-edge* >/dev/null
+
+      - name: Report the resolved PDF engine (print:doctor)
+        # Fails when a paper profile does not render at its physical size, and
+        # prints WHY when the pixel-true engine is unavailable.
+        run: php artisan print:doctor --render
+
+      - name: Run print visual regression & parity suite
+        env:
+          E2E_BASE_URL: http://127.0.0.1:8000
+          E2E_EMAIL: admin@polytronx-e2e.test
+          E2E_PASSWORD: E2eDemo#2026
+          E2E_BROWSERS: ${{ matrix.browser }}
+          EXPECT_PRINT_DRIVER: chromium
+        run: |
+          set -o pipefail
+          npx playwright test tests/print 2>&1 | tee /tmp/print-visual.log
+
+      - name: Print visual failure detail (fresh annotation budget)
+        if: failure()
+        run: |
+          grep -aE "passed|failed|✘|engines used|expected|Received" /tmp/print-visual.log 2>/dev/null | head -14 | sed 's/^/::error::print /' || true
+          exit 1
+
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: print-visual-report-${{ matrix.browser }}
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 7
+
   deploy:
     name: Deploy to production VPS (ris.polytronx.com)
     runs-on: ubuntu-latest
-    needs: [api-tests, api-tests-postgres, spa-build, e2e]
+    needs: [api-tests, api-tests-postgres, spa-build, e2e, print-visual]
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     permissions:
       packages: read
@@ -387,11 +508,24 @@ jobs:
             curl -fsS http://127.0.0.1:8090/api/v1/health | grep -q '"db":"ok"' \
               || fail "health endpoint missing or database check failed"
 
-            # 2. Reporting routes exist and stay auth-gated (401, not 404).
-            for path in /api/v1/reporting/worklist /api/v1/reporting/preferences; do
+            # 2. Reporting and print routes exist and stay auth-gated (401, not 404).
+            for path in /api/v1/reporting/worklist /api/v1/reporting/preferences /api/v1/print/registry /api/v1/settings/printing; do
               code=$(curl -s -o /dev/null -w '%{http_code}' "http://127.0.0.1:8090${path}")
               [ "$code" = "401" ] || fail "${path} answered ${code} (expected 401 — route missing or unguarded)"
             done
+
+            # 2b. The shipped image can actually render documents — in the
+            #     pixel-true engine. This is the one claim about printing that
+            #     cannot be verified from the source tree: the browser binary,
+            #     its system libraries and node all have to be present in THIS
+            #     image, or every PDF silently degrades to a different renderer
+            #     than the operator's print dialog.
+            docker exec adc-portal-app php artisan print:doctor \
+              | grep -q 'chromium available | yes' \
+              || fail "the deployed image cannot render with Chromium (PDFs would not match the print dialog)"
+
+            docker exec adc-portal-app php artisan print:doctor --render >/dev/null \
+              || fail "a paper profile did not render at its physical size in the deployed image"
 
             # 3. The running container is the image this deploy shipped.
             running=$(docker inspect adc-portal-app --format '{{.Image}}')

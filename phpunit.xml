@@ -33,6 +33,10 @@
         <env name="TELESCOPE_ENABLED" value="false"/>
         <!-- AI screening triage: tests are hermetic. The empty key disables the
              TypeSafe client unless a test opts in via config() + Http::fake(). -->
-        <env name="AI_GATEWAY_API_KEY" value=""/>
+        <env name="AI_GATEWAY_API_KEY" value="" />
+        <!-- The print suites render one PDF per printable artifact and assert
+             each one's physical page box, which needs more than PHP's default
+             128 MB (DomPDF holds a page dictionary per artifact). -->
+        <ini name="memory_limit" value="512M" />
     </php>
 </phpunit>

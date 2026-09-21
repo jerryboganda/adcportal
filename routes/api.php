@@ -21,6 +21,8 @@ use App\Http\Controllers\Api\V1\Platform\PlatformUserController;
 use App\Http\Controllers\Api\V1\ReportController;
 use App\Http\Controllers\Api\V1\ReportingController;
 use App\Http\Controllers\Api\V1\ReportingPreferenceController;
+use App\Http\Controllers\Api\V1\PrintController;
+use App\Http\Controllers\Api\V1\PrintSettingsController;
 use App\Http\Controllers\Api\V1\PublicTenantContextController;
 use App\Http\Controllers\Api\V1\QueueDisplayController;
 use App\Http\Controllers\Api\V1\SettingsController;
@@ -129,6 +131,17 @@ Route::middleware(['auth', 'tenant.active', 'throttle:tenant'])->group(function 
     Route::post('/reports/{report}/addendum', [ReportController::class, 'addendum'])->whereNumber('report');
     Route::post('/reports/{report}/release', [ReportController::class, 'release'])->whereNumber('report');
     Route::get('/reports/{report}/pdf', [ReportController::class, 'downloadPdf'])->whereNumber('report');
+
+    // Printing & documents — ONE payload + ONE PDF per printable artifact.
+    // The artifact registry owns the paper profile, the permission and the
+    // tenant default, so a print path cannot bypass authorization by being a
+    // different endpoint. `/print/registry` is declared before the wildcard. 
+    Route::get('/print/registry', [PrintController::class, 'registry']);
+    Route::get('/print/{artifact}/{id}', [PrintController::class, 'show'])->where('artifact', '[a-z-]+');
+    Route::get('/print/{artifact}/{id}/pdf', [PrintController::class, 'pdf'])->where('artifact', '[a-z-]+');
+    Route::post('/print/{artifact}/{id}/events', [PrintController::class, 'event'])->where('artifact', '[a-z-]+');
+    Route::get('/settings/printing', [PrintSettingsController::class, 'show']);
+    Route::put('/settings/printing', [PrintSettingsController::class, 'update']);
 
     // Radiologist reporting module: server-side reading worklist, template
     // resolution/library, curated macros, report search, priors and the

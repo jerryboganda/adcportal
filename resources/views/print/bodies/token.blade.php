@@ -1,0 +1,6 @@
+@include('print.partials.header')
+@include('print.partials.hero')
+@include('print.partials.meta')
+@include('print.partials.notices')
+@include('print.partials.codes')
+@include('print.partials.footer')

@@ -75,3 +75,6 @@ public/assets/
 # Local E2E repro scratch (never commit)
 .env.e2e
 /database/e2e.sqlite
+
+# Scratch space for the Chromium PDF renderer (one HTML + one PDF per render)
+/storage/app/print-tmp/

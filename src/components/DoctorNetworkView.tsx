@@ -36,6 +36,7 @@ import {
   ClinicProfileSettings
 } from '../types';
 import { canAny } from '../services/permissions';
+import { openPrintPreview } from '../print/printDocument';
 
 interface DoctorNetworkViewProps {
   referrers: Referrer[];
@@ -97,8 +98,15 @@ export const DoctorNetworkView: React.FC<DoctorNetworkViewProps> = ({
   const [dispatchRecipient, setDispatchRecipient] = useState('');
   const [dispatchSuccessToast, setDispatchSuccessToast] = useState(false);
 
-  // Settlement Print Modal
-  const [settlementDoctor, setSettlementDoctor] = useState<Referrer | null>(null);
+  /**
+   * The referral settlement is a printed financial document, so it is rendered by
+   * the print engine on A4 — tenant letterhead, server-computed payout figures
+   * and no markup of its own. The sheet used to be a modal in this file whose
+   * `window.print()` produced a blank page and whose footer named the vendor
+   * instead of the clinic.
+   */
+  const openSettlement = (doctor: Referrer) =>
+    void openPrintPreview({ artifact: 'doctor-settlement', id: doctor.id, paper: 'a4' });
 
   // Specialties list
   const specialties = Array.from(new Set(referrers.map(r => r.specialty))).filter(Boolean);
@@ -423,7 +431,7 @@ export const DoctorNetworkView: React.FC<DoctorNetworkViewProps> = ({
                         <ChevronRight className="w-3.5 h-3.5" />
                       </button>
                       <button
-                        onClick={() => setSettlementDoctor(doctor)}
+                        onClick={() => openSettlement(doctor)}
                         className="text-xs font-semibold text-emerald-700 hover:text-emerald-900 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200 cursor-pointer"
                       >
                         Statement
@@ -686,11 +694,11 @@ export const DoctorNetworkView: React.FC<DoctorNetworkViewProps> = ({
 
                     <div className="space-y-2">
                       <button
-                        onClick={() => setSettlementDoctor(doctor)}
+                        onClick={() => openSettlement(doctor)}
                         className="w-full py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs font-bold transition-all shadow-xs cursor-pointer flex items-center justify-center space-x-1.5"
                       >
                         <Printer className="w-3.5 h-3.5 text-sky-400" />
-                        <span>View Statement & Payout</span>
+                        <span>Open Settlement Statement</span>
                       </button>
                     </div>
                   </div>
@@ -944,87 +952,6 @@ export const DoctorNetworkView: React.FC<DoctorNetworkViewProps> = ({
         </div>
       )}
 
-      {/* Printable Settlement Sheet Modal */}
-      {settlementDoctor && (
-        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-2xl w-full p-6 space-y-4 animate-in fade-in zoom-in-95 duration-150">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-200">
-              <div>
-                <h3 className="font-bold text-slate-900 text-base">Doctor Referral Settlement Sheet</h3>
-                <p className="text-xs text-slate-500">PolytronX - Enterprise PACS & RIS • Referral Accounting Department</p>
-              </div>
-              <div className="flex items-center space-x-2">
-                <button
-                  onClick={() => window.print()}
-                  className="px-3 py-1.5 bg-slate-900 text-white rounded-lg text-xs font-bold flex items-center space-x-1 cursor-pointer"
-                >
-                  <Printer className="w-3.5 h-3.5" />
-                  <span>Print</span>
-                </button>
-                <button onClick={() => setSettlementDoctor(null)} className="text-slate-400 hover:text-slate-600 cursor-pointer">
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
-            </div>
-
-            <div className="p-4 bg-slate-50 rounded-xl border border-slate-200 space-y-3 text-xs">
-              <div className="flex justify-between">
-                <div>
-                  <span className="text-slate-500 block">Consultant Name:</span>
-                  <span className="font-bold text-slate-900 text-sm">{settlementDoctor.name}</span>
-                </div>
-                <div className="text-right">
-                  <span className="text-slate-500 block">Clinic / Hospital:</span>
-                  <span className="font-bold text-slate-900">{settlementDoctor.clinicName}</span>
-                </div>
-              </div>
-              <div className="flex justify-between pt-2 border-t border-slate-200">
-                <span>Period: {new Date().toLocaleDateString(undefined, { month: 'long', year: 'numeric' })}</span>
-                <span className="font-semibold text-sky-700">Specialty: {settlementDoctor.specialty}</span>
-              </div>
-            </div>
-
-            <div className="max-h-60 overflow-y-auto border border-slate-200 rounded-xl">
-              <table className="w-full text-left text-xs">
-                <thead className="bg-slate-100 border-b border-slate-200 text-slate-600 font-semibold sticky top-0">
-                  <tr>
-                    <th className="p-2.5">Token</th>
-                    <th className="p-2.5">Patient</th>
-                    <th className="p-2.5">Investigation</th>
-                    <th className="p-2.5 text-right">Fee (PKR)</th>
-                    <th className="p-2.5 text-right">Referral Share</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100 text-slate-700">
-                  {appointments.filter(a => a.referrerId === settlementDoctor.id).map(apt => {
-                    const fee = apt.service?.price || 0;
-                    const share = Math.round(fee * (clinicSettings?.referralCommissionPercent ?? 0) / 100);
-                    return (
-                      <tr key={apt.id}>
-                        <td className="p-2.5 font-mono font-bold text-sky-700">{apt.tokenNumber}</td>
-                        <td className="p-2.5 font-medium">{apt.patient.name}</td>
-                        <td className="p-2.5">{apt.service?.name || 'Radiology Study'}</td>
-                        <td className="p-2.5 text-right font-mono">Rs. {fee.toLocaleString()}</td>
-                        <td className="p-2.5 text-right font-mono font-bold text-emerald-700">Rs. {share.toLocaleString()}</td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-
-            <div className="pt-3 border-t border-slate-200 flex justify-between items-center text-xs">
-              <span className="text-slate-500">Authorized by PolytronX - Enterprise PACS & RIS Accounts Division</span>
-              <button
-                onClick={() => setSettlementDoctor(null)}
-                className="px-4 py-2 bg-slate-200 text-slate-800 rounded-lg font-bold hover:bg-slate-300 cursor-pointer"
-              >
-                Close Statement
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 };

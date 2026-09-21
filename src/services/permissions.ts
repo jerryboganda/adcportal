@@ -67,6 +67,7 @@ export type SettingsSectionId =
   | 'branding'
   | 'dicom'
   | 'notifications'
+  | 'printing'
   | 'audit'
   | 'database';
 
@@ -76,6 +77,9 @@ export const SETTINGS_SECTIONS: { id: SettingsSectionId; module: string[] }[] = 
   { id: 'branding', module: ['setting manage'] },
   { id: 'dicom', module: ['setting manage'] },
   { id: 'notifications', module: ['setting manage'] },
+  // Printing & documents is its own grant so a clinic can delegate paper to the
+  // front desk without handing over users, DICOM nodes or the audit trail.
+  { id: 'printing', module: ['print settings manage', 'setting manage'] },
   { id: 'audit', module: ['user logs history'] },
   { id: 'database', module: ['setting manage'] },
 ];

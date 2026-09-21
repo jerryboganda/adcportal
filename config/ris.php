@@ -327,4 +327,46 @@ return [
         'window_minutes' => env('RIS_PLATFORM_STEP_UP_WINDOW', 15),
     ],
 
+    /*
+    |--------------------------------------------------------------------------
+    | Printing & document rendering
+    |--------------------------------------------------------------------------
+    |
+    | Two PDF engines exist and the difference is stated, never hidden:
+    |
+    |   dompdf   — always available, pure PHP, CSS 2.1 only. The archival
+    |              fallback, driven from the same blade markup + token sheet.
+    |   chromium — headless Chromium via Playwright. The pixel-true path: the
+    |              same CSS the browser print dialog uses, rendered off the web
+    |              tier by a queued job.
+    |
+    | `auto` prefers Chromium when it is actually usable (node + playwright +
+    | chromium present) and silently falls back to DomPDF otherwise, recording
+    | which engine produced each stored document. A clinic must never lose the
+    | ability to print because a browser binary is missing.
+    |
+    | `archive` stores every finalized document PDF once and reuses it, so a
+    | reprinted receipt or an archived report is byte-identical to the original
+    |    filing.
+    |
+    */
+
+    'print' => [
+        'pdf_driver' => env('RIS_PRINT_PDF_DRIVER', 'auto'), // auto|dompdf|chromium
+        'archive' => env('RIS_PRINT_ARCHIVE', true),
+        'chromium' => [
+            'enabled' => env('RIS_PRINT_CHROMIUM', true),
+            'node' => env('RIS_PRINT_NODE_BINARY', 'node'),
+            'script' => env('RIS_PRINT_CHROMIUM_SCRIPT', 'scripts/print-pdf.mjs'),
+            'timeout' => (int) env('RIS_PRINT_CHROMIUM_TIMEOUT', 45),
+
+            // Extra Chromium launch flags, comma separated. Deployment policy,
+            // not application behaviour: a container needs `--no-sandbox`
+            // (no user namespaces) and `--disable-dev-shm-usage` (a 64 MB
+            // /dev/shm truncates tall receipts), while a workstation must keep
+            // its sandbox. The production image sets these; nothing else does.
+            'args' => env('RIS_PRINT_CHROMIUM_ARGS', ''),
+        ],
+    ],
+
 ];

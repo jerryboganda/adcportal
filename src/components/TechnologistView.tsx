@@ -31,9 +31,9 @@ import {
 import { Appointment, Modality, DoseLog, WorkflowState } from '../types';
 import { canAny } from '../services/permissions';
 import { rerunScreeningTriage } from '../services/apiService';
+import { openPrintPreview } from '../print/printDocument';
 import { WorklistFilterToolbar } from './WorklistFilterToolbar';
 import { SortableColumnHeader } from './SortableColumnHeader';
-import { Barcode } from './Barcode';
 import {
   AdvancedFilterState,
   defaultAdvancedFilters,
@@ -95,7 +95,6 @@ export const TechnologistView: React.FC<TechnologistViewProps> = ({
   const [cancelModalApt, setCancelModalApt] = useState<Appointment | null>(null);
   const [cancelReason, setCancelReason] = useState('Patient Refusal');
   const [cancelNotes, setCancelNotes] = useState('');
-  const [wristbandApt, setWristbandApt] = useState<Appointment | null>(null);
 
   // Active tech pipeline states
   const techStates = ['checked_in', 'preparing', 'in_progress', 'acquired'];
@@ -629,9 +628,16 @@ export const TechnologistView: React.FC<TechnologistViewProps> = ({
                       <FileText className="w-3.5 h-3.5" />
                     </button>
 
+                    {/*
+                      * The accession label is a print-engine document: the same
+                      * vector Code 128 geometry the server puts in the PDF, at the
+                      * 63.5 × 25.4 mm tag the registry assigns it. The local modal
+                      * that used to sit here printed the application shell and
+                      * hardcoded a vendor name into the patient's label.
+                      */}
                     <button
-                      onClick={() => setWristbandApt(apt)}
-                      title="Print Patient Accession Barcode & Wristband"
+                      onClick={() => void openPrintPreview({ artifact: 'label', id: apt.id, paper: 'label' })}
+                      title="Open the patient accession barcode & wristband label"
                       className="p-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs border border-slate-200 transition-colors cursor-pointer"
                     >
                       <Printer className="w-3.5 h-3.5" />
@@ -857,71 +863,6 @@ export const TechnologistView: React.FC<TechnologistViewProps> = ({
       {/* ========================================================================= */}
       {/* ACCESSION BARCODE & PATIENT WRISTBAND MODAL */}
       {/* ========================================================================= */}
-      {wristbandApt && (
-        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white border border-slate-200 rounded-3xl max-w-md w-full p-5 shadow-2xl space-y-4">
-            <div className="flex items-center justify-between border-b border-slate-200 pb-3">
-              <div className="flex items-center space-x-2.5">
-                <div className="w-9 h-9 rounded-xl bg-indigo-50 text-indigo-700 border border-indigo-200 flex items-center justify-center">
-                  <Printer className="w-4 h-4 text-indigo-600" />
-                </div>
-                <div>
-                  <h3 className="font-bold text-slate-900 text-sm">Patient Wristband & Barcode Label</h3>
-                  <p className="text-[11px] text-slate-500">Accession Identifier for PACS & Laboratory</p>
-                </div>
-              </div>
-              <button onClick={() => setWristbandApt(null)} className="p-1 rounded-lg text-slate-400 hover:text-slate-700">
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-
-            {/* Printable Label Card */}
-            <div className="bg-slate-50 p-4 rounded-2xl border-2 border-dashed border-slate-300 text-slate-900 space-y-2">
-              <div className="flex justify-between items-start border-b border-slate-200 pb-2">
-                <div>
-                  <div className="font-black text-sm text-cyan-800">POLYTRONX - RIS</div>
-                </div>
-                <div className="text-right">
-                  <div className="font-mono font-black text-sm bg-slate-200 px-2 py-0.5 rounded">
-                    #{wristbandApt.tokenNumber}
-                  </div>
-                  <div className="text-[10px] font-bold text-slate-600">{wristbandApt.modality.code}</div>
-                </div>
-              </div>
-
-              <div className="space-y-0.5">
-                <div className="font-bold text-xs text-slate-900">{wristbandApt.patient.name}</div>
-                <div className="font-mono text-[11px] text-slate-600">
-                  MRN: {wristbandApt.patient.mrn} • Age: {wristbandApt.patient.age}y • {wristbandApt.patient.gender.toUpperCase()}
-                </div>
-                <div className="text-[11px] font-semibold text-slate-800">{wristbandApt.service.name}</div>
-              </div>
-
-              {/* Scannable Code128 barcode (encodes MRN, falls back to token) */}
-              <div className="pt-2 flex flex-col items-center">
-                <Barcode value={wristbandApt.patient.mrn || wristbandApt.tokenNumber} height={38} width={1} />
-              </div>
-            </div>
-
-            <div className="flex space-x-2 pt-2 border-t border-slate-200">
-              <button
-                onClick={() => setWristbandApt(null)}
-                className="flex-1 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-xs border border-slate-300"
-              >
-                Close
-              </button>
-              <button
-                onClick={() => {
-                  window.print();
-                }}
-                className="flex-1 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs shadow-md shadow-indigo-600/30 flex items-center justify-center gap-1.5"
-              >
-                <Printer className="w-3.5 h-3.5" /> Print Label
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 };
