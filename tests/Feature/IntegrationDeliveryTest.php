@@ -61,7 +61,13 @@ class IntegrationDeliveryTest extends ApiTestCase
             'screening_required' => false,
             'screening_cleared' => true,
             'business_id' => $this->tenant->id,
-            'created_by' => 1,
+            // The real author id, not a literal 1. User ids come from a shared
+            // sequence across every tenant fixture, so "user 1" is only this
+            // tenant's admin by luck of insertion order. PostgreSQL enforces
+            // appointments_created_by_foreign and SQLite does not, so the
+            // hardcoded id was a latent violation that only the production
+            // engine could see.
+            'created_by' => $this->adminA->id,
         ]);
 
         RadiologyReport::create([

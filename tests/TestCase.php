@@ -3,6 +3,7 @@
 namespace Tests;
 
 use Illuminate\Foundation\Testing\TestCase as BaseTestCase;
+use Illuminate\Support\Facades\DB;
 
 abstract class TestCase extends BaseTestCase
 {
@@ -46,5 +47,27 @@ abstract class TestCase extends BaseTestCase
                 .'test database (for example DB_DATABASE=ris_test).'
             );
         }
+
+        $this->enforceSqliteForeignKeys();
+    }
+
+    /**
+     * Make SQLite enforce foreign keys, as production PostgreSQL does.
+     *
+     * SQLite ships with `foreign_keys` OFF, so the fast gate accepted rows that
+     * name a user or a role which does not exist: a test could hardcode
+     * `created_by => 1` and pass here while PostgreSQL rejected it with
+     * appointments_created_by_foreign. That is precisely the class of bug this
+     * repository's own StudyTokenAllocatorTest docblock describes as "SQLite
+     * stayed green". Turning the pragma on makes the two engines agree, so a
+     * latent violation fails on the fast job instead of surprising a deploy.
+     */
+    private function enforceSqliteForeignKeys(): void
+    {
+        if ((string) config('database.default') !== 'sqlite') {
+            return;
+        }
+
+        DB::statement('PRAGMA foreign_keys = ON');
     }
 }

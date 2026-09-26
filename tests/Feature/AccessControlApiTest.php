@@ -131,7 +131,14 @@ class AccessControlApiTest extends ApiTestCase
             'name' => 'Escalator', 'permissions' => ['platform.super_admin'],
         ])->assertStatus(422);
 
-        $this->actingAs($this->adminA)->putJson('/api/v1/access/roles/1/permissions', [
+        // Address the role by its real id, never a hardcoded 1. Role ids come
+        // from a shared sequence across every tenant, so "role 1" is only the
+        // admin's role by luck of insertion order: on PostgreSQL tenant A's
+        // roles start higher, and tenantRoleOrFail() correctly 404'd a role
+        // belonging to another tenant. That guard is the point of the test.
+        $roleId = $this->systemRoleId($this->adminA, 'radiologist');
+
+        $this->actingAs($this->adminA)->putJson("/api/v1/access/roles/{$roleId}/permissions", [
             'permissions' => ['not a permission'],
         ])->assertStatus(422);
     }
