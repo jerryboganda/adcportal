@@ -37,9 +37,17 @@ export interface Room {
 
 /** Tenant-configured payment method (code = wire format on payments). */
 export interface PaymentMethod {
+  /** Numeric: `normalizePaymentMethod` applies `Number(...)` on the way in. */
   id: number;
   code: string;
   name: string;
+  /**
+   * What the method IS, as opposed to its label: the counter drawer, the POS, a
+   * wallet/Raast, a corporate panel. Money arithmetic asks for a kind — "what is
+   * in the drawer" is a behavioural question — so the SPA must not infer it from
+   * the code.
+   */
+  kind: 'cash' | 'card' | 'digital' | 'insurance' | 'other';
   isActive: boolean;
   sortOrder: number;
 }
@@ -597,7 +605,18 @@ export interface StaffUser {
   id: string;
   name: string;
   email: string;
-  role: StaffRole;
+  /**
+   * The role as the server issued it. A tenant CUSTOM role surfaces its own name
+   * here, so this is wider than the five system roles — the string is cosmetic
+   * (avatar and labels) while every real gate is permission-driven.
+   */
+  role: AppRole;
+  /**
+   * The laratrust role id in the ACTIVE tenant. Editing a user writes this back,
+   * never the name: a custom role is selected by id because two roles may share
+   * a display name. Null for a user with no resolvable tenant role.
+   */
+  roleId?: number | null;
   department: string;
   phone: string;
   initials: string;
@@ -730,8 +749,14 @@ export interface InventoryItem {
   unit: string; // "Vial 100mL", "Vial 20mL", "Piece", "Box (50)", "Pack"
   currentStock: number;
   minThreshold: number; // Reorder alert level
-  unitCost: number; // in PKR Rs.
-  sellingPrice: number; // standard billable price in PKR Rs.
+  /**
+   * Commercial fields are `null`/empty for a role that may USE stock but not
+   * administer it — `/bootstrap` hands the catalogue to anyone who can acquire a
+   * study (the contrast picker needs it) and omits the pricing side from theirs.
+   * Render them only behind an `inventory view` / `setting manage` check.
+   */
+  unitCost: number | null; // in PKR Rs.
+  sellingPrice: number | null; // standard billable price in PKR Rs.
   batches: InventoryBatch[];
   supplier: string;
   storageLocation: string; // "CT Console Bay Room 1", "MRI Prep Cold Cabinet"

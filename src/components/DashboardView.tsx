@@ -38,6 +38,8 @@ interface DashboardViewProps {
   onOpenBookingModal: () => void;
   /** Server-issued `appointment create` — hides the booking module otherwise. */
   canOpenBooking?: boolean;
+  /** The tenant's currency symbol, resolved once in `App`. */
+  currency: string;
 }
 
 export const DashboardView: React.FC<DashboardViewProps> = ({
@@ -49,6 +51,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   onSelectAppointment,
   onOpenBookingModal,
   canOpenBooking = false,
+  currency,
 }) => {
   const [cockpitFilter, setCockpitFilter] = useState<'all' | 'clinical' | 'admin'>('all');
 
@@ -180,15 +183,15 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       title: 'Billing & Cash Counter',
       category: 'admin',
       description: 'Patient invoices, multi-tender payments (Cash/POS), discount approvals, and printed receipts.',
-      badgeText: totalDue > 0 ? `Rs. ${totalDue.toLocaleString()} Due` : 'Settled',
+      badgeText: totalDue > 0 ? `${currency} ${totalDue.toLocaleString()} Due` : 'Settled',
       badgeColor: totalDue > 0 ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-slate-50 text-slate-600 border-slate-200',
       icon: Receipt,
       iconBg: 'bg-teal-50 text-teal-600 border-teal-200',
       actionLabel: 'Open Billing',
       actionType: 'tab',
       action: () => setActiveTab('billing'),
-      metricValue: `Rs. ${totalPaid.toLocaleString()}`,
-      metricSub: `Collected of Rs. ${totalBilled.toLocaleString()}`,
+      metricValue: `${currency} ${totalPaid.toLocaleString()}`,
+      metricSub: `Collected of ${currency} ${totalBilled.toLocaleString()}`,
       borderHover: 'hover:border-teal-400 hover:shadow-teal-500/10'
     }] : []),
     ...(canAny(permissions, ['queue view']) ? [{
@@ -410,11 +413,11 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               </div>
             </div>
             <div className="mt-3 flex items-baseline justify-between">
-              <span className="text-2xl font-black text-emerald-600">Rs. {totalPaid.toLocaleString()}</span>
+              <span className="text-2xl font-black text-emerald-600">{currency} {totalPaid.toLocaleString()}</span>
               <span className="text-xs text-slate-500 font-mono">/ {totalBilled.toLocaleString()}</span>
             </div>
             <div className="mt-2 flex items-center text-[11px] text-slate-500">
-              <span>Outstanding balance: <strong className="text-slate-800">Rs. {totalDue.toLocaleString()}</strong></span>
+              <span>Outstanding balance: <strong className="text-slate-800">{currency} {totalDue.toLocaleString()}</strong></span>
             </div>
           </div>
         )}

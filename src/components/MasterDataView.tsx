@@ -36,6 +36,7 @@ import { Modality, Service, Referrer, ScreeningForm, ReportTemplate, ScreeningQu
 import { canAny } from '../services/permissions';
 import { openPrintPreview } from '../print/printDocument';
 import * as api from '../services/apiService';
+import { localDateString } from '../utils/tableUtils';
 
 interface MasterDataViewProps {
   modalities: Modality[];
@@ -57,7 +58,7 @@ interface MasterDataViewProps {
   onUpdateRoom?: (updatedRoom: Room) => void;
   onDeleteRoom?: (roomId: number) => void;
   onAddPaymentMethod?: (input: { code: string; name: string; isActive?: boolean; sortOrder?: number }) => void;
-  onUpdatePaymentMethod?: (method: { id: number; name: string; isActive?: boolean; sortOrder?: number }) => void;
+  onUpdatePaymentMethod?: (method: { id: number; name: string; kind?: PaymentMethod['kind']; isActive?: boolean; sortOrder?: number }) => void;
   onDeletePaymentMethod?: (methodId: number) => void;
   onAddReferrer?: (newRef: Omit<Referrer, 'id'>) => void;
   onUpdateReferrer?: (updatedRef: Referrer) => void;
@@ -222,7 +223,7 @@ export const MasterDataView: React.FC<MasterDataViewProps> = ({
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
     const link = document.createElement('a');
     link.setAttribute('href', URL.createObjectURL(blob));
-    link.setAttribute('download', `Fee_Schedule_${new Date().toISOString().split('T')[0]}.csv`);
+    link.setAttribute('download', `Fee_Schedule_${localDateString()}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -1389,7 +1390,7 @@ export const MasterDataView: React.FC<MasterDataViewProps> = ({
             if (editingPaymentMethod && onUpdatePaymentMethod) {
               onUpdatePaymentMethod({ ...data, id: editingPaymentMethod.id });
             } else if (onAddPaymentMethod) {
-              onAddPaymentMethod(data as { code: string; name: string; isActive?: boolean });
+              onAddPaymentMethod(data as { code: string; name: string; kind?: PaymentMethod['kind']; isActive?: boolean });
             }
             setPaymentMethodModalOpen(false);
             setEditingPaymentMethod(null);
@@ -2618,13 +2619,14 @@ const RoomFormModal: React.FC<RoomFormModalProps> = ({ room, modalities, onSave,
 // Payment Method Form Modal
 interface PaymentMethodFormModalProps {
   method: PaymentMethod | null;
-  onSave: (data: { code: string; name: string; isActive?: boolean; sortOrder?: number }) => void;
+  onSave: (data: { code: string; name: string; kind?: PaymentMethod['kind']; isActive?: boolean; sortOrder?: number }) => void;
   onClose: () => void;
 }
 
 const PaymentMethodFormModal: React.FC<PaymentMethodFormModalProps> = ({ method, onSave, onClose }) => {
   const [code, setCode] = useState(method?.code || '');
   const [name, setName] = useState(method?.name || '');
+  const [kind, setKind] = useState<PaymentMethod['kind']>(method?.kind ?? 'other');
   const [isActive, setIsActive] = useState(method ? method.isActive : true);
   const [sortOrder, setSortOrder] = useState(method?.sortOrder ?? 0);
 
@@ -2638,6 +2640,7 @@ const PaymentMethodFormModal: React.FC<PaymentMethodFormModalProps> = ({ method,
     onSave({
       code: cleanedCode,
       name: name.trim(),
+      kind,
       isActive,
       sortOrder: Number(sortOrder),
     });
@@ -2680,6 +2683,27 @@ const PaymentMethodFormModal: React.FC<PaymentMethodFormModalProps> = ({ method,
                 placeholder="e.g. cash, card, corporate-panel"
                 className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-mono disabled:opacity-60"
               />
+            </div>
+            <div>
+              <label className="block font-semibold text-slate-700 mb-1">
+                Type <span className="text-slate-400 font-normal">- what this method IS, not what it is called</span>
+              </label>
+              <select
+                value={kind}
+                onChange={(e) => setKind(e.target.value as PaymentMethod['kind'])}
+                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs"
+              >
+                <option value="cash">Cash drawer (physical money in the counter)</option>
+                <option value="card">Card / POS (merchant terminal)</option>
+                <option value="digital">Digital (bank transfer, Raast, Easypaisa, JazzCash)</option>
+                <option value="insurance">Insurance / corporate panel</option>
+                <option value="other">Other</option>
+              </select>
+              <p className="mt-1 text-[11px] text-slate-500">
+                Marking the counter drawer as <strong>Cash</strong> is what puts the right figure on the
+                shift-closing statement and offers the change calculator at the counter. A method left as
+                <strong> Other</strong> is never treated as money in hand.
+              </p>
             </div>
             <div>
               <label className="block font-semibold text-slate-700 mb-1">Sort Order</label>

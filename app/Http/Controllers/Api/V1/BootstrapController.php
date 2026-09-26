@@ -15,12 +15,14 @@ use App\Models\Modality;
 use App\Models\PaymentMethod;
 use App\Models\Referrer;
 use App\Models\ReportTemplate;
+use App\Models\Role;
 use App\Models\Room;
 use App\Models\RisNotificationTemplate;
 use App\Models\ScreeningForm;
 use App\Models\Service;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Support\Facades\Auth;
 
 /**
  * One round-trip hydration of every collection the SPA works from.
@@ -60,7 +62,7 @@ class BootstrapController extends BaseApiController
             // Clinic identity/profile (name, address, disclaimers) is shared
             // operational context, not PHI — every staff session needs it.
             'clinicSettings' => ApiShape::clinicSettings($tenantId),
-            'notifications' => AppNotification::where('business_id', $tenantId)->orderByDesc('id')->limit(200)->get()
+            'notifications' => AppNotification::visibleTo(Auth::id(), $tenantId)->orderByDesc('id')->limit(200)->get()
                 ->map(fn ($n) => ApiShape::appNotification($n))->all(),
             'entitlements' => $tenant ? \App\Services\EntitlementService::payload($tenant) : null,
             // White-label presentation for this tenant (server-resolved from the
@@ -132,6 +134,22 @@ class BootstrapController extends BaseApiController
                 ->map(fn ($u) => ApiShape::staffUser($u))->all();
         }
 
+        // The roles a person can be GIVEN. A tenant admin can create a custom
+        // role in Access Control, but the staff form only ever offered the five
+        // system roles, so anything it created was unusable — the RBAC screen
+        // advertised a feature the product could not deliver. `user manage` is
+        // included deliberately: assigning a role is part of managing a user.
+        if ($this->allowsAny(['user manage', 'role view'])) {
+            $tenantUserIds = User::query()->where('business_id', $tenantId)->pluck('id');
+
+            $payload['roles'] = Role::query()
+                ->whereIn('created_by', $tenantUserIds)
+                ->orderBy('name')
+                ->get()
+                ->map(fn (Role $role) => ApiShape::accessRole($role))
+                ->all();
+        }
+
         if ($this->allows('setting manage')) {
             $payload['dicomNodes'] = DicomNode::where('business_id', $tenantId)->orderBy('node_name')->get()
                 ->map(fn ($n) => ApiShape::dicomNode($n))->all();
@@ -151,8 +169,13 @@ class BootstrapController extends BaseApiController
         }
 
         if ($this->allowsAny(['setting manage', 'inventory view', 'study acquire'])) {
+            // `study acquire` needs the catalogue for the contrast picker, but not
+            // the clinic's purchasing data. Commercial fields ride only for the
+            // roles that actually administer stock.
+            $commercial = $this->allowsAny(['setting manage', 'inventory view']);
+
             $payload['inventoryItems'] = InventoryItem::forClinic($tenantId)->orderBy('name')->get()
-                ->map(fn ($i) => ApiShape::inventoryItem($i))->all();
+                ->map(fn ($i) => ApiShape::inventoryItem($i, $commercial))->all();
             $payload['inventoryTransactions'] = InventoryTransaction::where('business_id', $tenantId)->with('performer')->orderByDesc('id')->limit(500)->get()
                 ->map(fn ($t) => ApiShape::inventoryTransaction($t))->all();
         }
@@ -194,7 +217,7 @@ class BootstrapController extends BaseApiController
             'referrers' => Referrer::where('business_id', $tenantId)->where('is_active', true)->orderBy('name')->get()
                 ->map(fn ($r) => ApiShape::referrer($r))->all(),
             'clinicSettings' => ApiShape::clinicSettings($tenantId),
-            'notifications' => AppNotification::where('business_id', $tenantId)->orderByDesc('id')->limit(50)->get()
+            'notifications' => AppNotification::visibleTo(Auth::id(), $tenantId)->orderByDesc('id')->limit(50)->get()
                 ->map(fn ($n) => ApiShape::appNotification($n))->all(),
             'branding' => $tenant ? \App\Services\TenantBrandingService::forTenant($tenant) : null,
         ]);

@@ -82,8 +82,15 @@ export const UserProfileMenu: React.FC<UserProfileMenuProps> = ({
       case 'billing':
         return 'Billing Officer';
       case 'admin':
+        return 'Clinic Administrator';
       default:
-        return 'System Administrator';
+        // A tenant-CUSTOM role. These were collectable in `default` and so every
+        // one of them was announced as "System Administrator" in the navbar and
+        // the profile card — a role the person does not hold, on a screen they
+        // will be trusted by. Show the name the tenant actually gave it.
+        return r
+          .replace(/[-_]+/g, ' ')
+          .replace(/\b\w/g, c => c.toUpperCase());
     }
   };
 

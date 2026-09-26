@@ -30,6 +30,8 @@ import { canAny } from '../services/permissions';
 
 import { invoicePdfUrl, fetchShiftSummary, requestShiftReview } from '../services/apiService';
 import { openPrintPreview } from '../print/printDocument';
+import { localDateString } from '../utils/tableUtils';
+import { currencySymbol } from '../utils/bookingMoney';
 
 interface BillingViewProps {
   invoices: Invoice[];
@@ -78,6 +80,11 @@ export const BillingView: React.FC<BillingViewProps> = ({
   onVoidInvoice,
   onRefundPayment,
 }) => {
+  // The tenant's own currency. This screen used to hardcode `Rs.` in 30-odd
+  // places, so a clinic billing in anything else showed the wrong currency on its
+  // invoices, receipts, payment collector, shift statement and refund history.
+  const cur = currencySymbol(clinicSettings);
+
   // Search & Filters
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
@@ -133,13 +140,6 @@ export const BillingView: React.FC<BillingViewProps> = ({
   const [discountValue, setDiscountValue] = useState<number>(0);
   const [taxRate, setTaxRate] = useState<number>(0);
   const [discountReason, setDiscountReason] = useState('Doctor Courtesy / Referral');
-  const [selectedAddons, setSelectedAddons] = useState<{ id: string; name: string; price: number; selected: boolean }[]>([
-    { id: 'add-contrast', name: 'IV Contrast Omnipaque 50ml (Non-Ionic)', price: 2500, selected: false },
-    { id: 'add-cannula', name: 'IV Cannula 20G & Infusion Tray Kit', price: 350, selected: false },
-    { id: 'add-film', name: 'High-Definition Laser Film Print (14x17")', price: 500, selected: false },
-    { id: 'add-stat', name: 'STAT Urgent 60-Minute Reporting Surcharge', price: 1000, selected: false },
-    { id: 'add-media', name: 'DICOM Archive CD/DVD Disc Export', price: 200, selected: false },
-  ]);
   const [isPanelBilling, setIsPanelBilling] = useState(false);
   const [panelProvider, setPanelProvider] = useState('');
   const [panelAuthCode, setPanelAuthCode] = useState('');
@@ -187,17 +187,19 @@ export const BillingView: React.FC<BillingViewProps> = ({
     return acc;
   }, {});
   const methodTotal = (code: string) => collectionsByMethod[code] ?? 0;
-  const cashCollected = methodTotal('cash');
-  const cardCollected = methodTotal('card');
-  const bankCollected = methodTotal('bank');
-  const mobileCollected = methodTotal('mobile');
-  const insuranceCollected = methodTotal('insurance');
+
+  // Which codes mean "drawer" and "POS" is the TENANT's configuration, not a
+  // convention. Asking for `cash`/`card` by name meant a clinic that coded its
+  // methods `currency` / `pos` saw a zero shift total and never got the change
+  // calculator — on the same screens that reconcile real money.
+  const cashCode = paymentMethods.find(m => m.kind === 'cash' && m.isActive)?.code ?? 'cash';
+  const cardCode = paymentMethods.find(m => m.kind === 'card' && m.isActive)?.code ?? 'card';
 
   // Server-ledger shift figures when loaded; deterministic client fallback
   // (same arithmetic over today's payments) keeps the window usable offline.
   const shiftCashExpected = shiftSummary
-    ? Math.max(0, shiftSummary.byMethod.find(m => m.method === 'cash')?.total ?? 0)
-    : todayPayments.filter(p => p.method === 'cash').reduce((s, p) => s + p.amount, 0);
+    ? Math.max(0, shiftSummary.byMethod.find(m => m.method === cashCode)?.total ?? 0)
+    : todayPayments.filter(p => p.method === cashCode).reduce((s, p) => s + p.amount, 0);
   const shiftTotalCollected = shiftSummary?.totalCollected ?? todayPayments.reduce((s, p) => s + p.amount, 0);
   const shiftRefundedTotal = shiftSummary?.refundedTotal ?? todayRefunds.reduce((s, p) => s + p.amount, 0);
   const shiftPaymentCount = shiftSummary?.paymentCount ?? todayCollections.length;
@@ -391,23 +393,16 @@ export const BillingView: React.FC<BillingViewProps> = ({
       calculatedDiscount = Math.min(apt.service.price, Math.max(0, discountValue));
     }
 
-    // Build extra items
-    const extraItems: InvoiceItem[] = selectedAddons
-      .filter(ad => ad.selected)
-      .map(ad => ({
-        id: `addon-${Date.now()}-${ad.id}`,
-        description: ad.name,
-        quantity: 1,
-        unitPrice: ad.price,
-        discount: 0,
-        lineTotal: ad.price,
-      }));
+    // No preset add-on lines: see the note where the picker used to be. Anything
+    // extra is added deliberately through "Add item", where the cashier sets the
+    // description and price and can see them.
+    const extraItems: InvoiceItem[] = [];
 
     const finalNotes = isPanelBilling
       ? `PANEL: ${panelProvider} | Auth #${panelAuthCode || 'DIRECT-VERIFIED'} | ${invoiceNotes}`
       : `${discountValue > 0 ? `Discount Reason: ${discountReason} | ` : ''}${invoiceNotes}`;
 
-    const totalBeforeInitialPay = apt.service.price - calculatedDiscount + extraItems.reduce((s, i) => s + i.lineTotal, 0);
+    const totalBeforeInitialPay = apt.service.price - calculatedDiscount;
 
     const initialPayObj = collectUpfront && upfrontAmount > 0 && upfrontMethod
       ? {
@@ -426,7 +421,6 @@ export const BillingView: React.FC<BillingViewProps> = ({
         setInvoiceNotes('');
         setIsPanelBilling(false);
         setPanelAuthCode('');
-        setSelectedAddons(prev => prev.map(a => ({ ...a, selected: false })));
       })
       .catch(() => { /* failure already flashed by the shell */ })
       .finally(() => setSubmittingCreate(false));
@@ -485,7 +479,7 @@ export const BillingView: React.FC<BillingViewProps> = ({
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement('a');
     link.setAttribute('href', encodedUri);
-    link.setAttribute('download', `PolytronX-Enterprise-PACS-RIS-Invoices-${new Date().toISOString().split('T')[0]}.csv`);
+    link.setAttribute('download', `PolytronX-Enterprise-PACS-RIS-Invoices-${localDateString()}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -504,7 +498,10 @@ export const BillingView: React.FC<BillingViewProps> = ({
   const handleOpenShiftClosingDocument = () => {
     void openPrintPreview({
       artifact: 'shift-closing',
-      id: new Date().toISOString().slice(0, 10),
+      // The day the drawer is being closed, in the clinic's timezone. A UTC
+      // derivation filed the shift sheet under yesterday for the first five
+      // hours of every morning.
+      id: localDateString(),
       options: {
         countedCash: physicalCashCounted,
         supervisor: supervisorName,
@@ -576,10 +573,10 @@ export const BillingView: React.FC<BillingViewProps> = ({
             <span className="text-xs text-slate-500 font-semibold uppercase tracking-wider">Total Invoiced</span>
             <Receipt className="w-4 h-4 text-slate-400" />
           </div>
-          <div className="text-2xl font-black text-slate-900 mt-1.5">Rs. {totalInvoiced.toLocaleString()}</div>
+          <div className="text-2xl font-black text-slate-900 mt-1.5">{cur} {totalInvoiced.toLocaleString()}</div>
           <div className="text-[11px] text-slate-400 mt-1 flex items-center justify-between">
             <span>{invoices.filter(i => i.status !== 'void').length} active invoices</span>
-            <span className="font-semibold text-slate-600">Discounts: Rs. {totalDiscounts.toLocaleString()}</span>
+            <span className="font-semibold text-slate-600">Discounts: {cur} {totalDiscounts.toLocaleString()}</span>
           </div>
         </div>
 
@@ -588,7 +585,7 @@ export const BillingView: React.FC<BillingViewProps> = ({
             <span className="text-xs text-emerald-700 font-semibold uppercase tracking-wider">Total Collections (Paid)</span>
             <CheckCircle2 className="w-4 h-4 text-emerald-600" />
           </div>
-          <div className="text-2xl font-black text-emerald-600 mt-1.5">Rs. {totalPaid.toLocaleString()}</div>
+          <div className="text-2xl font-black text-emerald-600 mt-1.5">{cur} {totalPaid.toLocaleString()}</div>
           <div className="text-[11px] text-emerald-600/80 font-medium mt-1">
             {totalInvoiced > 0 ? ((totalPaid / totalInvoiced) * 100).toFixed(1) : '100'}% collection efficiency
           </div>
@@ -599,7 +596,7 @@ export const BillingView: React.FC<BillingViewProps> = ({
             <span className="text-xs text-amber-700 font-semibold uppercase tracking-wider">Outstanding Receivables</span>
             <AlertCircle className="w-4 h-4 text-amber-600" />
           </div>
-          <div className="text-2xl font-black text-amber-600 mt-1.5">Rs. {totalDue.toLocaleString()}</div>
+          <div className="text-2xl font-black text-amber-600 mt-1.5">{cur} {totalDue.toLocaleString()}</div>
           <div className="text-[11px] text-amber-600/80 font-medium mt-1">
             {invoices.filter(i => i.balanceDue > 0 && i.status !== 'void').length} pending study balances
           </div>
@@ -610,9 +607,9 @@ export const BillingView: React.FC<BillingViewProps> = ({
             <span className="text-xs text-cyan-700 font-semibold uppercase tracking-wider">Cash in Counter Drawer (Today)</span>
             <Wallet className="w-4 h-4 text-cyan-600" />
           </div>
-          <div className="text-2xl font-black text-cyan-600 mt-1.5">Rs. {shiftCashExpected.toLocaleString()}</div>
+          <div className="text-2xl font-black text-cyan-600 mt-1.5">{cur} {shiftCashExpected.toLocaleString()}</div>
           <div className="text-[11px] text-slate-500 mt-1">
-            Card POS today: <span className="font-semibold text-slate-800">Rs. {shiftMethodTotal('card').toLocaleString()}</span>
+            Card POS today: <span className="font-semibold text-slate-800">{cur} {shiftMethodTotal(cardCode).toLocaleString()}</span>
           </div>
         </div>
       </div>
@@ -631,7 +628,7 @@ export const BillingView: React.FC<BillingViewProps> = ({
           )}
           {tenderBreakdown.map(t => (
             <span key={t.code} className="px-2.5 py-1 rounded-lg bg-white border border-slate-200 text-slate-700 font-medium">
-              {t.label}: <strong className="text-slate-900 font-mono">Rs. {t.total.toLocaleString()}</strong>
+              {t.label}: <strong className="text-slate-900 font-mono">{cur} {t.total.toLocaleString()}</strong>
             </span>
           ))}
         </div>
@@ -766,7 +763,7 @@ export const BillingView: React.FC<BillingViewProps> = ({
                                 {item.description}
                               </span>
                               <span className="text-[10px] text-slate-500 font-mono whitespace-nowrap">
-                                Rs. {item.lineTotal.toLocaleString()}
+                                {cur} {item.lineTotal.toLocaleString()}
                               </span>
                             </div>
                           ))}
@@ -780,11 +777,11 @@ export const BillingView: React.FC<BillingViewProps> = ({
 
                       {/* Net Total & Discount */}
                       <td className="py-2.5 px-3.5 whitespace-nowrap">
-                        <div className="font-bold text-slate-900 font-mono text-xs">Rs. {inv.total.toLocaleString()}</div>
+                        <div className="font-bold text-slate-900 font-mono text-xs">{cur} {inv.total.toLocaleString()}</div>
                         {inv.discountTotal > 0 && (
                           <div className="text-[9px] text-emerald-600 font-semibold flex items-center gap-0.5">
                             <Tag className="w-2.5 h-2.5" />
-                            <span>Disc: -Rs. {inv.discountTotal.toLocaleString()}</span>
+                            <span>Disc: -{cur} {inv.discountTotal.toLocaleString()}</span>
                           </div>
                         )}
                       </td>
@@ -792,11 +789,11 @@ export const BillingView: React.FC<BillingViewProps> = ({
                       {/* Paid / Balance */}
                       <td className="py-2.5 px-3.5 whitespace-nowrap">
                         <div className="text-emerald-700 font-mono font-bold text-xs">
-                          Paid: Rs. {inv.paidTotal.toLocaleString()}
+                          Paid: {cur} {inv.paidTotal.toLocaleString()}
                         </div>
                         {inv.balanceDue > 0 ? (
                           <div className="text-amber-700 font-mono font-bold text-[10px]">
-                            Due: Rs. {inv.balanceDue.toLocaleString()}
+                            Due: {cur} {inv.balanceDue.toLocaleString()}
                           </div>
                         ) : (
                           <div className="text-[9px] text-slate-400 font-semibold">Cleared in Full</div>
@@ -962,15 +959,15 @@ export const BillingView: React.FC<BillingViewProps> = ({
               </div>
               <div className="flex justify-between">
                 <span className="text-slate-500">Total Invoiced:</span>
-                <span className="font-mono font-semibold text-slate-800">Rs. {paymentModalInvoice.total.toLocaleString()}</span>
+                <span className="font-mono font-semibold text-slate-800">{cur} {paymentModalInvoice.total.toLocaleString()}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-slate-500">Already Paid:</span>
-                <span className="font-mono font-bold text-emerald-600">Rs. {paymentModalInvoice.paidTotal.toLocaleString()}</span>
+                <span className="font-mono font-bold text-emerald-600">{cur} {paymentModalInvoice.paidTotal.toLocaleString()}</span>
               </div>
               <div className="flex justify-between font-bold border-t border-slate-200 pt-1.5 text-amber-700">
                 <span>Remaining Balance Due:</span>
-                <span className="font-mono text-sm">Rs. {paymentModalInvoice.balanceDue.toLocaleString()}</span>
+                <span className="font-mono text-sm">{cur} {paymentModalInvoice.balanceDue.toLocaleString()}</span>
               </div>
             </div>
 
@@ -1040,7 +1037,7 @@ export const BillingView: React.FC<BillingViewProps> = ({
               </div>
 
               {/* Cash Change Calculator (if method is cash) */}
-              {payMethod === 'cash' && (
+              {payMethod === cashCode && (
                 <div className="bg-emerald-50/70 border border-emerald-200 p-3 rounded-xl space-y-2 text-xs">
                   <div className="flex items-center justify-between">
                     <span className="font-semibold text-emerald-800">Physical Cash Handed by Patient:</span>
@@ -1054,7 +1051,7 @@ export const BillingView: React.FC<BillingViewProps> = ({
                   <div className="flex justify-between items-center text-xs font-bold pt-1 border-t border-emerald-200/80">
                     <span className="text-emerald-900">Change to Return to Patient:</span>
                     <span className="font-mono text-sm text-emerald-700">
-                      Rs. {Math.max(0, cashTendered - payAmount).toLocaleString()}
+                      {cur} {Math.max(0, cashTendered - payAmount).toLocaleString()}
                     </span>
                   </div>
                 </div>
@@ -1143,49 +1140,32 @@ export const BillingView: React.FC<BillingViewProps> = ({
                     <option value="">Select an appointment...</option>
                     {unInvoicedAppointments.map((apt) => (
                       <option key={apt.id} value={apt.id}>
-                        [{apt.tokenNumber}] {apt.patient.name} ({apt.patient.mrn}) — {apt.service.name} (Rs. {apt.service.price.toLocaleString()})
+                        [{apt.tokenNumber}] {apt.patient.name} ({apt.patient.mrn}) — {apt.service.name} ({cur} {apt.service.price.toLocaleString()})
                       </option>
                     ))}
                   </select>
                 )}
               </div>
 
-              {/* Step 2: Add-on Consumables / Surcharges */}
-              <div>
-                <label className="block text-xs font-bold text-slate-800 mb-1.5">
-                  2. Optional Consumables & Service Add-ons
-                </label>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                  {selectedAddons.map((addon, index) => (
-                    <label
-                      key={addon.id}
-                      className={`flex items-center space-x-2.5 p-2.5 rounded-xl border text-xs cursor-pointer transition-all ${
-                        addon.selected
-                          ? 'bg-cyan-50/80 border-cyan-300 text-cyan-900 font-semibold'
-                          : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100'
-                      }`}
-                    >
-                      <input
-                        type="checkbox"
-                        checked={addon.selected}
-                        onChange={(e) => {
-                          const checked = e.target.checked;
-                          setSelectedAddons(prev =>
-                            prev.map((a, i) => (i === index ? { ...a, selected: checked } : a))
-                          );
-                        }}
-                        className="rounded text-cyan-600 focus:ring-cyan-500 cursor-pointer"
-                      />
-                      <div className="flex-1 truncate">
-                        <div className="truncate">{addon.name}</div>
-                        <div className="font-mono text-[11px] text-cyan-700 font-bold">+Rs. {addon.price.toLocaleString()}</div>
-                      </div>
-                    </label>
-                  ))}
-                </div>
-              </div>
+              {/*
+                The "optional consumables & add-ons" picker was removed.
 
-              {/* Step 3: Corporate Panel / Insurance Option */}
+                It offered five clinical add-ons with PKR prices hardcoded in the
+                bundle, and that `unitPrice` went onto the invoice line as sent —
+                the server recomputes a booking's procedure price from the tenant's
+                catalog but not a manually-added line. So it was a client-dictated
+                price in a fixed currency on a financial document: wrong for every
+                tenant but the one it was written for, and editable in devtools.
+
+                A correct version needs tenant-configurable BILLABLE ITEMS, which
+                `Service` does not model (a service is a procedure belonging to a
+                modality). Until that exists, the cashier adds a line with an
+                explicit description and price via "Add item" — a deliberate
+                override they can see and correct — rather than ticking a preset
+                that quietly prices itself.
+              */}
+
+              {/* Step 2: Corporate Panel / Insurance Option */}
               <div className="bg-slate-50 p-3.5 rounded-2xl border border-slate-200 space-y-2.5">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center space-x-2">
@@ -1494,7 +1474,7 @@ export const BillingView: React.FC<BillingViewProps> = ({
                         {p.kind === 'refund' ? 'Refund' : `Receipt #${idx + 1}`}
                       </span>
                       <span className={`font-mono text-sm ${p.kind === 'refund' ? 'text-rose-700' : 'text-emerald-700'}`}>
-                        {p.kind === 'refund' ? '-' : ''}Rs. {Math.abs(p.amount).toLocaleString()}
+                        {p.kind === 'refund' ? '-' : ''}{cur} {Math.abs(p.amount).toLocaleString()}
                       </span>
                     </div>
                     <div className="flex justify-between text-slate-500 text-[11px]">
@@ -1591,8 +1571,8 @@ export const BillingView: React.FC<BillingViewProps> = ({
                       const left = Math.max(0, p.amount - already);
                       return (
                         <option key={p.id} value={p.id} disabled={left <= 0}>
-                          {p.paidAt} — {p.method.toUpperCase()} — Rs. {p.amount.toLocaleString()}
-                          {already > 0 ? ` (refunded Rs. ${already.toLocaleString()}, left Rs. ${left.toLocaleString()})` : ''}
+                          {p.paidAt} — {p.method.toUpperCase()} — {cur} {p.amount.toLocaleString()}
+                          {already > 0 ? ` (refunded ${cur} ${already.toLocaleString()}, left ${cur} ${left.toLocaleString()})` : ''}
                         </option>
                       );
                     })}
@@ -1616,7 +1596,7 @@ export const BillingView: React.FC<BillingViewProps> = ({
                       onClick={() => setRefundAmount(refundableOnSelected)}
                       className="px-2 py-1 rounded bg-slate-100 hover:bg-slate-200 text-slate-700 text-[10px] font-bold cursor-pointer"
                     >
-                      Refundable: Rs. {refundableOnSelected.toLocaleString()}
+                      Refundable: {cur} {refundableOnSelected.toLocaleString()}
                     </button>
                   </div>
                 </div>
@@ -1781,21 +1761,21 @@ export const BillingView: React.FC<BillingViewProps> = ({
               </div>
               <div className="flex justify-between">
                 <span className="text-slate-600">Total Invoiced Today (Gross):</span>
-                <span className="font-mono font-semibold">Rs. {todayInvoiced.toLocaleString()}</span>
+                <span className="font-mono font-semibold">{cur} {todayInvoiced.toLocaleString()}</span>
               </div>
               <div className="flex justify-between text-emerald-700">
                 <span>Total Discounts Given Today:</span>
-                <span className="font-mono font-semibold">- Rs. {todayDiscounts.toLocaleString()}</span>
+                <span className="font-mono font-semibold">- {cur} {todayDiscounts.toLocaleString()}</span>
               </div>
               {shiftRefundedTotal < 0 && (
                 <div className="flex justify-between text-rose-700">
                   <span>Refunds Issued Today (money out):</span>
-                  <span className="font-mono font-semibold">Rs. {shiftRefundedTotal.toLocaleString()}</span>
+                  <span className="font-mono font-semibold">{cur} {shiftRefundedTotal.toLocaleString()}</span>
                 </div>
               )}
               <div className="flex justify-between font-bold text-slate-900 border-t border-slate-200 pt-1">
                 <span>Total Shift Collections Realized ({shiftInvoiceCount} invoices / {shiftPaymentCount} payments):</span>
-                <span className="font-mono text-sm text-emerald-600">Rs. {shiftTotalCollected.toLocaleString()}</span>
+                <span className="font-mono text-sm text-emerald-600">{cur} {shiftTotalCollected.toLocaleString()}</span>
               </div>
             </div>
 
@@ -1807,8 +1787,8 @@ export const BillingView: React.FC<BillingViewProps> = ({
                   <span>Physical Cash Drawer Denomination Count</span>
                 </div>
                 <div className="text-[11px] text-cyan-800 font-semibold">
-                  Expected in Drawer: <strong className="font-mono">Rs. {shiftCashExpected.toLocaleString()}</strong>
-                  {shiftSummary && shiftSummary.byMethod.find(m => m.method === 'cash') && (
+                  Expected in Drawer: <strong className="font-mono">{cur} {shiftCashExpected.toLocaleString()}</strong>
+                  {shiftSummary && shiftSummary.byMethod.find(m => m.method === cashCode) && (
                     <span className="ml-1 text-[9px] text-cyan-600">(server ledger)</span>
                   )}
                 </div>
@@ -1817,7 +1797,7 @@ export const BillingView: React.FC<BillingViewProps> = ({
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
                 {[5000, 1000, 500, 100, 50, 20, 10].map((denom) => (
                   <div key={denom} className="bg-white p-2 rounded-xl border border-cyan-200 flex items-center justify-between shadow-2xs">
-                    <span className="font-bold font-mono text-slate-700">x Rs.{denom}</span>
+                    <span className="font-bold font-mono text-slate-700">x {cur}{denom}</span>
                     <input
                       type="number"
                       min={0}
@@ -1837,21 +1817,21 @@ export const BillingView: React.FC<BillingViewProps> = ({
               <div className="bg-white p-3 rounded-xl border border-cyan-200 flex flex-wrap items-center justify-between gap-2 text-xs">
                 <div>
                   <span className="text-slate-500">Physical Counted Cash: </span>
-                  <strong className="font-mono text-sm text-slate-900">Rs. {physicalCashCounted.toLocaleString()}</strong>
+                  <strong className="font-mono text-sm text-slate-900">{cur} {physicalCashCounted.toLocaleString()}</strong>
                 </div>
                 <div>
                   <span className="text-slate-500">Variance: </span>
                   {cashDiscrepancy === 0 ? (
                     <span className="px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 font-bold font-mono text-xs">
-                      BALANCED (Rs. 0)
+                      BALANCED ({cur} 0)
                     </span>
                   ) : cashDiscrepancy > 0 ? (
                     <span className="px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 font-bold font-mono text-xs">
-                      +Rs. {cashDiscrepancy.toLocaleString()} (Surplus)
+                      +{cur} {cashDiscrepancy.toLocaleString()} (Surplus)
                     </span>
                   ) : (
                     <span className="px-2 py-0.5 rounded bg-rose-100 text-rose-800 font-bold font-mono text-xs">
-                      -Rs. {Math.abs(cashDiscrepancy).toLocaleString()} (Shortage)
+                      -{cur} {Math.abs(cashDiscrepancy).toLocaleString()} (Shortage)
                     </span>
                   )}
                 </div>
@@ -1909,7 +1889,7 @@ export const BillingView: React.FC<BillingViewProps> = ({
                   type="text"
                   value={shiftNotes}
                   onChange={(e) => setShiftNotes(e.target.value)}
-                  placeholder="e.g. Handed over key & Rs. 18,500 to evening shift."
+                  placeholder="e.g. Handed over key & 18,500 to evening shift."
                   className="w-full bg-white text-slate-900 p-2.5 rounded-xl border border-slate-300 text-xs"
                 />
               </div>

@@ -26,6 +26,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 
 /**
@@ -676,9 +677,12 @@ class ReportingController extends BaseApiController
         $mine = (int) $macro->created_by === (int) Auth::id();
 
         // A shared macro belongs to the clinic; a personal one to its author.
+        // Same authority as storeMacro, deliberately: a snippet is clinical
+        // content, so editing the shared library is a template-editor action.
+        // (This guard used to also accept a `report macro manage` grant that
+        // does not exist in PermissionCatalog, so no role could ever hold it.)
         $this->denyUnlessAny(
             $mine ? ['report edit', 'report template edit'] : ['report template edit'],
-            'report macro manage',
         );
     }
 
@@ -938,12 +942,21 @@ class ReportingController extends BaseApiController
         }
 
         $v = $request->validate([
-            'radiologistId' => ['present', 'nullable', 'integer'],
+            // `me` is an INTENT ("put this in my own list"), not an id. The
+            // worklist's Claim button speaks that intent; the id it would have
+            // guessed did not survive `Number('me')` → NaN → JSON `null`, so
+            // every claim silently became an UNASSIGN. Resolving it here keeps
+            // the caller from having to know its own user id.
+            'radiologistId' => ['present', 'nullable', 'regex:/^\d+$|^me$/'],
             'note' => ['nullable', 'string', 'max:255'],
         ]);
 
-        $target = $v['radiologistId'] !== null ? (int) $v['radiologistId'] : null;
         $me = (int) Auth::id();
+        $target = match (true) {
+            $v['radiologistId'] === null => null,
+            $v['radiologistId'] === 'me' => $me,
+            default => (int) $v['radiologistId'],
+        };
         $currentAssignee = $appointment->assigned_radiologist_id !== null ? (int) $appointment->assigned_radiologist_id : null;
 
         // A radiologist may take a study and release their own claim; handing
@@ -1060,7 +1073,14 @@ class ReportingController extends BaseApiController
             'newPatient.bloodGroup' => ['nullable', 'string', 'max:8'],
 
             'serviceId' => ['required', 'integer'],
-            'referrerId' => ['nullable', 'integer'],
+            // Tenant-scoped: a bare `integer` let a report cite another clinic's
+            // referrer, and the study response then serialised that doctor's
+            // contact details back to the reporter.
+            'referrerId' => [
+                'nullable',
+                'integer',
+                Rule::exists('referrers', 'id')->where(fn ($q) => $q->where('business_id', $this->tenantId())),
+            ],
             'date' => ['required', 'date_format:Y-m-d'],
             'priority' => ['required', 'in:routine,urgent,stat'],
             // Date the external examination was performed, when it differs

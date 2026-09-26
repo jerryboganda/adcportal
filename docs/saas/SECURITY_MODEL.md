@@ -31,3 +31,5 @@
 ## Honest scope
 
 Technical controls target OWASP ASVS/multi-tenant guidance; **no compliance certification is claimed** (HIPAA/GDPR/SOC 2 are formal processes, not code outcomes). Payment data never touches the system (manual activation; no gateway).
+- **Secrets are write-only.** Tenant integration credentials are encrypted at rest (`encrypted:array`) and never serialized to any response — the API reports which secret *keys* exist plus a fixed mask. There is no read-back path, by design.
+- **Outbound AI egress is opt-in.** The screening-triage assistant (`TYPESAFE_ENABLED`) posts submitted screening answers, catalog question text and shift-review figures to a third-party model host (`AI_GATEWAY_BASE_URL`). It is **off by default**: a clinic sets the flag and supplies a key to activate it. It is fail-open — the deterministic `flagsRisk()` gate stays authoritative and nothing clinical depends on the model answering. This is the one place clinical text leaves the tenant boundary, and it is stated here because it was previously enabled by default and named in no security or data-classification document.

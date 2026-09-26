@@ -18,13 +18,61 @@
 
 | Command | Purpose |
 |---|---|
-| `ris:subscription-sweep` | lapses finished trials/terms → `expired`; closes expired support sessions (scheduled daily 03:10 via `schedule:run`) |
+| `ris:subscription-sweep` | lapses finished trials/terms → `expired`; closes expired support sessions (scheduled daily 03:10) |
 | `ris:tenant-destroy {tenant_code} --confirm={code}` | destroys a **terminated** tenant's retained data after the retention window (`--force` overrides the clock; interactive confirmation required). Not exposed via any API. |
 | `ris:purge-demo --force` | removes the demo tenant + its data (pre-existing, demo-mode only) |
 
-## Scheduler (existing cron `schedule:run`)
+## Scheduler (`schedule:work`, in-container)
 
-`ris:subscription-sweep` (daily), `app:appointment-reminder` (5 min), `sanctum:prune-expired` (hourly), `model:prune` (daily, non-sync queues), API-log trim (daily).
+**There is no host cron and none is needed.** `docker/entrypoint.sh` starts
+`php artisan schedule:work` in the background on container boot
+(`APP_SCHEDULE_ON_BOOT`, default `true`), so every deploy brings the scheduler
+back with the container. Verified in production: the process runs in the app
+container's cgroup and ticks once a minute.
+
+A host `curl http://localhost:PORT/cron` line in `crontab -l` is NOT this
+scheduler — the app defines no `/cron` route, so that path returns the SPA shell
+and runs nothing. (A stale `localhost:9000/cron` line exists on the shared VPS
+and belongs to another project; it is a red herring when debugging.)
+
+The schedule itself lives in `routes/console.php` — the source of truth:
+
+| Task | Cadence |
+|---|---|
+| `queue:work --stop-when-empty --max-time=50 --backoff=10` | every minute |
+| `app:appointment-reminder` | hourly |
+| `sanctum:prune-expired --hours=24` | hourly |
+| print scratch sweep (`storage/app/print-tmp`, files older than 1h) | hourly |
+| `ris:subscription-sweep` | daily at 03:10 |
+
+`model:prune` and an api.log trim are **not** scheduled: no model is `Prunable`
+and the APILog middleware is attached to no route, so neither job has anything
+to do.
+
+## Logs (verified on the VPS 2026-09-26)
+
+| File | Grows by | Rotates? |
+|---|---|---|
+| `storage/logs/laravel.log` | only on `ERROR`+ (50 lines to date) | **No** — `stack` aggregates the `single` channel |
+| `storage/logs/schedule.log` | ~156 KiB/month (2 lines/minute from `schedule:work`) | **No** — plain shell redirect in `docker/entrypoint.sh` |
+| `docker logs adc-portal-app` | container stdout | Yes — daemon caps json-file at `10m` × 5 |
+
+`storage/` is a persistent bind mount (`/opt/adc-portal-data/storage`), so neither
+file is reclaimed by a redeploy. At the observed rates this is not urgent (96 GB
+free), but both are **unbounded**, and the growth is only quiet while nobody logs
+an exception.
+
+Two things to know before "fixing" it:
+
+- **Do not switch the `stack` to `daily` casually.** `daily` writes
+  `laravel-YYYY-MM-DD.log`, and two CI steps (`ci.yml` lines 63 and 185) grep the
+  literal `storage/logs/laravel.log` to attach failure detail as annotations. The
+  change would compile, pass, and silently blind CI to every backend error.
+- **Production runs `LOG_LEVEL=debug`** while `.env.example` ships `error`. With
+  no rotation that is the worst pairing: maximum verbosity into a file nothing
+  prunes. `APP_DEBUG=false` is correctly set. Lowering `LOG_LEVEL` is a `.env`
+  change on the host, which needs explicit operator approval — it is not a
+  repository edit.
 
 ## Health
 

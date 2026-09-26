@@ -81,7 +81,18 @@ async function binaryFromPage(page, path) {
 const MM_TO_PX = 96 / 25.4;
 const MM_TO_PT = 2.8346456693;
 
-const TODAY = new Date().toISOString().slice(0, 10);
+// The day the SEEDED studies fall on. The seeder stamps them with
+// `now()->format('Y-m-d')` in the APP timezone (Asia/Karachi), so deriving this
+// from `toISOString()` (UTC) picks yesterday between 00:00 and 05:00 PKT — the
+// manifest and shift-closing documents then render an EMPTY day and still pass
+// every structural assertion below, validating nothing.
+const TODAY = (() => {
+    const now = new Date();
+    const month = `${now.getMonth() + 1}`.padStart(2, '0');
+    const day = `${now.getDate()}`.padStart(2, '0');
+
+    return `${now.getFullYear()}-${month}-${day}`;
+})();
 
 async function login(page) {
     await page.goto('/');
@@ -364,6 +375,19 @@ test.describe('print subsystem', () => {
             }
 
             expect(bodyBox.width).toBeLessThanOrEqual(box.width + 0.5);
+
+            // A paper with a FIXED height has to hold its own content. The label
+            // used to compose the shared letterhead and the shared key/value
+            // table — ~51 mm of content on a 25.4 mm tag — and came out of the
+            // printer as three tags per patient with the barcode on the second.
+            // No MediaBox assertion could have caught it: the first page still
+            // measured exactly 25.4 mm while two more followed it.
+            if (document.render.heightMm !== null) {
+                expect(
+                    bodyBox.height / MM_TO_PX,
+                    `${fixture.artifact} content is ${(bodyBox.height / MM_TO_PX).toFixed(1)} mm on a ${document.render.heightMm} mm sheet`,
+                ).toBeLessThanOrEqual(document.render.heightMm + 0.6);
+            }
         }
     });
 

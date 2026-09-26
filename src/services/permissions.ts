@@ -138,3 +138,29 @@ export type ActionGate = keyof typeof ACTION_GATES;
 
 export const canAction = (permissions: string[], gate: ActionGate): boolean =>
   canAny(permissions, [...ACTION_GATES[gate]]);
+
+// ==================== printing ====================
+
+/**
+ * Which permissions the SERVER will accept for each printable artifact.
+ *
+ * This mirrors `App\Support\Print\PrintArtifactRegistry` — the server is the only
+ * enforcement point, and it uses ANY-of. The SPA copy exists only so a print
+ * button is not offered to someone the registry will answer 403; `report print`
+ * and `label print` are real, separately revocable grants and were simply never
+ * consulted on this side. If the registry changes, this map must change with it.
+ */
+export const ARTIFACT_PRINT_PERMISSIONS: Record<string, string[]> = {
+  invoice: ['invoice print', 'invoice manage'],
+  receipt: ['receipt print', 'invoice manage'],
+  report: ['report print', 'report manage'],
+  token: ['receipt print', 'study checkin', 'appointment manage'],
+  label: ['label print', 'study acquire', 'study checkin', 'appointment manage'],
+  manifest: ['receipt print', 'appointment manage'],
+  'fee-schedule': ['invoice print', 'catalog view'],
+  'doctor-settlement': ['invoice print', 'doctors view'],
+  'shift-closing': ['invoice print', 'invoice payment'],
+};
+
+export const canPrintArtifact = (permissions: string[], artifact: string): boolean =>
+  canAny(permissions, ARTIFACT_PRINT_PERMISSIONS[artifact] ?? []);

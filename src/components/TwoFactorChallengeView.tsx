@@ -27,7 +27,10 @@ export const TwoFactorChallengeView: React.FC<TwoFactorChallengeViewProps> = ({ 
     e.preventDefault();
     setError('');
 
-    if (code.trim().length !== 6) {
+    // Digits only. The field accepts and the placeholder suggests "123 456", and
+    // the server strips whitespace before comparing — so counting the space made
+    // the format the UI advertises permanently unacceptable.
+    if (code.replace(/\D/g, '').length !== 6) {
       setError('Enter the 6-digit code from your authenticator app.');
       return;
     }

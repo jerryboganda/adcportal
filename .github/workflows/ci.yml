@@ -1,4 +1,4 @@
-name: CI — Test, Build & Deliver
+name: CI â€” Test, Build & Deliver
 
 on:
   push:
@@ -6,13 +6,13 @@ on:
   pull_request:
   workflow_dispatch:
 
-# Builds and tests run HERE (GitHub Actions) — never on the hosting box.
+# Builds and tests run HERE (GitHub Actions) â€” never on the hosting box.
 permissions:
   contents: read
 
 jobs:
   api-tests:
-    name: Backend — PHP feature tests
+    name: Backend â€” PHP feature tests
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -43,7 +43,7 @@ jobs:
       - name: Run API suite (auth, RBAC, tenant isolation, workflow, billing, inventory, reporting)
         run: |
           set -o pipefail
-          # NOTE: no `|| echo` here — a failing suite MUST fail this step and
+          # NOTE: no `|| echo` here â€” a failing suite MUST fail this step and
           # the job (the old swallow made the backend job unable to fail).
           # Unit is included explicitly: it holds the pure-logic tests (age
           # bands, structured-report rendering, booking money) that the Feature
@@ -52,63 +52,63 @@ jobs:
 
       # NOTE: GitHub publishes at most ~10 `::error::` annotations PER STEP.
       # Every diagnostic below therefore lives in its OWN step so it gets a
-      # fresh annotation budget — a single fat step silently swallows all but
+      # fresh annotation budget â€” a single fat step silently swallows all but
       # the first ten lines (which is exactly how a 500 stayed undiagnosed).
 
-      - name: Failure detail — application log
+      - name: Failure detail â€” application log
         if: failure()
         run: |
           # Laravel reports every uncaught exception here: class, message and
           # the first stack frames. This is the fastest path to a 5xx cause.
           grep -aE "\.ERROR:" storage/logs/laravel.log 2>/dev/null | head -10 | cut -c1-900 | sed 's/^/::error::laravel /' || true
 
-      - name: Failure detail — failing tests
+      - name: Failure detail â€” failing tests
         if: failure()
         run: |
           grep -aE "FAILED |ERRORS |Tests: " /tmp/phpunit.log | head -10 | cut -c1-300 | sed 's/^/::error::result /' || true
 
-      - name: Failure detail — assertion lines
+      - name: Failure detail â€” assertion lines
         if: failure()
         run: |
           # Line-numbered orientation: exactly where the failures sit.
           grep -anE "FAILED |ERRORS |Tests: |Failed asserting|Expected response|Exception|Error:|SQLSTATE" /tmp/phpunit.log | head -10 | cut -c1-400 | sed 's/^/::error::assert /' || true
 
-      - name: Failure detail — phpunit warnings
+      - name: Failure detail â€” phpunit warnings
         if: failure()
         run: |
           # PHPUnit reports unexpected output as a warning and only shows the
-          # first line, which is usually the only clue — print it in full.
-          grep -aE "! .*→" /tmp/phpunit.log | head -3 | cut -c1-900 | sed 's/^/::error::warn /' || true
+          # first line, which is usually the only clue â€” print it in full.
+          grep -aE "! .*â†’" /tmp/phpunit.log | head -3 | cut -c1-900 | sed 's/^/::error::warn /' || true
 
-      - name: Failure detail — tail 1/5
+      - name: Failure detail â€” tail 1/5
         if: failure()
         run: tail -n 50 /tmp/phpunit.log | sed -n '1,10p' | cut -c1-900 | sed 's/^/::error::t1 /' || true
 
-      - name: Failure detail — tail 2/5
+      - name: Failure detail â€” tail 2/5
         if: failure()
         run: tail -n 50 /tmp/phpunit.log | sed -n '11,20p' | cut -c1-900 | sed 's/^/::error::t2 /' || true
 
-      - name: Failure detail — tail 3/5
+      - name: Failure detail â€” tail 3/5
         if: failure()
         run: tail -n 50 /tmp/phpunit.log | sed -n '21,30p' | cut -c1-900 | sed 's/^/::error::t3 /' || true
 
-      - name: Failure detail — tail 4/5
+      - name: Failure detail â€” tail 4/5
         if: failure()
         run: tail -n 50 /tmp/phpunit.log | sed -n '31,40p' | cut -c1-900 | sed 's/^/::error::t4 /' || true
 
-      - name: Failure detail — tail 5/5
+      - name: Failure detail â€” tail 5/5
         if: failure()
         run: tail -n 50 /tmp/phpunit.log | sed -n '41,50p' | cut -c1-900 | sed 's/^/::error::t5 /' || true
 
   api-tests-postgres:
     # The engine parity job. Production runs PostgreSQL (17) while the fast
     # suite above runs SQLite, and the two disagree in ways that cost real
-    # outages: SQLite silently ignores `SELECT … FOR UPDATE` on an aggregate
+    # outages: SQLite silently ignores `SELECT â€¦ FOR UPDATE` on an aggregate
     # (PostgreSQL rejects it with SQLSTATE[0A000]), so a booking allocator that
     # 500'd every production booking stayed green here. Anything touching
     # booking money, tokens or tenancy must therefore also pass on PostgreSQL
     # BEFORE a release can deploy.
-    name: Backend — booking & billing suites on PostgreSQL (prod dialect)
+    name: Backend â€” booking & billing suites on PostgreSQL (prod dialect)
     runs-on: ubuntu-latest
 
     services:
@@ -150,28 +150,35 @@ jobs:
       - name: Bootstrap packages (package:discover)
         run: php artisan package:discover --ansi
 
-      - name: Booking, billing, token, reporting & tenancy suites on PostgreSQL
+      - name: Full suite on PostgreSQL
         run: |
           set -o pipefail
-          # Run the money/queue/token/reporting paths on the engine production
-          # actually uses. Reporting belongs here because it writes clinical
-          # records (versioning, JSON structured values, LIKE escaping, row
-          # locks for token allocation) — dialect bugs there would corrupt or
-          # block a signed report in production. Widen to --testsuite=Feature
-          # once the rest of the suite is proven dialect-clean.
-          php artisan test --filter='RadiologyCatalog|MastersConfigTest|BookingMoneyTest|WalkInBookingFinancialsTest|StudyBookingPaymentTest|StudyBookingTokenTest|StudyTokenAllocatorTest|StudyTokenConcurrencyTest|StudyFactAtomicityTest|StudyWorkflowTest|BookingRoomTest|BillingTest|TenantIsolationTest|ReportingWorklistTest|ReportingPreferencesTest|ReportTemplateResolutionTest|ReportDraftConcurrencyTest|ReportManualCreationTest|ReportMacrosTest|ReportDictationTest|ReportPdfTest|PrintDocumentTest|PrintPdfTest|CriticalFindingLogTest' 2>&1 | tee /tmp/phpunit-pg.log
+          # The SAME suite the SQLite job runs, on the engine production actually
+          # uses. This used to be a hand-maintained --filter allowlist of 25
+          # clinical/financial classes, which had silently rotted: all 30 tenancy,
+          # RBAC, platform and lifecycle classes were excluded, so cross-tenant
+          # leakage and authorization regressions were only ever proven against
+          # SQLite. Its own comment said "widen once the rest of the suite is
+          # proven dialect-clean" - the tests are now explicitly dialect-aware
+          # (see TestCase, StudyTokenAllocatorTest, StudyTokenConcurrencyTest),
+          # so the allowlist is gone rather than extended again.
+          #
+          # Keep the SQLite job as the fast gate; this one exists to catch what
+          # SQLite cannot express (row locks, FK enforcement, LIKE case
+          # sensitivity, boolean and strict-mode coercion).
+          php artisan test --testsuite=Feature,Unit 2>&1 | tee /tmp/phpunit-pg.log
 
       # GitHub publishes at most ~10 `::error::` annotations PER STEP, so the
       # summary and every failing test name get their own step (fresh budget)
-      # BEFORE the error detail — a single fat grep silently hides all but the
+      # BEFORE the error detail â€” a single fat grep silently hides all but the
       # first ten lines, which is exactly how the SQLSTATE below stayed
       # undiagnosed on the first run of this job.
-      - name: Failure detail — PostgreSQL suite results
+      - name: Failure detail â€” PostgreSQL suite results
         if: failure()
         run: |
           grep -aE "^  Tests: |FAILED " /tmp/phpunit-pg.log | head -9 | cut -c1-380 | sed 's/^/::error::pg-result /' || true
 
-      - name: Failure detail — PostgreSQL suite errors
+      - name: Failure detail â€” PostgreSQL suite errors
         if: failure()
         run: |
           grep -aE "SQLSTATE|Failed asserting|Exception:" /tmp/phpunit-pg.log | head -7 | cut -c1-380 | sed 's/^/::error::pg-error /' || true
@@ -179,7 +186,7 @@ jobs:
           exit 1
 
   spa-build:
-    name: Frontend — typecheck & production build
+    name: Frontend â€” typecheck & production build
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -191,7 +198,7 @@ jobs:
           cache: 'npm'
 
       - name: Install npm dependencies
-        run: npm ci --legacy-peer-deps || npm install --legacy-peer-deps
+        run: npm ci --legacy-peer-deps
 
       - name: Typecheck (tsc --noEmit)
         run: npm run lint
@@ -207,7 +214,7 @@ jobs:
           retention-days: 7
 
   e2e:
-    name: E2E — real browser journey
+    name: E2E â€” real browser journey
     runs-on: ubuntu-latest
     needs: [api-tests, spa-build]
     steps:
@@ -241,7 +248,7 @@ jobs:
           set -o pipefail
           {
             # The repo ships no .env (by design). key:generate cannot CREATE
-            # one, so provision it from the example first — otherwise the app
+            # one, so provision it from the example first â€” otherwise the app
             # runs with an empty APP_KEY and the browser login flow can never
             # complete (CSRF/session cookies cannot be encrypted).
             php -r "file_exists('.env') || copy('.env.example', '.env');"
@@ -249,7 +256,7 @@ jobs:
             sed -i 's|^APP_URL=.*|APP_URL=http://127.0.0.1:8000|' .env
             sed -i 's|^DB_CONNECTION=.*|DB_CONNECTION=sqlite|' .env
             # An empty DB_DATABASE= overrides SQLite's default path with "",
-            # which fails with "unable to open database file" — drop it.
+            # which fails with "unable to open database file" â€” drop it.
             sed -i '/^DB_DATABASE=/d' .env
             grep -q '^SANCTUM_STATEFUL_DOMAINS=' .env || echo 'SANCTUM_STATEFUL_DOMAINS=localhost:3000,127.0.0.1:3000,localhost:8000,127.0.0.1:8000' >> .env
             sed -i 's|^SANCTUM_STATEFUL_DOMAINS=.*|SANCTUM_STATEFUL_DOMAINS=localhost:3000,127.0.0.1:3000,localhost:8000,127.0.0.1:8000|' .env
@@ -275,7 +282,7 @@ jobs:
 
       - name: Install Playwright
         run: |
-          npm ci --legacy-peer-deps || npm install --legacy-peer-deps
+          npm ci --legacy-peer-deps
           npx playwright install chromium --with-deps
 
       - name: Run E2E specs
@@ -285,13 +292,13 @@ jobs:
           E2E_PASSWORD: E2eDemo#2026
         run: |
           set -o pipefail
-          # No `|| echo` — a failing E2E run MUST fail this step and the job.
+          # No `|| echo` â€” a failing E2E run MUST fail this step and the job.
           npx playwright test 2>&1 | tee /tmp/e2e.log
 
       - name: E2E failure detail (fresh annotation budget)
         if: failure()
         run: |
-          grep -aE "passed|failed|✘" /tmp/e2e.log | head -12 | sed 's/^/::error::e2e-result /' || true
+          grep -aE "passed|failed|âœ˜" /tmp/e2e.log | head -12 | sed 's/^/::error::e2e-result /' || true
           grep -aE "Error:|Timed out|waiting for|locator" /tmp/e2e.log | head -14 | sed 's/^/::error::e2e-detail /' || true
           exit 1
 
@@ -305,10 +312,10 @@ jobs:
     # Printing is verified against a REAL browser and a REAL renderer per browser
     # engine: paper geometry, print-media CSS, calibration, PDF page size, and the
     # PDF compared to the page the browser actually laid out. The server-side PDF
-    # engine is asserted to be Chromium (the pixel-true path) — a silent fallback
+    # engine is asserted to be Chromium (the pixel-true path) â€” a silent fallback
     # to another renderer is a FAILURE here, because that is exactly the drift
     # that reaches paper unnoticed.
-    name: Print — visual regression & PDF page QA (${{ matrix.browser }})
+    name: Print â€” visual regression & PDF page QA (${{ matrix.browser }})
     runs-on: ubuntu-latest
     needs: [api-tests, spa-build]
     strategy:
@@ -372,7 +379,7 @@ jobs:
 
       - name: Install Playwright browsers
         run: |
-          npm ci --legacy-peer-deps || npm install --legacy-peer-deps
+          npm ci --legacy-peer-deps
           npx playwright install chromium --with-deps
 
       - name: Install Microsoft Edge (second engine, same Chromium family)
@@ -410,7 +417,7 @@ jobs:
       - name: Print visual failure detail (fresh annotation budget)
         if: failure()
         run: |
-          grep -aE "passed|failed|✘|engines used|expected|Received" /tmp/print-visual.log 2>/dev/null | head -14 | sed 's/^/::error::print /' || true
+          grep -aE "passed|failed|âœ˜|engines used|expected|Received" /tmp/print-visual.log 2>/dev/null | head -14 | sed 's/^/::error::print /' || true
           exit 1
 
       - uses: actions/upload-artifact@v4
@@ -422,10 +429,24 @@ jobs:
             test-results/
           retention-days: 7
 
+  # The image is produced only from a commit whose whole matrix is green, so the
+  # public `:latest` tag can never point at code the tests rejected. `deploy`
+  # consumes this job, so the SHA it pulls was proven before it was shipped.
+  publish:
+    name: Publish image to GHCR
+    needs: [api-tests, api-tests-postgres, spa-build, e2e, print-visual]
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    uses: ./.github/workflows/publish.yml
+    with:
+      sha: ${{ github.sha }}
+    permissions:
+      contents: read
+      packages: write
+
   deploy:
     name: Deploy to production VPS (ris.polytronx.com)
     runs-on: ubuntu-latest
-    needs: [api-tests, api-tests-postgres, spa-build, e2e, print-visual]
+    needs: [publish]
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     permissions:
       packages: read
@@ -465,7 +486,7 @@ jobs:
             cd "${APP_PATH}"
 
             # Deploy the EXACT image this run built and tested (tag = commit
-            # SHA), never the floating :latest — a publish that failed or
+            # SHA), never the floating :latest â€” a publish that failed or
             # raced CI would otherwise redeploy an OLD image while the
             # pipeline reports green. The pull itself is the existence proof:
             # a SHA-tagged manifest can only be there if publish pushed it.
@@ -473,22 +494,22 @@ jobs:
 
             # A stored long-lived VPS credential can lapse and break every
             # future deploy. Authenticate each pull with the short-lived
-            # workflow token — delivered through the SSH env (never a CLI
+            # workflow token â€” delivered through the SSH env (never a CLI
             # flag or the remote process list) and consumed via
             # --password-stdin (never echoed or logged), then cleared.
             printf '%s' "$GHCR_TOKEN" | docker login ghcr.io --username "$GHCR_USER" --password-stdin
             trap 'docker logout ghcr.io >/dev/null 2>&1 || true' EXIT
 
             # Publish races this workflow on push, so retry a few times
-            # before concluding the image is genuinely absent — and then
+            # before concluding the image is genuinely absent â€” and then
             # fail BEFORE the running app is touched.
             pulled=""
             for i in 1 2 3 4 5 6; do
               if docker pull "$IMAGE"; then pulled=1; break; fi
-              echo "attempt $i: image not pullable yet — publish may still be running"; sleep 20
+              echo "attempt $i: image not pullable yet â€” publish may still be running"; sleep 20
             done
             if [ -z "$pulled" ]; then
-              echo "::error::Image $IMAGE not in registry after retries — publish failed; refusing to redeploy a stale :latest."
+              echo "::error::Image $IMAGE not in registry after retries â€” publish failed; refusing to redeploy a stale :latest."
               exit 1
             fi
 
@@ -511,10 +532,10 @@ jobs:
             # 2. Reporting and print routes exist and stay auth-gated (401, not 404).
             for path in /api/v1/reporting/worklist /api/v1/reporting/preferences /api/v1/print/registry /api/v1/settings/printing; do
               code=$(curl -s -o /dev/null -w '%{http_code}' "http://127.0.0.1:8090${path}")
-              [ "$code" = "401" ] || fail "${path} answered ${code} (expected 401 — route missing or unguarded)"
+              [ "$code" = "401" ] || fail "${path} answered ${code} (expected 401 â€” route missing or unguarded)"
             done
 
-            # 2b. The shipped image can actually render documents — in the
+            # 2b. The shipped image can actually render documents â€” in the
             #     pixel-true engine. This is the one claim about printing that
             #     cannot be verified from the source tree: the browser binary,
             #     its system libraries and node all have to be present in THIS
@@ -535,6 +556,6 @@ jobs:
             # 4. Public URL through Cloudflare (soft: transient CF issues
             #    must not fail a deploy whose local checks passed).
             curl -fsS --max-time 15 https://ris.polytronx.com/api/v1/health >/dev/null \
-              || echo "::warning::public health check soft-failed — local checks passed; investigate if it persists"
+              || echo "::warning::public health check soft-failed â€” local checks passed; investigate if it persists"
             echo DEPLOY_DONE
           REMOTE

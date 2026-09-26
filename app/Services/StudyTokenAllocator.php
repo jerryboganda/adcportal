@@ -8,10 +8,10 @@ use Illuminate\Support\Facades\DB;
 /**
  * Domain service: allocation of daily radiology token numbers.
  *
- * Single source of truth for the "token" rule of the study context — both
- * the API booking adapter (StudyController) and the legacy booking/print
- * adapter (AppointmentController) delegate here, so the invariant "one
- * tenant, one day, one sequence" can never drift between implementations.
+ * Single source of truth for the "token" rule of the study context — the
+ * booking adapters (StudyController, BookingService) delegate here, so the
+ * invariant "one tenant, one day, one sequence" can never drift between
+ * implementations.
  *
  * Tokens are per-tenant, per-day integers. Allocation locks the day's
  * counter row (`study_token_counters`, unique on business_id + token_date)

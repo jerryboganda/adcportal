@@ -1,6 +1,7 @@
 <?php
 
 use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Schedule;
 
 /*
@@ -13,6 +14,21 @@ use Illuminate\Support\Facades\Schedule;
 Schedule::command('sanctum:prune-expired --hours=24')->hourly();
 Schedule::command('app:appointment-reminder')->hourly();
 Schedule::command('ris:subscription-sweep')->dailyAt('03:10');
+
+// PDF render scratch (storage/app/print-tmp). ChromiumPdfDriver unlinks both of
+// its temp files in a `finally`, so this only collects residue from a hard kill
+// (OOM, container restart, deploy) mid-render \?" otherwise unbounded on a VPS
+// that only ever receives `docker compose pull`. The one-hour floor is far longer
+// than any render, so an in-flight file is never swept.
+Schedule::call(function (): void {
+    $cutoff = now()->subHour()->getTimestamp();
+
+    foreach (File::glob(storage_path('app/print-tmp/*')) as $file) {
+        if (is_file($file) && filemtime($file) < $cutoff) {
+            @unlink($file);
+        }
+    }
+})->hourly();
 
 // Integration delivery queue: drain between cron ticks (cron-only deploy
 // model — no long-running supervisor). --stop-when-empty exits after the

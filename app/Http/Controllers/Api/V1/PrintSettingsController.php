@@ -22,7 +22,12 @@ final class PrintSettingsController extends BaseApiController
 {
     public function show(Request $request): JsonResponse
     {
-        $this->denyUnless('clinic manage');
+        // The SAME permission set the write uses, and the same set the SPA gates
+        // the section on (`['print settings manage', 'setting manage']`). It asked
+        // for `clinic manage`, which `PermissionCatalog` does not have `print
+        // settings manage` imply — so the delegated front-desk role the catalog
+        // documents was handed a 403 on the very panel it was entitled to open.
+        $this->denyUnlessAny(['print settings manage', 'setting manage'], 'print settings manage');
 
         $tenantId = $this->tenantId();
 

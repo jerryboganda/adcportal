@@ -1,9 +1,11 @@
 # AGENTS.md — PolytronX - Enterprise PACS & RIS (Radiology Clinic Management SaaS)
 
 Multi-tenant Radiology Information System (RIS) for diagnostic clinics:
-study workflow, safety screening, reporting, invoicing, inventory, doctor
-dispatch, patient self-service. Built as **Laravel 11 (PHP) + MySQL backend**
-exposing `/api/v1` (Sanctum cookie sessions) + **React/Vite SPA frontend**.
+study workflow, safety screening, reporting, invoicing, inventory and doctor
+dispatch. Built as **Laravel 11 (PHP 8.4) + PostgreSQL backend** exposing
+`/api/v1` (Sanctum cookie sessions) + **React 19/Vite SPA frontend**. There is
+no patient-facing surface: `patient` accounts exist in the users table but
+expose no route, and no portal page is served (see `docs/saas/QUEUE_TV.md`).
 
 ## HARD ENFORCED RULE — Compute Placement (do not violate)
 

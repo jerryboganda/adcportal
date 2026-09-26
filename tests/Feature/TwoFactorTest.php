@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\User;
+use App\Services\TwoFactorService;
 use App\Services\Totp;
 use Illuminate\Support\Facades\Hash;
 
@@ -107,8 +108,63 @@ class TwoFactorTest extends ApiTestCase
         $this->getJson('/api/v1/platform/tenants')->assertOk();
     }
 
-    public function test_challenge_rejects_without_pending_login(): void
+    /**
+     * The regression: `CHALLENGE_TTL_MINUTES` was declared and never read, so a
+     * pending identity — password already verified — sat in the session waiting
+     * for a code for as long as the session lived.
+     */
+    public function test_a_pending_challenge_expires(): void
     {
+        $super = $this->platformUser();
+        $this->enroll($super);
+        $this->withHeaders(['Referer' => 'http://localhost:3000']);
+
+        $this->postJson('/api/v1/login', [
+            'email' => $super->email,
+            'password' => 'R1s!T3st#2026x',
+        ])->assertOk()->assertJsonPath('data.two_factor_required', true);
+
+        // The code that WOULD have worked...
+        $code = Totp::currentCode($super->two_factor_secret);
+
+        // ...is refused once the challenge is older than the stated window.
+        $this->travel(TwoFactorService::CHALLENGE_TTL_MINUTES + 1)->minutes();
+
+        $this->postJson('/api/v1/two-factor/challenge', ['code' => $code])->assertStatus(422);
+        $this->getJson('/api/v1/platform/overview')->assertStatus(401);
+    }
+
+    /**
+     * A TOTP code is valid for its whole ±1 step window — up to 90 seconds — so
+     * an observed code could be spent twice. Once a step has been accepted, that
+     * step and every earlier one are refused.
+     */
+    public function test_an_accepted_code_cannot_be_replayed(): void
+    {
+        $super = $this->platformUser();
+        $this->enroll($super);
+        $this->withHeaders(['Referer' => 'http://localhost:3000']);
+
+        $this->postJson('/api/v1/login', [
+            'email' => $super->email,
+            'password' => 'R1s!T3st#2026x',
+        ])->assertOk();
+
+        $code = Totp::currentCode($super->two_factor_secret);
+        $this->postJson('/api/v1/two-factor/challenge', ['code' => $code])->assertOk();
+
+        // A second session for the same user presents the same code again.
+        $this->post('/api/v1/logout');
+        $this->postJson('/api/v1/login', [
+            'email' => $super->email,
+            'password' => 'R1s!T3st#2026x',
+        ])->assertOk();
+
+        $this->postJson('/api/v1/two-factor/challenge', ['code' => $code])
+            ->assertStatus(422, 'A TOTP code must not be spendable twice.');
+    }
+
+    public function test_challenge_rejects_without_pending_login(): void    {
         // No login happened in this session: there is nothing to complete.
         $this->postJson('/api/v1/two-factor/challenge', ['code' => '123456'])
             ->assertStatus(422);

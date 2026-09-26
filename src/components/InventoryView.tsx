@@ -46,6 +46,8 @@ import {
   Appointment
 } from '../types';
 import { canAny } from '../services/permissions';
+import { localDateString } from '../utils/tableUtils';
+import { formatMoney } from '../utils/bookingMoney';
 
 interface InventoryViewProps {
   inventoryItems: InventoryItem[];
@@ -68,6 +70,8 @@ interface InventoryViewProps {
   appointments: Appointment[];
   role: string;
   onNavigateToTab?: (tab: string, appointmentId?: string) => void;
+  /** Tenant currency symbol; prices are null for roles without commercial access. */
+  currency: string;
 }
 
 type SubTab = 'contrast' | 'syringes' | 'emergency' | 'all_items' | 'movements' | 'adverse';
@@ -83,6 +87,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
   appointments,
   role,
   onNavigateToTab,
+  currency,
 }) => {
   const [activeSubTab, setActiveSubTab] = useState<SubTab>('contrast');
   const [searchQuery, setSearchQuery] = useState('');
@@ -155,12 +160,12 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
   const lowStockCount = lowStockItems.length;
 
   const totalValuationCost = useMemo(
-    () => inventoryItems.reduce((acc, curr) => acc + curr.currentStock * curr.unitCost, 0),
+    () => inventoryItems.reduce((acc, curr) => acc + curr.currentStock * (curr.unitCost ?? 0), 0),
     [inventoryItems]
   );
 
   const totalValuationSelling = useMemo(
-    () => inventoryItems.reduce((acc, curr) => acc + curr.currentStock * curr.sellingPrice, 0),
+    () => inventoryItems.reduce((acc, curr) => acc + curr.currentStock * (curr.sellingPrice ?? 0), 0),
     [inventoryItems]
   );
 
@@ -296,7 +301,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
           batchNumber: newItemBatchNum.trim() || `BAT-${new Date().getFullYear()}-01`,
           expiryDate: newItemExpiry,
           quantity: newItemStock,
-          receivedDate: new Date().toISOString().split('T')[0],
+          receivedDate: localDateString(),
         },
       ],
       notes: 'Manually created clinical inventory item.',
@@ -338,7 +343,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
   };
 
   const handleExportCSV = () => {
-    const headers = ['Item Code', 'Item Name', 'Generic Name', 'Category', 'Modality', 'Current Stock', 'Unit', 'Min Threshold', 'Unit Cost (PKR)', 'Selling Price (PKR)', 'Valuation (PKR)', 'Supplier', 'Primary Batch', 'Expiry Date'];
+    const headers = ['Item Code', 'Item Name', 'Generic Name', 'Category', 'Modality', 'Current Stock', 'Unit', 'Min Threshold', `Unit Cost ()`, `Selling Price ()`, `Valuation ()`, 'Supplier', 'Primary Batch', 'Expiry Date'];
     const rows = inventoryItems.map(i => [
       `"${i.code}"`,
       `"${i.name}"`,
@@ -350,7 +355,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
       i.minThreshold,
       i.unitCost,
       i.sellingPrice,
-      i.currentStock * i.unitCost,
+      i.currentStock * (i.unitCost ?? 0),
       `"${i.supplier}"`,
       `"${i.batches[0]?.batchNumber || 'N/A'}"`,
       `"${i.batches[0]?.expiryDate || 'N/A'}"`,
@@ -360,7 +365,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement('a');
     link.setAttribute('href', encodedUri);
-    link.setAttribute('download', `PolytronX_Enterprise_PACS_RIS_Inventory_${new Date().toISOString().split('T')[0]}.csv`);
+    link.setAttribute('download', `PolytronX_Enterprise_PACS_RIS_Inventory_${localDateString()}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -512,7 +517,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
           </div>
         </div>
 
-        {/* Card 5: Inventory Valuation (PKR) */}
+        {/* Card 5: Inventory Valuation */}
         <div className="col-span-2 lg:col-span-1 bg-gradient-to-br from-slate-900 to-cyan-950 p-4 rounded-xl text-white shadow-xs flex flex-col justify-between border border-cyan-900/40">
           <div className="flex items-center justify-between">
             <span className="text-xs font-bold text-cyan-300 uppercase tracking-wider">Total Stock Value</span>
@@ -522,10 +527,10 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
           </div>
           <div className="mt-2">
             <div className="text-xl sm:text-2xl font-black text-white tracking-tight">
-              Rs. {(totalValuationCost / 1000).toFixed(1)}k
+              {currency} {(totalValuationCost / 1000).toFixed(1)}k
             </div>
             <p className="text-[11px] text-slate-300 font-medium mt-0.5">
-              Billing Potential: Rs. {(totalValuationSelling / 1000).toFixed(1)}k
+              Billing Potential: {currency} {(totalValuationSelling / 1000).toFixed(1)}k
             </p>
           </div>
         </div>
@@ -778,11 +783,11 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                         <div className="bg-slate-50 p-2 rounded-lg border border-slate-100">
                           <span className="text-[10px] text-slate-400 block uppercase font-bold">Pricing / Unit</span>
                           <span className="font-bold text-slate-800 text-[11px]">
-                            Cost: Rs. {item.unitCost.toLocaleString()}
+                            Cost: {currency} {formatMoney(item.unitCost)}
                           </span>
-                          {item.sellingPrice > 0 ? (
+                          {(item.sellingPrice ?? 0) > 0 ? (
                             <span className="text-[10px] text-cyan-700 font-bold block mt-0.5">
-                              Sell: Rs. {item.sellingPrice.toLocaleString()}
+                              Sell: {currency} {formatMoney(item.sellingPrice)}
                             </span>
                           ) : (
                             <span className="text-[10px] text-slate-400 block mt-0.5">Internal Only</span>
@@ -796,24 +801,29 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                       </div>
                     </div>
 
-                    {/* Action Buttons */}
-                    <div className="mt-4 pt-3 border-t border-slate-100 flex items-center gap-2">
-                      <button
-                        onClick={() => handleOpenAdjust(item)}
-                        className="flex-1 flex items-center justify-center space-x-1 py-1.5 px-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl transition cursor-pointer"
-                      >
-                        <Syringe className="w-3.5 h-3.5 text-slate-600" />
-                        <span>Log Usage</span>
-                      </button>
+                    {/* Action Buttons — `canMoveStock` was computed and never
+                        used, so both stock-mutating buttons rendered for every
+                        role. The server already refuses them; hiding them keeps
+                        the card from offering an action the operator cannot take. */}
+                    {canMoveStock && (
+                      <div className="mt-4 pt-3 border-t border-slate-100 flex items-center gap-2">
+                        <button
+                          onClick={() => handleOpenAdjust(item)}
+                          className="flex-1 flex items-center justify-center space-x-1 py-1.5 px-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl transition cursor-pointer"
+                        >
+                          <Syringe className="w-3.5 h-3.5 text-slate-600" />
+                          <span>Log Usage</span>
+                        </button>
 
-                      <button
-                        onClick={() => handleOpenStockIn(item)}
-                        className="flex-1 flex items-center justify-center space-x-1 py-1.5 px-2.5 bg-cyan-600 hover:bg-cyan-500 text-white font-bold text-xs rounded-xl transition cursor-pointer shadow-xs"
-                      >
-                        <Plus className="w-3.5 h-3.5" />
-                        <span>Restock</span>
-                      </button>
-                    </div>
+                        <button
+                          onClick={() => handleOpenStockIn(item)}
+                          className="flex-1 flex items-center justify-center space-x-1 py-1.5 px-2.5 bg-cyan-600 hover:bg-cyan-500 text-white font-bold text-xs rounded-xl transition cursor-pointer shadow-xs"
+                        >
+                          <Plus className="w-3.5 h-3.5" />
+                          <span>Restock</span>
+                        </button>
+                      </div>
+                    )}
                   </div>
                 );
               })}
@@ -1288,7 +1298,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
 
               <div className="grid grid-cols-2 gap-2">
                 <div>
-                  <label className="font-bold text-slate-700 block mb-1">Cost Price (PKR)</label>
+                  <label className="font-bold text-slate-700 block mb-1">Cost Price ({currency})</label>
                   <input
                     type="number"
                     value={newItemCost}
@@ -1297,7 +1307,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                   />
                 </div>
                 <div>
-                  <label className="font-bold text-slate-700 block mb-1">Billing Price (PKR)</label>
+                  <label className="font-bold text-slate-700 block mb-1">Billing Price ({currency})</label>
                   <input
                     type="number"
                     value={newItemSelling}

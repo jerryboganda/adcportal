@@ -19,11 +19,31 @@ export interface AdvancedFilterState {
   billingStatus: 'all' | 'paid' | 'unpaid';
 }
 
+/**
+ * The calendar date the CLINICIAN is living in, as `YYYY-MM-DD`.
+ *
+ * `toISOString()` is UTC. The clinic is not: on a UTC+5 workstation it reports
+ * yesterday between 00:00 and 05:00 local, which silently emptied the reception
+ * desk and the tech worklist ("Today" matched no study), defaulted new bookings
+ * and the batch-received date to yesterday, and filed the shift-closing sheet
+ * under the wrong day. The server stamps documents and rows in the same local
+ * zone (`APP_TIMEZONE`), so the browser has to agree with it.
+ *
+ * Every "what day is it" call in the SPA goes through here.
+ */
+export const localDateString = (date: Date = new Date()): string => {
+  const year = date.getFullYear();
+  const month = `${date.getMonth() + 1}`.padStart(2, '0');
+  const day = `${date.getDate()}`.padStart(2, '0');
+
+  return `${year}-${month}-${day}`;
+};
+
 export const defaultAdvancedFilters: AdvancedFilterState = {
   search: '',
   dateRangeMode: 'today',
-  startDate: new Date().toISOString().split('T')[0],
-  endDate: new Date().toISOString().split('T')[0],
+  startDate: localDateString(),
+  endDate: localDateString(),
   modalities: [],
   priorities: [],
   statuses: [],
@@ -32,11 +52,9 @@ export const defaultAdvancedFilters: AdvancedFilterState = {
 };
 
 /**
- * Returns today's ISO date string (YYYY-MM-DD)
+ * Returns today's ISO date string (YYYY-MM-DD) in the clinic's own timezone.
  */
-export const getTodayDateString = (): string => {
-  return new Date().toISOString().split('T')[0];
-};
+export const getTodayDateString = (): string => localDateString();
 
 /**
  * Helper to compute date range from preset
@@ -45,7 +63,7 @@ export const getDateRangeForPreset = (
   preset: AdvancedFilterState['dateRangeMode']
 ): { startDate: string; endDate: string } => {
   const today = new Date();
-  const todayStr = today.toISOString().split('T')[0];
+  const todayStr = localDateString(today);
 
   switch (preset) {
     case 'today':
@@ -53,21 +71,19 @@ export const getDateRangeForPreset = (
     case 'tomorrow': {
       const tomorrow = new Date(today);
       tomorrow.setDate(tomorrow.getDate() + 1);
-      const tomStr = tomorrow.toISOString().split('T')[0];
-      return { startDate: tomStr, endDate: tomStr };
+      return { startDate: localDateString(tomorrow), endDate: localDateString(tomorrow) };
     }
     case 'yesterday': {
       const yesterday = new Date(today);
       yesterday.setDate(yesterday.getDate() - 1);
-      const yestStr = yesterday.toISOString().split('T')[0];
-      return { startDate: yestStr, endDate: yestStr };
+      return { startDate: localDateString(yesterday), endDate: localDateString(yesterday) };
     }
     case 'next7days': {
       const nextWeek = new Date(today);
       nextWeek.setDate(nextWeek.getDate() + 7);
       return {
         startDate: todayStr,
-        endDate: nextWeek.toISOString().split('T')[0],
+        endDate: localDateString(nextWeek),
       };
     }
     case 'all':

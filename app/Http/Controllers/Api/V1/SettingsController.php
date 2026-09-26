@@ -27,8 +27,20 @@ class SettingsController extends BaseApiController
 {
     // ==================== clinic profile ====================
 
+    /**
+     * The full clinic profile: PNRA licence, PMC registration, tax id, emergency
+     * contact, billing and currency configuration.
+     *
+     * Gated like its own write path. The SPA never calls this — it hydrates
+     * `clinicSettings` from `/bootstrap`, which already filters collection by
+     * collection — so an ungated duplicate was a way to read every clinic
+     * registration and billing identifier with nothing but a valid session, and a
+     * radiologist's default bundle carries no administration permission at all.
+     */
     public function showClinic(): JsonResponse
     {
+        $this->denyUnless('setting manage');
+
         return $this->ok(['clinic' => ApiShape::clinicSettings($this->tenantId())]);
     }
 
@@ -286,16 +298,6 @@ class SettingsController extends BaseApiController
                 'clinicSettings' => ApiShape::clinicSettings($tenantId),
             ],
         ]);
-    }
-
-    public function importBackup(): JsonResponse
-    {
-        $this->denyUnless('setting manage');
-
-        // Deliberately disabled: restoring a snapshot would destructively
-        // overwrite live clinical records (studies, invoices, reports).
-        // Export remains fully available for archiving.
-        abort(422, 'Snapshot import into a live tenant is disabled. Use JSON export for archiving.');
     }
 
     public function resetDemo(): JsonResponse

@@ -17,6 +17,9 @@ import { Appointment, DoseLog, InventoryItem } from '../types';
 interface DoseCaptureModalProps {
   appointment: Appointment;
   inventoryItems?: InventoryItem[];
+  /** The signed-in operator. The dose record is attributed to the SESSION, not to
+      a name typed into a box. */
+  currentUserName?: string;
   onCompleteAcquisition: (aptId: string, doseLog: DoseLog) => void;
   onClose: () => void;
 }
@@ -24,6 +27,7 @@ interface DoseCaptureModalProps {
 export const DoseCaptureModal: React.FC<DoseCaptureModalProps> = ({
   appointment,
   inventoryItems = [],
+  currentUserName = '',
   onCompleteAcquisition,
   onClose,
 }) => {
@@ -82,7 +86,7 @@ export const DoseCaptureModal: React.FC<DoseCaptureModalProps> = ({
 
   const [techniqueNotes, setTechniqueNotes] = useState('');
   const [qcPassed, setQcPassed] = useState<boolean>(true);
-  const [techName, setTechName] = useState('');
+
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -113,7 +117,7 @@ export const DoseCaptureModal: React.FC<DoseCaptureModalProps> = ({
       techniqueNotes: techniqueNotes.trim() || undefined,
       qcPassed,
       recordedAt: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      recordedBy: techName,
+      recordedBy: currentUserName,
     };
 
     onCompleteAcquisition(appointment.id, doseLog);
@@ -410,20 +414,28 @@ export const DoseCaptureModal: React.FC<DoseCaptureModalProps> = ({
             />
           </div>
 
-          {/* QC Status & Technologist Sign-off */}
+          {/* QC Status & Recorder */}
           <div className="grid grid-cols-2 gap-2.5 pt-1">
+            {/*
+              The free-text "Technologist Signature" box is gone.
+
+              It was `required`, and its value went into the payload as
+              `recordedBy` — but `apiService` never sent that key, so the operator
+              was forced to type a name that reached nothing. Meanwhile the
+              server already records who captured the dose from the AUTHENTICATED
+              user (`ApiShape::doseLog` reads the `recorder` relation), which is
+              the only version of this field worth having: a self-declared name on
+              an acquisition record is spoofable, and on a dose record it is
+              exactly the value a regulator would want to be non-forgeable.
+            */}
             <div>
               <label className="block text-xs font-semibold text-slate-700 mb-1">
-                Technologist Signature
+                Recorded By
               </label>
-              <input
-                type="text"
-                required
-                placeholder="Technologist / RT name"
-                value={techName}
-                onChange={(e) => setTechName(e.target.value)}
-                className="w-full bg-white text-slate-900 p-2 rounded-lg border border-slate-300 text-xs focus:outline-none focus:ring-1 focus:ring-purple-500 font-medium"
-              />
+              <div className="bg-slate-50 text-slate-900 p-2 rounded-lg border border-slate-200 text-xs font-medium flex items-center justify-between gap-2">
+                <span className="truncate">{currentUserName || 'Signed-in operator'}</span>
+                <span className="text-[10px] text-slate-500 font-normal shrink-0">from your session</span>
+              </div>
             </div>
             <div>
               <label className="block text-xs font-semibold text-slate-700 mb-1">

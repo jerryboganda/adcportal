@@ -22,11 +22,18 @@ export const ScreeningModal: React.FC<ScreeningModalProps> = ({
   onSaveScreening,
   onClose,
 }) => {
-  // Determine relevant form based on modality (MRI form vs Contrast form)
+  // The screening form for THIS modality, and only this modality.
+  //
+  // This used to fall back to `forms[0]`, which meant an MRI study with no MRI
+  // form configured could be screened against the contrast checklist — the wrong
+  // questions for the wrong hazard, filled in and stored against a patient. An
+  // empty list also made `activeForm` undefined and threw a TypeError inside the
+  // modal. Neither is an acceptable way to deal with a missing form, so the modal
+  // now states that there is none and refuses to collect anything.
   const isMri = appointment.modality.code === 'MR';
-  const activeForm = isMri
-    ? forms.find(f => f.slug === 'mri-safety-screening') || forms[0]
-    : forms.find(f => f.slug === 'contrast-screening') || forms[0];
+  const activeForm = forms.find(
+    form => form.isActive && form.slug === (isMri ? 'mri-safety-screening' : 'contrast-screening')
+  );
 
   // Initialize answers from existing or defaults
   const [answersState, setAnswersState] = useState<Record<string, { val: string; override?: string }>>(() => {
@@ -36,7 +43,7 @@ export const ScreeningModal: React.FC<ScreeningModalProps> = ({
         init[a.questionId] = { val: a.answerValue, override: a.overrideReason };
       });
     } else {
-      activeForm.questions.forEach(q => {
+      activeForm?.questions.forEach(q => {
         init[q.id] = { val: 'no', override: '' };
       });
     }
@@ -46,15 +53,15 @@ export const ScreeningModal: React.FC<ScreeningModalProps> = ({
   const [overrideSupervisor, setOverrideSupervisor] = useState('');
 
   // Check if any affirmative risk answers exist
-  const hasBlockingRisk = activeForm.questions.some(q => {
+  const hasBlockingRisk = activeForm?.questions.some(q => {
     const ans = answersState[q.id]?.val;
     return ans === q.riskValue && q.isRiskBlocking;
-  });
+  }) ?? false;
 
-  const hasAnyRisk = activeForm.questions.some(q => {
+  const hasAnyRisk = activeForm?.questions.some(q => {
     const ans = answersState[q.id]?.val;
     return ans === q.riskValue;
-  });
+  }) ?? false;
 
   const handleAnswerChange = (qId: string, val: string) => {
     setAnswersState(prev => ({
@@ -71,6 +78,10 @@ export const ScreeningModal: React.FC<ScreeningModalProps> = ({
   };
 
   const handleSubmit = () => {
+    if (!activeForm) {
+      return;
+    }
+
     const formattedAnswers: StudyScreeningAnswer[] = activeForm.questions.map(q => {
       const state = answersState[q.id] || { val: 'no' };
       const isRisk = state.val === q.riskValue;
@@ -91,6 +102,45 @@ export const ScreeningModal: React.FC<ScreeningModalProps> = ({
     onSaveScreening(appointment.id, formattedAnswers, cleared);
     onClose();
   };
+
+  // Every hook above runs unconditionally; only the render branches here.
+  if (!activeForm) {
+    return (
+      <div className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4">
+        <div
+          role="alert"
+          className="bg-white border border-amber-200 rounded-3xl max-w-lg w-full p-6 shadow-2xl space-y-4"
+        >
+          <div className="flex items-center space-x-3">
+            <div className="w-10 h-10 rounded-xl bg-amber-50 text-amber-700 border border-amber-200 flex items-center justify-center">
+              <AlertTriangle className="w-5 h-5 text-amber-600" />
+            </div>
+            <h2 className="font-bold text-slate-900 text-base">No screening form configured</h2>
+          </div>
+          <p className="text-sm text-slate-700">
+            This is a <strong>{appointment.modality.name}</strong> study
+            {appointment.modality.code === 'MR' ? ' (MRI)' : ' (contrast)'}, and no <strong>active</strong>{' '}
+            {appointment.modality.code === 'MR' ? 'MRI safety screening' : 'contrast screening'} form is
+            available for this clinic.
+          </p>
+          <p className="text-xs text-slate-600">
+            Screening cannot be recorded. An administrator must activate the correct form under{' '}
+            <strong>Settings &rarr; Catalog &amp; Forms &rarr; Screening Forms</strong>. Another modality&apos;s
+            form is deliberately not offered as a substitute — the wrong questions against the wrong hazard is
+            worse than no record at all.
+          </p>
+          <div className="flex justify-end">
+            <button
+              onClick={onClose}
+              className="px-4 py-2 rounded-xl bg-slate-900 text-white text-xs font-bold cursor-pointer"
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4">

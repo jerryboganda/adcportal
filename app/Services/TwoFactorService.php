@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Cache;
 
 /**
  * Platform 2FA session state. Enrollment is per-user (TOTP secret on the
@@ -27,6 +28,17 @@ class TwoFactorService
 
     public const CHALLENGE_TTL_MINUTES = 10;
 
+    /** Session key holding when the pending challenge was raised. */
+    public const PENDING_AT_KEY = 'platform_2fa_pending_at';
+
+    /**
+     * Cache key recording the last accepted time-step for a user.
+     *
+     * Shared, not per-session: a replayed code arrives on whatever session the
+     * attacker controls, so session storage would not stop it.
+     */
+    private const LAST_COUNTER_PREFIX = 'auth.2fa.last_counter.';
+
     public static function hasEnabledTwoFactor(User $user): bool
     {
         return $user->two_factor_enabled_at !== null && (string) $user->two_factor_secret !== '';
@@ -43,6 +55,7 @@ class TwoFactorService
             // Stash the identity, then drop the authenticated session state:
             // possession of the password alone must not yield a usable session.
             $request->session()->put(self::PENDING_USER_KEY, $user->id);
+            $request->session()->put(self::PENDING_AT_KEY, now()->timestamp);
             $request->session()->remove(self::SESSION_KEY);
             Auth::guard('web')->logout();
         } else {
@@ -62,10 +75,22 @@ class TwoFactorService
             return null;
         }
 
+        // A pending identity used to survive until the session died, because the
+        // TTL constant was declared and never read: a password verified hours
+        // ago still had a live challenge waiting for a code. The window is now
+        // the stated ten minutes, after which the challenge is discarded and the
+        // user must authenticate again from the password.
+        $raisedAt = (int) $request->session()->get(self::PENDING_AT_KEY, 0);
+        if ($raisedAt <= 0 || $raisedAt < now()->subMinutes(self::CHALLENGE_TTL_MINUTES)->timestamp) {
+            self::cancelChallenge($request);
+
+            return null;
+        }
+
         $user = User::find($id);
 
         if (! $user || ! self::hasEnabledTwoFactor($user)) {
-            $request->session()->forget(self::PENDING_USER_KEY);
+            self::cancelChallenge($request);
 
             return null;
         }
@@ -86,23 +111,39 @@ class TwoFactorService
             return false;
         }
 
-        if (! Totp::verify($user->two_factor_secret, $code)) {
+        $counter = Totp::matchingCounter($user->two_factor_secret, $code);
+
+        if ($counter === null) {
             return false;
         }
+
+        // A TOTP code is valid for its whole ±1 step window — up to 90 seconds —
+        // so a shoulder-surfed or proxied code could be spent again. Once a step
+        // has been accepted, refuse that step and every earlier one.
+        $key = self::LAST_COUNTER_PREFIX.$user->id;
+        $last = Cache::get($key);
+
+        if ($last !== null && $counter <= (int) $last) {
+            return false;
+        }
+
+        Cache::put($key, $counter, now()->addMinutes(self::CHALLENGE_TTL_MINUTES));
 
         Auth::login($user, remember: false);
         $request->session()->regenerate();
         $request->session()->put(self::SESSION_KEY, now()->timestamp);
         $request->session()->forget(self::PENDING_USER_KEY);
+        $request->session()->forget(self::PENDING_AT_KEY);
 
         return true;
     }
 
-    /** Cancel a pending challenge (user aborted sign-in). */
+    /** Cancel a pending challenge (user aborted sign-in, or it expired). */
     public static function cancelChallenge(Request $request): void
     {
         if ($request->hasSession()) {
             $request->session()->forget(self::PENDING_USER_KEY);
+            $request->session()->forget(self::PENDING_AT_KEY);
         }
     }
 

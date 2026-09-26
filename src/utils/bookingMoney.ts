@@ -62,6 +62,21 @@ export function formatMoney(amount: number | string | null | undefined): string 
 }
 
 /**
+ * The clinic's currency symbol.
+ *
+ * Money was rendered as a hardcoded `Rs.` on every financial surface, so a tenant
+ * that bills in anything else showed the wrong currency on its own dashboard,
+ * invoices, receipts and shift statements. `clinicSettings.currencySymbol` is
+ * server-issued per tenant; the fallback only covers a session that has not
+ * hydrated settings yet.
+ */
+export function currencySymbol(clinic?: { currencySymbol?: string | null } | null): string {
+  const symbol = (clinic?.currencySymbol ?? '').trim();
+
+  return symbol !== '' ? symbol : 'Rs.';
+}
+
+/**
  * Derive every financial figure from the canonical inputs. `amountReceived`
  * is clamped for display only — validation (not silent clamping) is what
  * rejects an invalid amount before submit.

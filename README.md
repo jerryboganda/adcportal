@@ -3,7 +3,8 @@
 A multi-tenant **Radiology Information System (RIS)** — radiology study workflow,
 patient management, MRI/contrast safety screening, dose tracking, radiologist
 reporting with e-signature, billing/POS, inventory, doctor network dispatch and a
-public queue board. Built as **Laravel (PHP 8.4) + MySQL/SQLite backend** with a
+public queue board. Built as **Laravel (PHP 8.4) + PostgreSQL backend** (SQLite
+in the test suite only) with a
 **React 19 + Vite + TypeScript SPA** frontend, served from a single origin.
 
 ## Repository layout

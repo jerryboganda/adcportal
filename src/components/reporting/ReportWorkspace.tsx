@@ -14,6 +14,7 @@ import {
   Mic,
   MicOff,
   Pause,
+  Pencil,
   PhoneCall,
   Plus,
   Printer,
@@ -21,6 +22,7 @@ import {
   Send,
   Settings2,
   Sparkles,
+  Trash2,
   UserPlus,
   X,
   Zap,
@@ -67,7 +69,7 @@ interface ReportWorkspaceProps {
   /** Full study record for the selected worklist row (patient, dose, notes…). */
   appointment: Appointment | null;
   permissions: string[];
-  currentUser: { name: string; role: string };
+  currentUser: { id: string; name: string; role: string };
   clinicSettings?: ClinicProfileSettings;
   radiologists: RadiologistSummary[];
   controllerRef: React.MutableRefObject<WorkspaceController | null>;
@@ -126,6 +128,18 @@ export const ReportWorkspace: React.FC<ReportWorkspaceProps> = ({
   const isAddendumVersion = currentReport?.type === 'addendum';
 
   const canAuthor = canAny(permissions, ['report create', 'report edit']);
+  // Mirrors the server exactly. `storeMacro`: a PERSONAL snippet needs
+  // `report edit`, a TENANT one `report template edit`. `guardMacro`: editing a
+  // personal snippet also accepts `report template edit`, a shared one does not.
+  // Gating on `canAuthor` instead would offer a `report create`-only holder a
+  // 403 on submit; gating the chips on `report edit` alone would hide controls
+  // the server does allow.
+  const canEditMacros = canAny(permissions, ['report edit']);
+  const canPublishTenantMacros = canAny(permissions, ['report template edit']);
+  const canManageMacro = (macro: ReportMacro) =>
+    canAny(permissions, macro.scope === 'personal'
+      ? ['report edit', 'report template edit']
+      : ['report template edit']);
   const canSign = canAny(permissions, ['report sign']);
   const canRelease = canAny(permissions, ['report release']);
   const canDownload = canAny(permissions, ['report manage']);
@@ -146,6 +160,8 @@ export const ReportWorkspace: React.FC<ReportWorkspaceProps> = ({
   const [templateMatch, setTemplateMatch] = useState<TemplateMatch | null>(null);
   const [templateList, setTemplateList] = useState<ReportTemplate[]>([]);
   const [macros, setMacros] = useState<ReportMacro[]>([]);
+  /** Macro being authored: null = closed, undefined-seeded = new snippet. */
+  const [macroEditor, setMacroEditor] = useState<{ macro?: ReportMacro } | null>(null);
   const [priors, setPriors] = useState<PriorExam[]>([]);
   const [criticalLogs, setCriticalLogs] = useState<CriticalFindingLog[]>([]);
   const [activeField, setActiveField] = useState<FieldKey>('findings');
@@ -488,6 +504,20 @@ export const ReportWorkspace: React.FC<ReportWorkspaceProps> = ({
     autosave.touch();
     onToast(`Inserted “${macro.name}”.`);
     void api.useReportMacro(macro.id).catch(() => undefined);
+  };
+
+  /**
+   * Retire a snippet. Archived, never deleted: reports already drafted from a
+   * macro keep their provenance, and clinical text must stay auditable.
+   */
+  const archiveMacro = async (macro: ReportMacro) => {
+    try {
+      await api.archiveReportMacro(macro.id);
+      setMacros(previous => previous.filter(m => m.id !== macro.id));
+      onToast(`Archived “${macro.name}”.`, 'success');
+    } catch (err: any) {
+      onToast(err?.response?.data?.message ?? `Could not archive “${macro.name}”.`, 'error');
+    }
   };
 
   /** Curated "Normal" phrasing for one structured field. */
@@ -989,25 +1019,62 @@ export const ReportWorkspace: React.FC<ReportWorkspaceProps> = ({
                 </p>
               )}
 
-              {macros.length > 0 && (
+              {(macros.length > 0 || canEditMacros) && (
                 <div className="space-y-1.5">
-                  <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wide flex items-center gap-1">
-                    <Zap className="w-3 h-3 text-purple-600" /> {study.modalityCode} snippets &amp; macros
-                  </div>
-                  <div className="flex flex-wrap gap-1.5">
-                    {macros.slice(0, 10).map(macro => (
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wide flex items-center gap-1">
+                      <Zap className="w-3 h-3 text-purple-600" /> {study.modalityCode} snippets &amp; macros
+                    </div>
+                    {canEditMacros && (
                       <button
-                        key={macro.id}
                         type="button"
-                        title={macro.shortcut ? `${macro.shortcut} — ${macro.impression}` : macro.impression}
-                        onClick={() => applyMacro(macro)}
-                        className="px-2.5 py-1 rounded-lg bg-white hover:bg-purple-50 text-slate-700 hover:text-purple-900 text-[11px] font-semibold border border-slate-200 cursor-pointer"
+                        onClick={() => setMacroEditor({})}
+                        title="Save this report's findings and impression as a reusable snippet"
+                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-purple-50 hover:bg-purple-100 text-purple-800 text-[10px] font-bold border border-purple-200 cursor-pointer"
                       >
-                        + {macro.name}
-                        {macro.scope === 'personal' && <span className="text-purple-600"> ●</span>}
+                        <Plus className="w-3 h-3" /> Save as macro
                       </button>
-                    ))}
+                    )}
                   </div>
+                  {macros.length > 0 && (
+                    <div className="flex flex-wrap gap-1.5">
+                      {macros.slice(0, 10).map(macro => (
+                        <span key={macro.id} className="inline-flex items-stretch rounded-lg border border-slate-200 bg-white overflow-hidden">
+                          <button
+                            type="button"
+                            title={macro.shortcut ? `${macro.shortcut} — ${macro.impression}` : macro.impression}
+                            onClick={() => applyMacro(macro)}
+                            className="px-2.5 py-1 text-slate-700 hover:text-purple-900 text-[11px] font-semibold cursor-pointer"
+                          >
+                            + {macro.name}
+                            {macro.scope === 'personal' && <span className="text-purple-600"> ●</span>}
+                          </button>
+                          {canManageMacro(macro) && (
+                            <>
+                              <button
+                                type="button"
+                                aria-label={`Edit macro ${macro.name}`}
+                                title="Edit this snippet"
+                                onClick={() => setMacroEditor({ macro })}
+                                className="px-1.5 text-slate-400 hover:text-purple-700 border-l border-slate-200 cursor-pointer"
+                              >
+                                <Pencil className="w-3 h-3" />
+                              </button>
+                              <button
+                                type="button"
+                                aria-label={`Archive macro ${macro.name}`}
+                                title="Archive this snippet (reports already drafted from it keep their text)"
+                                onClick={() => void archiveMacro(macro)}
+                                className="px-1.5 text-slate-400 hover:text-red-600 border-l border-slate-200 cursor-pointer"
+                              >
+                                <Trash2 className="w-3 h-3" />
+                              </button>
+                            </>
+                          )}
+                        </span>
+                      ))}
+                    </div>
+                  )}
                 </div>
               )}
             </div>
@@ -1354,22 +1421,45 @@ export const ReportWorkspace: React.FC<ReportWorkspaceProps> = ({
                 <span className="italic text-slate-500">Not assigned</span>
               )}
             </div>
-            {study.assignedRadiologistId !== currentUser.name && canAuthor && (
-              <button
-                type="button"
-                onClick={async () => {
-                  try {
-                    await api.assignStudyToRadiologist(study.id, null);
-                    onToast('Study released from your list.');
-                  } catch (error: any) {
-                    onToast(error?.message ?? 'Could not release the study.', 'error');
-                  }
-                }}
-                className="flex items-center gap-1.5 text-[11px] font-bold text-purple-700 hover:underline cursor-pointer"
-              >
-                <UserPlus className="w-3 h-3" /> Claim / release
-              </button>
-            )}
+            {(() => {
+              // `assignedRadiologistId` is a user ID and `currentUser.name` is a
+              // display name; they were being compared to each other, so the test
+              // was always true and the button always said "Claim / release"
+              // while only ever releasing. The label now says what the click
+              // will actually do.
+              const mine =
+                study.assignedRadiologistId != null &&
+                String(study.assignedRadiologistId) === String(currentUser.id);
+
+              if (!canAuthor || (!mine && study.assignedRadiologistId == null)) {
+                return null;
+              }
+
+              return (
+                <button
+                  type="button"
+                  onClick={async () => {
+                    try {
+                      if (mine) {
+                        await api.assignStudyToRadiologist(study.id, null);
+                        onToast('Study released from your list.');
+                      } else {
+                        await api.assignStudyToRadiologist(study.id, 'me');
+                        onToast('Study assigned to you.');
+                      }
+                    } catch (error: any) {
+                      onToast(
+                        error?.message ?? (mine ? 'Could not release the study.' : 'Could not claim the study.'),
+                        'error'
+                      );
+                    }
+                  }}
+                  className="flex items-center gap-1.5 text-[11px] font-bold text-purple-700 hover:underline cursor-pointer"
+                >
+                  <UserPlus className="w-3 h-3" /> {mine ? 'Release' : 'Claim'}
+                </button>
+              );
+            })()}
           </div>
 
           {/* Priors */}
@@ -1441,6 +1531,24 @@ export const ReportWorkspace: React.FC<ReportWorkspaceProps> = ({
       </div>
 
       {/* ---------------- modals ---------------- */}
+
+      {macroEditor && (
+        <MacroEditorModal
+          macro={macroEditor.macro}
+          draft={values}
+          canPublishTenant={canPublishTenantMacros}
+          onClose={() => setMacroEditor(null)}
+          onSaved={(saved, message) => {
+            setMacros(previous => {
+              const rest = previous.filter(m => m.id !== saved.id);
+              return [saved, ...rest];
+            });
+            setMacroEditor(null);
+            onToast(message, 'success');
+          }}
+          onError={message => onToast(message, 'error')}
+        />
+      )}
 
       {criticalOpen && (
         <CriticalFindingModal
@@ -1583,6 +1691,136 @@ const Modal: React.FC<{
     </div>
   </div>
 );
+
+/**
+ * Create or edit a reporting macro (the snippet library).
+ *
+ * A new snippet is seeded from the report currently in the editor, because that
+ * is the text the radiologist just decided was worth keeping. Editing an
+ * existing one prefills from the stored macro instead: overwriting a shared
+ * snippet with whatever happens to be in the editor would be data loss.
+ */
+const MacroEditorModal: React.FC<{
+  macro?: ReportMacro;
+  draft: { findings: string; impression: string; recommendations: string };
+  canPublishTenant: boolean;
+  onClose: () => void;
+  onSaved: (macro: ReportMacro, message: string) => void;
+  onError: (message: string) => void;
+}> = ({ macro, draft, canPublishTenant, onClose, onSaved, onError }) => {
+  const [name, setName] = useState(macro?.name ?? '');
+  const [shortcut, setShortcut] = useState(macro?.shortcut ?? '');
+  const [findings, setFindings] = useState(macro?.findings ?? draft.findings);
+  const [impression, setImpression] = useState(macro?.impression ?? draft.impression);
+  const [recommendations, setRecommendations] = useState(macro?.recommendations ?? draft.recommendations);
+  const [scope, setScope] = useState<'personal' | 'tenant'>(macro?.scope ?? 'personal');
+  const [saving, setSaving] = useState(false);
+
+  const submit = async () => {
+    if (!name.trim() || !findings.trim() && !impression.trim()) {
+      onError('A macro needs a name and at least findings or an impression.');
+
+      return;
+    }
+
+    setSaving(true);
+
+    try {
+      if (macro) {
+        const updated = await api.updateReportMacro({
+          ...macro,
+          name: name.trim(),
+          shortcut: shortcut.trim(),
+          findings,
+          impression,
+          recommendations,
+          scope,
+        });
+        onSaved(updated, `Updated “${updated.name}”.`);
+      } else {
+        const created = await api.createReportMacro({
+          name: name.trim(),
+          shortcut: shortcut.trim() || undefined,
+          findings,
+          impression,
+          recommendations,
+          scope,
+        });
+        onSaved(created, `Saved “${created.name}”.`);
+      }
+    } catch (err: any) {
+      onError(err?.response?.data?.message ?? 'Could not save the macro.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <Modal
+      title={macro ? 'Edit snippet' : 'Save as snippet'}
+      subtitle={macro ? macro.name : 'Reusable findings and impression for this modality'}
+      onClose={onClose}
+    >
+      <div className="space-y-3">
+        <div className="grid grid-cols-2 gap-2">
+          <div>
+            <label className="block text-[11px] font-bold text-slate-700 mb-1">Name *</label>
+            <input value={name} onChange={e => setName(e.target.value)} maxLength={120}
+              className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm" />
+          </div>
+          <div>
+            <label className="block text-[11px] font-bold text-slate-700 mb-1">Shortcut</label>
+            <input value={shortcut} onChange={e => setShortcut(e.target.value)} maxLength={40} placeholder="e.g. CT-NORMAL"
+              className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm" />
+          </div>
+        </div>
+
+        <div>
+          <label className="block text-[11px] font-bold text-slate-700 mb-1">Findings *</label>
+          <textarea value={findings} onChange={e => setFindings(e.target.value)} rows={4}
+            className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm font-mono" />
+        </div>
+
+        <div>
+          <label className="block text-[11px] font-bold text-slate-700 mb-1">Impression *</label>
+          <textarea value={impression} onChange={e => setImpression(e.target.value)} rows={2}
+            className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm font-mono" />
+        </div>
+
+        <div>
+          <label className="block text-[11px] font-bold text-slate-700 mb-1">Recommendations</label>
+          <textarea value={recommendations} onChange={e => setRecommendations(e.target.value)} rows={2}
+            className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm font-mono" />
+        </div>
+
+        <div>
+          <label className="block text-[11px] font-bold text-slate-700 mb-1">Visible to</label>
+          <select value={scope} onChange={e => setScope(e.target.value as 'personal' | 'tenant')}
+            className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm bg-white">
+            <option value="personal">Only me</option>
+            {canPublishTenant && <option value="tenant">Everyone in this clinic</option>}
+          </select>
+          {!canPublishTenant && (
+            <p className="text-[10px] text-slate-500 mt-1">
+              Publishing to the whole clinic needs the “report template edit” permission.
+            </p>
+          )}
+        </div>
+
+        <div className="flex justify-end gap-2 pt-1">
+          <button type="button" onClick={onClose}
+            className="px-3 py-1.5 rounded-xl text-xs font-bold text-slate-600 border border-slate-300 cursor-pointer">
+            Cancel
+          </button>
+          <button type="button" onClick={() => void submit()} disabled={saving}
+            className="px-3 py-1.5 rounded-xl text-xs font-bold bg-purple-700 hover:bg-purple-800 text-white disabled:opacity-50 cursor-pointer">
+            {saving ? 'Saving…' : macro ? 'Save changes' : 'Save snippet'}
+          </button>
+        </div>
+      </div>
+    </Modal>
+  );
+};
 
 const CriticalFindingModal: React.FC<{
   appointment: Appointment;

@@ -761,7 +761,14 @@ class MastersController extends BaseApiController
                     ->ignore($ignoreId),
             ],
             'modalityId' => $this->modalityRule(),
-            'locationId' => ['nullable', 'integer'],
+            // Tenant-scoped like the modality beside it: `StudyController` copies
+            // `room.location_id` onto every appointment, so an unscoped id here
+            // attached a suite to another clinic's facility.
+            'locationId' => [
+                'nullable',
+                'integer',
+                Rule::exists('locations', 'id')->where(fn ($q) => $q->where('business_id', $this->tenantId())),
+            ],
             'capacityPerSlot' => ['nullable', 'integer', 'min:1', 'max:20'],
             'description' => ['nullable', 'string', 'max:2000'],
             'isActive' => ['nullable', 'boolean'],
@@ -789,6 +796,7 @@ class MastersController extends BaseApiController
             $method->restore();
             $method->update([
                 'name' => $validated['name'],
+                'kind' => $validated['kind'] ?? ($method->kind ?: PaymentMethod::KIND_OTHER),
                 'is_active' => (bool) ($validated['isActive'] ?? true),
                 'sort_order' => (int) ($validated['sortOrder'] ?? $method->sort_order),
             ]);
@@ -799,6 +807,7 @@ class MastersController extends BaseApiController
         $method = PaymentMethod::create([
             'code' => $code,
             'name' => $validated['name'],
+            'kind' => $validated['kind'] ?? PaymentMethod::KIND_OTHER,
             'is_active' => (bool) ($validated['isActive'] ?? true),
             'sort_order' => (int) ($validated['sortOrder'] ?? 0),
             'business_id' => $this->tenantId(),
@@ -818,6 +827,7 @@ class MastersController extends BaseApiController
 
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:80'],
+            'kind' => ['nullable', Rule::in(PaymentMethod::KINDS)],
             'isActive' => ['nullable', 'boolean'],
             'sortOrder' => ['nullable', 'integer', 'min:0', 'max:999'],
         ]);
@@ -825,6 +835,7 @@ class MastersController extends BaseApiController
         // `code` is intentionally immutable: recorded payments reference it.
         $paymentMethod->update([
             'name' => $validated['name'],
+            'kind' => $validated['kind'] ?? ($paymentMethod->kind ?: PaymentMethod::KIND_OTHER),
             'is_active' => (bool) ($validated['isActive'] ?? $paymentMethod->is_active),
             'sort_order' => (int) ($validated['sortOrder'] ?? $paymentMethod->sort_order),
         ]);
@@ -854,6 +865,9 @@ class MastersController extends BaseApiController
         return $request->validate([
             'code' => ['required', 'string', 'max:20', 'regex:/^[a-z0-9_-]+$/i'],
             'name' => ['required', 'string', 'max:80'],
+            // What the method IS. The drawer and the POS are located by kind, not
+            // by code, so a tenant may name them anything.
+            'kind' => ['nullable', Rule::in(PaymentMethod::KINDS)],
             'isActive' => ['nullable', 'boolean'],
             'sortOrder' => ['nullable', 'integer', 'min:0', 'max:999'],
         ]);

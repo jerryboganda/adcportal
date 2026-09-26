@@ -123,6 +123,8 @@ export interface BootstrapPayload {
   screeningForms: ScreeningForm[];
   templates: ReportTemplate[];
   staff: StaffUser[];
+  /** Every role this clinic can assign, including tenant-created custom ones. */
+  roles?: AccessRoleRecord[];
   clinicSettings: ClinicProfileSettings;
   dicomNodes: DicomNodeConfig[];
   notificationTemplates: NotificationTemplateT[];
@@ -189,7 +191,11 @@ const normalizeRoom = (r: any): Room => ({
   locationId: r.locationId == null ? null : Number(r.locationId),
 });
 const normalizeService = (s: any): Service => ({ ...s, id: Number(s.id), modalityId: Number(s.modalityId), isBookableOnline: s.isBookableOnline ?? true });
-const normalizePaymentMethod = (m: any): PaymentMethod => ({ ...m, id: Number(m.id) });
+const normalizePaymentMethod = (m: any): PaymentMethod => ({
+  ...m,
+  id: Number(m.id),
+  kind: m.kind ?? 'other',
+});
 const normalizeReferrer = (r: any): Referrer => ({ ...r, id: Number(r.id), isActive: r.isActive ?? true });
 const normalizeScreeningForm = (f: any): ScreeningForm => ({ ...f, isActive: f.isActive ?? true });
 
@@ -871,12 +877,21 @@ export async function fetchRadiologistRoster(): Promise<RadiologistSummary[]> {
   return data.data.radiologists;
 }
 
+/**
+ * Assign a study, or take it yourself.
+ *
+ * `radiologistId` is a real user id, the literal `'me'` (the server resolves that
+ * to the caller), or `null` to unassign. It is sent as-is on purpose: this used
+ * to be `Number(radiologistId)`, and `Number('me')` is `NaN`, which
+ * `JSON.stringify` writes as `null` — so every "Claim" button in the product
+ * quietly unassigned the study and then reported success.
+ */
 export async function assignStudyToRadiologist(
   appointmentId: string,
   radiologistId: string | null
 ): Promise<WorklistStudy> {
   const { data } = await http.post(`/reporting/studies/${appointmentId}/assign`, {
-    radiologistId: radiologistId ? Number(radiologistId) : null,
+    radiologistId,
   });
   return data.data.study;
 }
@@ -1045,14 +1060,15 @@ export async function deleteRoom(id: string): Promise<void> {
 
 // ==================== payment methods ====================
 
-export async function createPaymentMethod(input: { code: string; name: string; isActive?: boolean; sortOrder?: number }): Promise<PaymentMethod> {
+export async function createPaymentMethod(input: { code: string; name: string; kind?: PaymentMethod['kind']; isActive?: boolean; sortOrder?: number }): Promise<PaymentMethod> {
   const { data } = await http.post('/payment-methods', input);
   return normalizePaymentMethod(data.data.paymentMethod);
 }
 
-export async function updatePaymentMethod(method: Pick<PaymentMethod, 'id'> & { name: string; isActive?: boolean; sortOrder?: number }): Promise<PaymentMethod> {
+export async function updatePaymentMethod(method: Pick<PaymentMethod, 'id'> & { name: string; kind?: PaymentMethod['kind']; isActive?: boolean; sortOrder?: number }): Promise<PaymentMethod> {
   const { data } = await http.put(`/payment-methods/${method.id}`, {
     name: method.name,
+    kind: method.kind,
     isActive: method.isActive,
     sortOrder: method.sortOrder,
   });
@@ -1250,12 +1266,19 @@ export async function createAdverseReaction(input: Omit<AdverseReactionReport, '
 
 // ==================== staff ====================
 
-export async function createStaff(input: Omit<StaffUser, 'id'> & { password: string }): Promise<StaffUser> {
+/**
+ * Creating or updating a staff member. `roleId` assigns a tenant-created custom
+ * role; omit it (or send null) to assign by the system `role` name instead.
+ * The server reads roleId with `! empty()`, so null is not a request for a role.
+ */
+export type StaffInput = Omit<StaffUser, 'id'> & { password?: string };
+
+export async function createStaff(input: StaffInput & { password: string }): Promise<StaffUser> {
   const { data } = await http.post('/staff', input);
   return data.data.staff;
 }
 
-export async function updateStaff(user: StaffUser & { password?: string }): Promise<StaffUser> {
+export async function updateStaff(user: StaffInput & { id: string }): Promise<StaffUser> {
   const { data } = await http.put(`/staff/${user.id}`, user);
   return data.data.staff;
 }

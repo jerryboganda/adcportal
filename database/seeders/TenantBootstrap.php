@@ -163,11 +163,11 @@ class TenantBootstrap extends Seeder
     private function seedPaymentMethods(Business $business, User $admin): void
     {
         $methods = [
-            ['code' => 'cash', 'name' => 'Cash (Counter Drawer)', 'sort_order' => 1],
-            ['code' => 'card', 'name' => 'Credit / Debit Card (POS)', 'sort_order' => 2],
-            ['code' => 'bank', 'name' => 'Bank Transfer / Raast QR', 'sort_order' => 3],
-            ['code' => 'mobile', 'name' => 'Mobile Wallet (Easypaisa / JazzCash)', 'sort_order' => 4],
-            ['code' => 'insurance', 'name' => 'Insurance / Corporate Panel', 'sort_order' => 5],
+            ['code' => 'cash', 'name' => 'Cash (Counter Drawer)', 'kind' => PaymentMethod::KIND_CASH, 'sort_order' => 1],
+            ['code' => 'card', 'name' => 'Credit / Debit Card (POS)', 'kind' => PaymentMethod::KIND_CARD, 'sort_order' => 2],
+            ['code' => 'bank', 'name' => 'Bank Transfer / Raast QR', 'kind' => PaymentMethod::KIND_DIGITAL, 'sort_order' => 3],
+            ['code' => 'mobile', 'name' => 'Mobile Wallet (Easypaisa / JazzCash)', 'kind' => PaymentMethod::KIND_DIGITAL, 'sort_order' => 4],
+            ['code' => 'insurance', 'name' => 'Insurance / Corporate Panel', 'kind' => PaymentMethod::KIND_INSURANCE, 'sort_order' => 5],
         ];
 
         foreach ($methods as $m) {

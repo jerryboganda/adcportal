@@ -1,9 +1,21 @@
 name: Publish — GHCR image (VPS pulls; compute lives here, never on the host)
 
+# Called by ci.yml as a job that `needs` the whole test matrix, so the image — and
+# the public `:latest` tag — is only ever produced from a green commit. It is also
+# runnable by hand to re-push an already-tested commit.
 on:
-  push:
-    branches: [main]
+  workflow_call:
+    inputs:
+      sha:
+        description: Commit to build and push.
+        required: true
+        type: string
   workflow_dispatch:
+    inputs:
+      sha:
+        description: Commit to build and push (defaults to HEAD).
+        required: false
+        type: string
 
 permissions:
   contents: read
@@ -15,6 +27,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.sha || github.sha }}
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -26,6 +40,10 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      # `latest` is published here, not on every push: this workflow is only
+      # reachable from a green ci.yml (or a manual re-run of a tested commit), so
+      # the public tag can never point at code whose tests did not pass. The
+      # deploy job still pulls by immutable SHA, never by `latest`.
       - name: Build & push (latest + sha tags)
         uses: docker/build-push-action@v6
         with:
@@ -33,9 +51,9 @@ jobs:
           push: true
           tags: |
             ghcr.io/jerryboganda/adcportal:latest
-            ghcr.io/jerryboganda/adcportal:${{ github.sha }}
+            ghcr.io/jerryboganda/adcportal:${{ inputs.sha || github.sha }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
       - name: Image digest
-        run: echo "pushed ghcr.io/jerryboganda/adcportal:${{ github.sha }}"
+        run: echo "pushed ghcr.io/jerryboganda/adcportal:${{ inputs.sha || github.sha }}"

@@ -63,6 +63,19 @@ abstract class BaseApiController extends Controller
     }
 
     /**
+     * Record an audit row against a NAMED tenant rather than the resolved one.
+     *
+     * Signup is the one flow that writes a tenant before anyone is authenticated,
+     * so `getActiveBusiness()` cannot see it — it falls back to `Business::first()`
+     * and filed every `tenant_registered` row against whichever clinic happened to
+     * have the lowest id. Platform events must name their tenant explicitly.
+     */
+    protected function auditForTenant(int $businessId, string $action, $subject, array $changes = []): void
+    {
+        AuditLog::record($action, $subject, $changes, $businessId);
+    }
+
+    /**
      * Server-enforced module entitlement. Reads stay available (historical
      * clinical data must remain visible); mutating a disabled module is
      * refused regardless of what the SPA shows.

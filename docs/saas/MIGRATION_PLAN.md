@@ -18,7 +18,7 @@ Deploy runs `php artisan migrate --force` (already in the CI deploy job). After 
 
 - Existing tenants keep working unchanged (`active`/`trialing` semantics untouched; `EnsureTenantActive` behaves identically for subscribable tenants).
 - The existing super admin (`RIS_SUPER_ADMIN_EMAIL`) automatically has full control-plane access (`type = 'super_admin'` ⇒ all capabilities).
-- `ris:subscription-sweep` activates on the existing schedule cron (`schedule:run`); first run simply records any genuinely lapsed trials.
+- `ris:subscription-sweep` activates on the existing in-container scheduler (`schedule:work`, started by `docker/entrypoint.sh`); first run simply records any genuinely lapsed trials.
 - Optional per-tenant role corrections can be made from the platform console (Tenant 360 → Users) — the backfill is deliberately conservative.
 
 ## Data safety

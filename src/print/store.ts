@@ -38,61 +38,76 @@ let readyResolver: (() => void) | null = null;
 let readyPromise: Promise<void> | null = null;
 const listeners = new Set<() => void>();
 
+/**
+ * A failure that happened BEFORE a document existed.
+ *
+ * `fail()` used to be a no-op without an active document, and the fetch is what
+ * fails first: `openPrintPreview` awaits the payload before activating the host,
+ * so a 403 (no `label print`), a 404 or a dropped connection threw past
+ * `activate()`, left `active` null, and the host bailed out at `!document`. The
+ * error panel was written but unreachable, and every call site discards the
+ * promise — so the operator clicked Print and nothing happened at all.
+ */
+let error: string | null = null;
+
 function emit(): void {
-  listeners.forEach((listener) => listener());
+    listeners.forEach((listener) => listener());
 }
 
 export const printStore = {
-  subscribe(listener: () => void): () => void {
-    listeners.add(listener);
+    subscribe(listener: () => void): () => void {
+        listeners.add(listener);
 
-    return () => listeners.delete(listener);
-  },
+        return () => listeners.delete(listener);
+    },
 
-  get(): ActivePrintDocument | null {
-    return active;
-  },
+    get(): ActivePrintDocument | null {
+        return active;
+    },
 
-  activate(input: {
-    mode: PrintHostMode;
-    document: PrintDocumentModel;
-    artifact: PrintArtifact;
-    documentId: string;
-    serverBacked: boolean;
-  }): Promise<void> {
-    token += 1;
-    readyPromise = new Promise<void>((resolve) => {
-      readyResolver = resolve;
-    });
-    active = { token, ...input };
-    emit();
+    getError(): string | null {
+        return error;
+    },
 
-    return readyPromise;
-  },
+    activate(input: {
+        mode: PrintHostMode;
+        document: PrintDocumentModel;
+        artifact: PrintArtifact;
+        documentId: string;
+        serverBacked: boolean;
+    }): Promise<void> {
+        token += 1;
+        readyPromise = new Promise<void>((resolve) => {
+            readyResolver = resolve;
+        });
+        error = null;
+        active = { token, ...input };
+        emit();
 
-  fail(message: string): void {
-    if (!active) {
-      return;
-    }
+        return readyPromise;
+    },
 
-    active = { ...active, error: message };
-    emit();
-    readyResolver?.();
-    readyResolver = null;
-  },
+    /** Publish a failure. Works with or without an active document. */
+    fail(message: string): void {
+        error = message;
+        emit();
+        readyResolver?.();
+        readyResolver = null;
+    },
 
-  /** Called by the host once fonts, images and layout have settled. */
-  markReady(): void {
-    readyResolver?.();
-    readyResolver = null;
-  },
+    /** Called by the host once fonts, images and layout have settled. */
+    markReady(): void {
+        readyResolver?.();
+        readyResolver = null;
+    },
 
-  clear(): void {
-    active = null;
-    readyResolver = null;
-    readyPromise = null;
-    emit();
-  },
+    clear(): void {
+        active = null;
+        error = null;
+        readyResolver = null;
+        readyPromise = null;
+        emit();
+    },
 
   /** True while a document is active — used to lock the UI during printing. */
   isActive(): boolean {
@@ -102,6 +117,17 @@ export const printStore = {
 
 export function useActivePrintDocument(): ActivePrintDocument | null {
   return useSyncExternalStore(printStore.subscribe, printStore.get, printStore.get);
+}
+
+/**
+ * A print failure, whether or not a document was ever activated.
+ *
+ * Its own subscription because `printStore.get()` returns `null` both before and
+ * after a fetch-time failure, so subscribing to the active document would see no
+ * change and never re-render.
+ */
+export function usePrintError(): string | null {
+  return useSyncExternalStore(printStore.subscribe, printStore.getError, printStore.getError);
 }
 
 /** Default geometry for the short window before a payload arrives. */

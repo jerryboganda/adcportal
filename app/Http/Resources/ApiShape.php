@@ -118,6 +118,10 @@ class ApiShape
             'id' => self::id($m->id),
             'code' => $m->code,
             'name' => $m->name,
+            // What the method IS, so the client can offer the change calculator
+            // and the card comparison for the tenant's own drawer/POS method
+            // instead of assuming the codes 'cash' and 'card'.
+            'kind' => (string) ($m->kind ?: PaymentMethod::KIND_OTHER),
             'isActive' => (bool) $m->is_active,
             'sortOrder' => (int) $m->sort_order,
         ];
@@ -559,6 +563,7 @@ class ApiShape
             'name' => $u->name,
             'email' => $u->email,
             'role' => $u->portalRole(),
+            'roleId' => $u->tenantRoleId(),
             'department' => (string) ($u->department ?? ''),
             'phone' => (string) ($u->mobile_no ?? ''),
             'initials' => (string) ($u->initials ?? ''),
@@ -791,9 +796,24 @@ class ApiShape
 
     // ==================== inventory ====================
 
-    public static function inventoryItem(InventoryItem $i): array
+    /**
+     * An inventory item.
+     *
+     * `$commercial` decides whether the buying and selling side travels with the
+     * clinical side. It is not decoration: `/bootstrap` hands the catalogue to
+     * anyone who may ACQUIRE a study, because the contrast picker needs it, and
+     * the Inventory tab is gated on `inventory view` — so without this split a
+     * technologist with no inventory permission received unit cost, selling
+     * price, supplier and storage location anyway, and global search rendered
+     * them. A role that may use a vial does not thereby gain the clinic's
+     * purchasing prices.
+     *
+     * @param  array<string, mixed>|null  $b
+     * @return array<string, mixed>
+     */
+    public static function inventoryItem(InventoryItem $i, bool $commercial = true): array
     {
-        return [
+        $clinical = [
             'id' => self::id($i->id),
             'code' => $i->code,
             'name' => $i->name,
@@ -803,9 +823,27 @@ class ApiShape
             'unit' => (string) ($i->unit ?? ''),
             'currentStock' => (int) $i->current_stock,
             'minThreshold' => (int) $i->min_threshold,
+            'requiresColdChain' => (bool) $i->requires_cold_chain,
+        ];
+
+        if (! $commercial) {
+            return $clinical + [
+                // Declared, explicitly empty, so the frontend contract does not
+                // change shape between the two viewers.
+                'unitCost' => null,
+                'sellingPrice' => null,
+                'batches' => [],
+                'supplier' => '',
+                'storageLocation' => '',
+                'isBillable' => false,
+                'notes' => null,
+            ];
+        }
+
+        return $clinical + [
             'unitCost' => (float) $i->unit_cost,
             'sellingPrice' => (float) $i->selling_price,
-            'batches' => collect($i->batches ?? [])->map(fn ($b) => [
+            'batches' => collect($i->batches ?? [])->map(fn (array $b) => [
                 'batchNumber' => $b['batch_number'] ?? $b['batchNumber'] ?? '',
                 'expiryDate' => $b['expiry_date'] ?? $b['expiryDate'] ?? '',
                 'quantity' => (int) ($b['quantity'] ?? 0),
@@ -813,7 +851,6 @@ class ApiShape
             ])->values()->all(),
             'supplier' => (string) ($i->supplier ?? ''),
             'storageLocation' => (string) ($i->storage_location ?? ''),
-            'requiresColdChain' => (bool) $i->requires_cold_chain,
             'isBillable' => (bool) $i->is_billable,
             'notes' => $i->notes,
         ];

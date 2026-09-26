@@ -18,7 +18,7 @@ import {
   Clock,
   Sparkles,
 } from 'lucide-react';
-import { AdvancedFilterState, SortField, getDateRangeForPreset } from '../utils/tableUtils';
+import { AdvancedFilterState, SortField, getDateRangeForPreset, localDateString } from '../utils/tableUtils';
 import { Modality, Priority, WorkflowState } from '../types';
 
 interface WorklistFilterToolbarProps {
@@ -93,7 +93,7 @@ export const WorklistFilterToolbar: React.FC<WorklistFilterToolbarProps> = ({
 
   // Reset all filters to default
   const handleResetFilters = () => {
-    const today = new Date().toISOString().split('T')[0];
+    const today = localDateString();
     onFilterChange({
       search: '',
       dateRangeMode: 'today',

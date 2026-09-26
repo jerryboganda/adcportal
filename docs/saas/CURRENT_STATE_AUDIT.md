@@ -2,7 +2,7 @@
 
 ## What the system was (evidence-backed)
 
-- **Stack**: Laravel 11 (PHP 8.4, Sanctum SPA cookie sessions, laratrust) + MySQL prod / SQLite CI; React 19 + Vite SPA served by Laravel from `public/`.
+- **Stack**: Laravel 11 (PHP 8.4, Sanctum SPA cookie sessions, laratrust) + PostgreSQL prod / SQLite CI; React 19 + Vite SPA served by Laravel from `public/`. (This line originally read "MySQL prod"; production was migrated to PostgreSQL 17 on 2026-09-17 — see `production-vps-topology.md`.)
 - **Tenancy model found**: **Model B — pooled shared database + `business_id` tenant column.** A tenant = one row in `businesses` (`business_id` scoping on every domain table; `getActiveBusiness()` resolves the tenant from the authenticated user; middleware `EnsureTenantActive` gates non-subscribable tenants with 402).
 - **Existing SaaS layer before this program**: `plans` table (with `max_users`/`max_studies_per_month` **displayed but never enforced**), denormalized subscription state on `businesses` (`plan_id`, `subscription_status` ∈ {trialing, active, suspended, expired}, `trial_ends_at`, `subscription_ends_at`, unique `tenant_code`), manual activation by super admin (no payment gateway — deliberately), `AuditLog` hand-rolled audit table, per-tenant laratrust roles seeded by `TenantBootstrap`, public signup (`POST /api/v1/register`) creating a trialing tenant.
 - **Identity**: single `users` table; `users.type ∈ {super_admin, admin, staff, customer}`; super admin identified by `users.type === 'super_admin'` with `business_id = 0`; **one user belonged to exactly one tenant** (`users.business_id`, legacy `active_business`).

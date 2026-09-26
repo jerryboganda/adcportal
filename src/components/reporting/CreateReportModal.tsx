@@ -12,6 +12,7 @@ import {
   TemplateMatch,
 } from '../../types';
 import * as api from '../../services/apiService';
+import { localDateString } from '../../utils/tableUtils';
 
 /**
  * Create a report for a study that never came through scheduling: an external
@@ -39,7 +40,7 @@ export const CreateReportModal: React.FC<{
   const [patientId, setPatientId] = useState<string>('');
   const [newPatient, setNewPatient] = useState({ name: '', phone: '', gender: 'male' as Patient['gender'], age: '' });
   const [isNewPatient, setIsNewPatient] = useState(false);
-  const [studyDate, setStudyDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [studyDate, setStudyDate] = useState(() => localDateString());
   const [priority, setPriority] = useState<Priority>('routine');
   const [indication, setIndication] = useState('');
   const [referrerId, setReferrerId] = useState<number | ''>('');
@@ -139,8 +140,12 @@ export const CreateReportModal: React.FC<{
               name: newPatient.name.trim(),
               phone: newPatient.phone.trim() || undefined,
               gender: newPatient.gender,
+              // Age is the fact this form actually collects. It used to also send
+              // `dob: studyDate`, which read as "the patient's date of birth is
+              // today" — it was neither validated nor ever read by
+              // `Customer::register()`, so it wrote nothing while implying
+              // something false about the patient record.
               age: newPatient.age ? Number(newPatient.age) : undefined,
-              dob: studyDate,
             }
           : undefined,
         serviceId,

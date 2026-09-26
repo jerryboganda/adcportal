@@ -454,7 +454,17 @@ final class PrintDocumentFactory
         ];
 
         $encode = $mrn !== '' ? $mrn : (string) ($appointment->token_number ?? '');
-        $data['codes'] = [$this->code($encode, $encode, 0.24, 6.0, 52.0)];
+        // 32 mm: the symbol column of the label grid (55% of the 59.5 mm safe
+        // width). A wider symbol would shrink the module below the ~0.19 mm a
+        // Code 128 needs to scan.
+        //
+        // ponytail: this has a hard ceiling — Code128::svg() floors the module at
+        // 0.12 mm, so a value longer than ~22 characters (266 modules) is printed
+        // narrower than 0.19 mm and may not scan. The MRN format is `MRN-` plus
+        // six digits, so the real headroom is ~12 characters. If legacy MRNs ever
+        // approach that, switch the label to DataMatrix rather than shrinking the
+        // module further.
+        $data['codes'] = [$this->code($encode, $encode, 0.24, 6.0, 32.0)];
         $data['lineCountEstimate'] = 10;
 
         return [$data, $this->estimateLines($data, $paper)];
@@ -685,7 +695,7 @@ final class PrintDocumentFactory
         $day = $this->validDate($date);
         $ledger = app(ShiftLedgerService::class)->forDay($this->businessId, $day);
 
-        $cashExpected = app(ShiftLedgerService::class)->cashExpected($ledger);
+        $cashExpected = app(ShiftLedgerService::class)->cashExpected($ledger, $this->businessId);
         $counted = (float) ($options['countedCash'] ?? 0);
         $discrepancy = round($counted - $cashExpected, 2);
 

@@ -456,16 +456,25 @@ class ReportController extends BaseApiController
         return ReportTemplate::forClinic($this->tenantId())->findOrFail($templateId);
     }
 
-    /** Typed-signature confirmation must match the signing radiologist's name. */
+    /**
+     * Sign a report, irreversibly.
+     *
+     * The guard is `denyUnless('report sign')` — the TENANT-SCOPED check — and not
+     * Laratrust's `isAbleTo()`. This is the write that sets `locked_at` and puts
+     * a radiologist's name on a clinical document for good, so it must resolve
+     * permissions against the ACTIVE tenant: a user who may sign in clinic A must
+     * not sign in clinic B, and `isAbleTo()` answers that question across every
+     * tenant the user belongs to. `isAbleTo()` sat here as a second line of
+     * defence; it is now the tenant-scoped gate, so a caller that forgets to check
+     * cannot silently downgrade the check.
+     */
     public function signReport(RadiologyReport $report, string $signAs): void
     {
         if ($report->isSigned()) {
             throw new InvalidArgumentException('Report is already signed.');
         }
 
-        if (! auth()->user()?->isAbleTo('report sign')) {
-            throw new InvalidArgumentException('You are not allowed to sign reports.');
-        }
+        $this->denyUnless('report sign');
 
         $type = $report->type === 'addendum' ? 'addendum' : ($signAs === 'preliminary' ? 'preliminary' : 'final');
 

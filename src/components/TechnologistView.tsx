@@ -29,7 +29,7 @@ import {
   User
 } from 'lucide-react';
 import { Appointment, Modality, DoseLog, WorkflowState } from '../types';
-import { canAny } from '../services/permissions';
+import { canAny, canPrintArtifact } from '../services/permissions';
 import { rerunScreeningTriage } from '../services/apiService';
 import { openPrintPreview } from '../print/printDocument';
 import { WorklistFilterToolbar } from './WorklistFilterToolbar';
@@ -77,6 +77,7 @@ export const TechnologistView: React.FC<TechnologistViewProps> = ({
   const canAcquire = canAny(permissions, ['study acquire']);
   const canScreen = canAny(permissions, ['study screen']);
   const canCancelStudy = canAny(permissions, ['study cancel']);
+  const canPrintLabel = canPrintArtifact(permissions, 'label');
 
   const [filters, setFilters] = useState<AdvancedFilterState>({
     ...defaultAdvancedFilters,
@@ -634,14 +635,19 @@ export const TechnologistView: React.FC<TechnologistViewProps> = ({
                       * 63.5 × 25.4 mm tag the registry assigns it. The local modal
                       * that used to sit here printed the application shell and
                       * hardcoded a vendor name into the patient's label.
+                      *
+                      * `label print` is a separately revocable grant the registry
+                      * enforces, so the button honours it too.
                       */}
-                    <button
-                      onClick={() => void openPrintPreview({ artifact: 'label', id: apt.id, paper: 'label' })}
-                      title="Open the patient accession barcode & wristband label"
-                      className="p-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs border border-slate-200 transition-colors cursor-pointer"
-                    >
-                      <Printer className="w-3.5 h-3.5" />
-                    </button>
+                    {canPrintLabel && (
+                      <button
+                        onClick={() => void openPrintPreview({ artifact: 'label', id: apt.id, paper: 'label' })}
+                        title="Open the patient accession barcode & wristband label"
+                        className="p-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs border border-slate-200 transition-colors cursor-pointer"
+                      >
+                        <Printer className="w-3.5 h-3.5" />
+                      </button>
+                    )}
 
                     {/* View PACS QC Viewer */}
                     <button
@@ -653,17 +659,26 @@ export const TechnologistView: React.FC<TechnologistViewProps> = ({
                       <span>PACS QC</span>
                     </button>
 
-                    <button
-                      onClick={() => {
-                        setCancelModalApt(apt);
-                        setCancelReason('Patient Refusal');
-                        setCancelNotes('');
-                      }}
-                      className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
-                      title="Cancel / Abort Examination"
-                    >
-                      <Ban className="w-3.5 h-3.5" />
-                    </button>
+                    {/*
+                      `canCancelStudy` was computed and never used, so the abort
+                      button rendered for every role and the server's 403 was the
+                      only thing stopping a technician from cancelling a study. The
+                      server still refuses it — this is about the button not
+                      offering an action the operator cannot take.
+                    */}
+                    {canCancelStudy && (
+                      <button
+                        onClick={() => {
+                          setCancelModalApt(apt);
+                          setCancelReason('Patient Refusal');
+                          setCancelNotes('');
+                        }}
+                        className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
+                        title="Cancel / Abort Examination"
+                      >
+                        <Ban className="w-3.5 h-3.5" />
+                      </button>
+                    )}
                   </div>
 
                   {/* Primary Stage Transition Buttons */}

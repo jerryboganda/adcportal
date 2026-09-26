@@ -100,12 +100,36 @@ class User extends Authenticatable implements LaratrustUser,MustVerifyEmail
         'canAccessPacs',
     ];
 
+    /** The tenant whose roles decide what this user may do right now. */
+    public function activeBusinessId(): int
+    {
+        return (int) (function_exists('getActiveBusiness') ? getActiveBusiness($this->id) : ($this->business_id ?: $this->active_business ?: 0));
+    }
+
+    /**
+     * The primary role id in the ACTIVE tenant, or null.
+     *
+     * The SPA needs the id, not the name: custom tenant roles are edited by id,
+     * and two roles can share a display name. Resolved through the same
+     * tenant-scoped lookup as `portalRole()` so name and id can never disagree.
+     */
+    public function tenantRoleId(): ?int
+    {
+        $businessId = $this->activeBusinessId();
+
+        if ($businessId <= 0) {
+            return null;
+        }
+
+        return \App\Services\TenantAuthorizer::roleIdsFor($this, $businessId)[0] ?? null;
+    }
+
     public function portalRole(): string
     {
         // Map the app's role names onto the React SPA role vocabulary. Roles are
         // evaluated for the ACTIVE tenant only, so a multi-tenant member always
         // carries the role their current membership grants.
-        $activeBusiness = (int) (function_exists('getActiveBusiness') ? getActiveBusiness($this->id) : ($this->business_id ?: $this->active_business ?: 0));
+        $activeBusiness = $this->activeBusinessId();
         $roles = $activeBusiness > 0
             ? \App\Services\TenantAuthorizer::roleNamesFor($this, $activeBusiness)
             : $this->getRoles();

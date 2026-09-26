@@ -24,6 +24,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 
 /**
@@ -81,7 +82,15 @@ class StudyController extends BaseApiController
             'newPatient.allergies' => ['nullable', 'string', 'max:2000'],
             'serviceId' => ['required', 'integer'],
             'roomId' => ['nullable', 'integer'],
-            'referrerId' => ['nullable', 'integer'],
+            // Tenant-scoped like every other foreign key in this payload. As a
+            // bare `integer` this stored another clinic's referrer id, and
+            // `Appointment::referrer()` + `ApiShape::referrer()` then handed back
+            // that doctor's name, clinic, email and phone to whoever booked.
+            'referrerId' => [
+                'nullable',
+                'integer',
+                Rule::exists('referrers', 'id')->where(fn ($q) => $q->where('business_id', $this->tenantId())),
+            ],
             'date' => ['required', 'date_format:Y-m-d'],
             'time' => ['required', 'string', 'max:20'],
             'priority' => ['required', 'in:routine,urgent,stat'],

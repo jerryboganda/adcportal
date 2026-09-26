@@ -22,6 +22,9 @@ class TenantAuthorizer
     /** @var array<string, array<string>> per-request cache: "user:tenant" */
     private static array $cache = [];
 
+    /** @var array<string, list<int>> per-request cache: "user:tenant" -> role ids */
+    private static array $roleCache = [];
+
     /** All permission names the user holds inside the given tenant. */
     public static function permissionsFor(User $user, int $businessId): array
     {
@@ -63,19 +66,48 @@ class TenantAuthorizer
         return in_array($permission, self::permissionsFor($user, $businessId), true);
     }
 
-    /** Laratrust role names the user holds within the given tenant. */
-    public static function roleNamesFor(User $user, int $businessId): array
+    /**
+     * Laratrust role ids the user holds within the given tenant, in a stable order.
+     *
+     * Ordered by id (creation order) so `roleNamesFor()[0]` and `roleIdsFor()[0]`
+     * are always the SAME role — the SPA shows the name and writes back the id.
+     */
+    public static function roleIdsFor(User $user, int $businessId): array
     {
         if ($businessId <= 0) {
             return [];
         }
 
-        $adminIds = self::tenantAdminIds($businessId);
-        $roleIds = DB::table('role_user')->where('user_id', $user->id)->pluck('role_id');
+        // Memoized for the same reason permissionsFor() is: the staff list calls
+        // this once per row AND portalRole() asks for the same lookup again, so
+        // an uncached version costs two `role_user` + `roles` round trips per
+        // person on a single admin screen.
+        $key = "{$user->id}:{$businessId}";
+        if (array_key_exists($key, self::$roleCache)) {
+            return self::$roleCache[$key];
+        }
+
+        return self::$roleCache[$key] = Role::query()
+            ->whereIn('id', DB::table('role_user')->where('user_id', $user->id)->pluck('role_id'))
+            ->whereIn('created_by', self::tenantAdminIds($businessId))
+            ->orderBy('id')
+            ->pluck('id')
+            ->map(fn ($id) => (int) $id)
+            ->all();
+    }
+
+    /** Laratrust role names the user holds within the given tenant. */
+    public static function roleNamesFor(User $user, int $businessId): array
+    {
+        $roleIds = self::roleIdsFor($user, $businessId);
+
+        if ($roleIds === []) {
+            return [];
+        }
 
         return Role::query()
             ->whereIn('id', $roleIds)
-            ->whereIn('created_by', $adminIds)
+            ->orderBy('id')
             ->pluck('name')
             ->all();
     }
@@ -108,6 +140,12 @@ class TenantAuthorizer
                 unset(self::$cache[$key]);
             }
         }
+
+        foreach (array_keys(self::$roleCache) as $key) {
+            if (str_starts_with($key, "{$userId}:")) {
+                unset(self::$roleCache[$key]);
+            }
+        }
     }
 
     /**
@@ -119,6 +157,7 @@ class TenantAuthorizer
     public static function flushAll(): void
     {
         self::$cache = [];
+        self::$roleCache = [];
     }
 
     /** Union of permissions from a user's tenant roles — or ALL tenant roles for support. */

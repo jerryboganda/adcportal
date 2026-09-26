@@ -228,15 +228,19 @@ export const DoctorNetworkView: React.FC<DoctorNetworkViewProps> = ({
               Manage referring physician directory, track live patient study manifests, dispatch verified reports via WhatsApp, and audit clinical commissions.
             </p>
           </div>
-          <div className="flex items-center space-x-3">
-            <button
-              onClick={() => handleOpenDoctorModal()}
-              className="flex items-center space-x-2 px-4 py-2 rounded-xl bg-sky-500 hover:bg-sky-400 text-slate-950 text-xs font-bold transition-all shadow-md shadow-sky-500/20 cursor-pointer"
-            >
-              <Plus className="w-4 h-4" />
-              <span>Register Referring Doctor</span>
-            </button>
-          </div>
+          {/* Gated like the per-row edit at :441 — the header button was offered
+              to every role that could open the screen. */}
+          {canEditReferrer && (
+            <div className="flex items-center space-x-3">
+              <button
+                onClick={() => handleOpenDoctorModal()}
+                className="flex items-center space-x-2 px-4 py-2 rounded-xl bg-sky-500 hover:bg-sky-400 text-slate-950 text-xs font-bold transition-all shadow-md shadow-sky-500/20 cursor-pointer"
+              >
+                <Plus className="w-4 h-4" />
+                <span>Register Referring Doctor</span>
+              </button>
+            </div>
+          )}
         </div>
 
         {/* Quick Highlights Strip */}

@@ -282,9 +282,19 @@ class TenantLifecycleService
 
             $tenant->forceFill($updates)->save();
 
-            if (in_array($to, ['suspended', 'expired', 'offboarding', 'terminated'], true)) {
-                // While not subscribable the tenant keeps its data but every
-                // tenant API request is refused by EnsureTenantActive.
+            // A REVERSIBLE state must not touch `is_enable_login`. That flag is a
+            // per-user HR decision, and flipping it for the whole clinic on
+            // suspend/expire was a one-way door: nothing ever set it back, so a
+            // single suspend → reactivate round-trip locked the clinic out for
+            // good, and restoring it would have re-enabled accounts a tenant
+            // admin had deliberately disabled. Suspended and expired are refused
+            // reversibly instead, by `EnsureTenantActive` (402) and by
+            // `AuthController::login` (no session is minted).
+            //
+            // The TERMINAL states do revoke logins. There "never coming back" is
+            // the intent, and it is the only way a departing staff member's
+            // account stops working.
+            if (in_array($to, ['offboarding', 'terminated'], true)) {
                 $this->revokeTenantLogins($tenant);
             }
 
@@ -296,6 +306,7 @@ class TenantLifecycleService
         return $tenant->fresh();
     }
 
+    /** Terminal-state access revocation. Only ever called for offboarding/termination. */
     private function revokeTenantLogins(Business $tenant): void
     {
         User::where('business_id', $tenant->id)->whereIn('type', ['admin', 'staff'])->update(['is_enable_login' => 0]);

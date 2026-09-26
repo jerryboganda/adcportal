@@ -68,7 +68,15 @@ export const DocumentHeader: React.FC<{
 }> = ({ paper, branding, kindLabel, status, documentKey, showLogo }) => {
   // The browser renders the public URL; the PDFs embed the same asset as a data
   // URI. Same image, one source, no second copy of the letterhead.
+  //
+  // A logo URL the browser cannot reach (a tenant pointing at an old host) must
+  // cost the letterhead, not print a broken-image box on a clinical document:
+  // `readiness` already waits for the error, so the element is gone before the
+  // dialog opens.
   const logo = branding.logoUrl || branding.logoDataUri;
+  const dropBrokenLogo = (event: React.SyntheticEvent<HTMLImageElement>) => {
+    event.currentTarget.style.display = 'none';
+  };
 
   if (paper === 'a4') {
     return (
@@ -77,7 +85,7 @@ export const DocumentHeader: React.FC<{
           <tbody>
             <tr>
               <td style={{ width: '62%' }}>
-                {showLogo && logo ? <img className="pd-logo" src={logo} alt={branding.name} /> : null}
+                {showLogo && logo ? <img className="pd-logo" src={logo} alt={branding.name} onError={dropBrokenLogo} /> : null}
                 <div className="pd-org">{branding.name}</div>
                 {branding.tagline ? <div className="pd-org-tagline">{branding.tagline}</div> : null}
                 <div className="pd-org-lines">
@@ -123,7 +131,7 @@ export const DocumentHeader: React.FC<{
   return (
     <>
       <div className="pd-c">
-        {showLogo && logo ? <img className="pd-logo" style={{ maxHeight: '12mm' }} src={logo} alt={branding.name} /> : null}
+        {showLogo && logo ? <img className="pd-logo" style={{ maxHeight: '12mm' }} src={logo} alt={branding.name} onError={dropBrokenLogo} /> : null}
         <div className="pd-b pd-upper">{branding.name}</div>
         {branding.tagline ? <div>{branding.tagline}</div> : null}
         {branding.addressLine ? <div>{branding.addressLine}</div> : null}
@@ -585,6 +593,45 @@ export const DocumentSignature: React.FC<{ signature: PrintSignature | null; sho
     </table>
   );
 };
+
+/**
+ * The label tag.
+ *
+ * Mirrors `resources/views/print/bodies/label.blade.php`. A 63.5 x 25.4 mm tag is
+ * a FIXED height, so it is a two-column table — identity left, symbol right — and
+ * never the shared letterhead and key/value table that measured 51 mm of content
+ * and put one patient across three tags. The symbol keeps 55% of the width
+ * because a Code 128 under ~0.19 mm per module will not scan, so the wrapping is
+ * absorbed by the identity column instead of by the tag growing a second page.
+ */
+export const DocumentLabel: React.FC<{
+  branding: PrintBranding;
+  rows: PrintLabeledValue[];
+  codes: PrintCode[];
+  show: boolean;
+}> = ({ branding, rows, codes, show }) => (
+  <table className="pd-label">
+    <tbody>
+      <tr>
+        <td className="pd-label-clinic" colSpan={2}>
+          {branding.name}
+        </td>
+      </tr>
+      <tr>
+        <td className="pd-label-id">
+          {rows.map((row) => (
+            <div className="pd-label-row" key={`${row.label}:${row.value}`}>
+              <span className="pd-label-key">{row.label}</span> <span className="pd-label-value">{row.value}</span>
+            </div>
+          ))}
+        </td>
+        <td className="pd-label-symbol">
+          <DocumentCodes codes={codes} show={show} />
+        </td>
+      </tr>
+    </tbody>
+  </table>
+);
 
 /**
  * The barcode as INLINE vector markup.

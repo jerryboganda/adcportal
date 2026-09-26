@@ -69,7 +69,13 @@ class BillingController extends BaseApiController
             'discountAmount' => ['nullable', 'numeric', 'min:0'],
             'notes' => ['nullable', 'string', 'max:2000'],
             'items' => ['required', 'array', 'min:1'],
-            'items.*.serviceId' => ['nullable', 'integer'],
+            // Tenant-scoped: as a bare `integer` this stored a foreign clinic's
+            // service id on a line item, and `ApiShape::invoice` echoes it back.
+            'items.*.serviceId' => [
+                'nullable',
+                'integer',
+                Rule::exists('services', 'id')->where(fn ($q) => $q->where('business_id', $this->tenantId())),
+            ],
             'items.*.description' => ['required', 'string', 'max:500'],
             'items.*.quantity' => ['required', 'integer', 'min:1', 'max:99'],
             'items.*.unitPrice' => ['required', 'numeric', 'min:0'],
@@ -155,7 +161,11 @@ class BillingController extends BaseApiController
         }
 
         $validated = $request->validate([
-            'serviceId' => ['nullable', 'integer'],
+            'serviceId' => [
+                'nullable',
+                'integer',
+                Rule::exists('services', 'id')->where(fn ($q) => $q->where('business_id', $this->tenantId())),
+            ],
             'description' => ['required', 'string', 'max:500'],
             'quantity' => ['required', 'integer', 'min:1', 'max:99'],
             'unitPrice' => ['required', 'numeric', 'min:0'],

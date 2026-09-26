@@ -59,13 +59,25 @@ return [
     | Application Timezone
     |--------------------------------------------------------------------------
     |
-    | Here you may specify the default timezone for your application, which
-    | will be used by the PHP date and date-time functions. The timezone
-    | is set to "UTC" by default as it is suitable for most use cases.
+    | The ZONE THE CLINIC IS IN, not the zone the server happens to sit in.
+    |
+    | This was "UTC", which is not a neutral choice for a clinical system: on a
+    | UTC+5 workstation the calendar day rolled over five hours late, so from
+    | 00:00 to 05:00 local "today" was yesterday. That silently emptied the
+    | reception desk and the tech worklist, defaulted new bookings and the
+    | batch-received date to yesterday, filed the shift-closing sheet under the
+    | wrong day, and stamped every printed document with "(UTC)".
+    |
+    | The SPA derives "today" the same way (`localDateString()` in
+    | `src/utils/tableUtils.ts`); if you change this, change that too, or the
+    | browser and the server will disagree about what day it is.
+    |
+    | A per-tenant timezone is the right long-term home for this; until then this
+    | is one zone for the whole platform.
     |
     */
 
-    'timezone' => env('APP_TIMEZONE', 'UTC'),
+    'timezone' => env('APP_TIMEZONE', 'Asia/Karachi'),
 
     /*
     |--------------------------------------------------------------------------

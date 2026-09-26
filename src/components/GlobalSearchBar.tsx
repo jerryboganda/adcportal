@@ -24,7 +24,8 @@ import {
   FolderOpen
 } from 'lucide-react';
 import { Appointment, Patient, ActiveTab, Invoice, InventoryItem } from '../types';
-import { allowedTabs } from '../services/permissions';
+import { formatMoney } from '../utils/bookingMoney';
+import { allowedTabs, canAny } from '../services/permissions';
 import { Boxes, Droplet, ThermometerSnowflake } from 'lucide-react';
 
 interface GlobalSearchBarProps {
@@ -39,6 +40,8 @@ interface GlobalSearchBarProps {
   onOpenBookingModal?: () => void;
   /** Server-issued `appointment create` — booking affordances render only when true. */
   canOpenBooking?: boolean;
+  /** Tenant currency symbol; the server hides prices from roles without commercial access. */
+  currency: string;
 }
 
 export const GlobalSearchBar: React.FC<GlobalSearchBarProps> = ({
@@ -51,6 +54,7 @@ export const GlobalSearchBar: React.FC<GlobalSearchBarProps> = ({
   onSelectAppointment,
   onOpenBookingModal,
   canOpenBooking = false,
+  currency,
 }) => {
   const [query, setQuery] = useState('');
   const [isOpen, setIsOpen] = useState(false);
@@ -215,6 +219,15 @@ export const GlobalSearchBar: React.FC<GlobalSearchBarProps> = ({
     const allowed = allowedTabs(permissions);
     setActiveTab(preferred.find(t => allowed.includes(t)) ?? 'dashboard');
   };
+
+  /** The same modules this session may open, for the in-card "Manage" jumps. */
+  const allowed = allowedTabs(permissions);
+  // Inventory commercial detail (price, lot, storage) is for stock admins only —
+  // the server omits those fields for everyone else.
+  const canSeeInventory = canAny(permissions, ['inventory view', 'setting manage']);
+  // A report impression is the report. Reading it is a reporting permission, not
+  // a side effect of being able to see the study row.
+  const canReadReports = canAny(permissions, ['report manage', 'report edit', 'report release']);
 
   const getStateBadge = (state: string) => {
     switch (state) {
@@ -665,11 +678,21 @@ export const GlobalSearchBar: React.FC<GlobalSearchBarProps> = ({
                               )}
                             </div>
                             <div className="flex items-center space-x-3 text-[11px] text-slate-500 mt-0.5">
-                              <span>Loc: <strong className="text-slate-700">{item.storageLocation}</strong></span>
-                              <span>•</span>
-                              <span>Lot: <strong className="font-mono text-slate-700">{item.batches[0]?.batchNumber || 'N/A'}</strong></span>
-                              <span>•</span>
-                              <span>Price: <strong className="text-slate-900">PKR {item.sellingPrice.toLocaleString()}</strong></span>
+                              {/*
+                                Commercial detail is only rendered for a role
+                                that may administer stock. The server now omits
+                                these fields entirely for everyone else, so this
+                                is a second gate, not the only one.
+                              */}
+                              {canSeeInventory && (
+                                <>
+                                  <span>Loc: <strong className="text-slate-700">{item.storageLocation}</strong></span>
+                                  <span>•</span>
+                                  <span>Lot: <strong className="font-mono text-slate-700">{item.batches[0]?.batchNumber || 'N/A'}</strong></span>
+                                  <span>•</span>
+                                  <span>Price: <strong className="text-slate-900">{currency} {formatMoney(item.sellingPrice)}</strong></span>
+                                </>
+                              )}
                             </div>
                           </div>
                         </div>
@@ -683,17 +706,22 @@ export const GlobalSearchBar: React.FC<GlobalSearchBarProps> = ({
                               Min: {item.minThreshold}
                             </span>
                           </div>
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setActiveTab('inventory');
-                              setIsOpen(false);
-                            }}
-                            className="px-2.5 py-1 bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 rounded-md text-[11px] font-semibold transition-colors flex items-center space-x-1"
-                          >
-                            <span>Manage Stock</span>
-                            <ArrowRight className="w-3 h-3" />
-                          </button>
+                          {/* The jump must go through the same tab gate the
+                              navigation bar uses, or it lands the operator on a
+                              module their role cannot open. */}
+                          {allowed.includes('inventory') && (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setActiveTab('inventory');
+                                setIsOpen(false);
+                              }}
+                              className="px-2.5 py-1 bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 rounded-md text-[11px] font-semibold transition-colors flex items-center space-x-1"
+                            >
+                              <span>Manage Stock</span>
+                              <ArrowRight className="w-3 h-3" />
+                            </button>
+                          )}
                         </div>
                       </div>
                     );
@@ -876,8 +904,12 @@ export const GlobalSearchBar: React.FC<GlobalSearchBarProps> = ({
                 </div>
               )}
 
-              {/* Diagnostic Report Preview if available */}
-              {selectedQuickViewApt.report && (
+              {/* Diagnostic Report Preview if available.
+                  The impression is the report itself, so it is shown only to a
+                  role that may read reports. The patient card above (allergies)
+                  and the dose record stay visible to anyone who legitimately
+                  reaches this drawer. */}
+              {selectedQuickViewApt.report && canReadReports && (
                 <div className="border border-purple-200 bg-purple-50/40 rounded-xl p-3.5 space-y-2">
                   <div className="flex items-center justify-between">
                     <h4 className="font-bold text-purple-900 text-xs flex items-center gap-1.5">

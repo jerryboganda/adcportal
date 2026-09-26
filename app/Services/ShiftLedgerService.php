@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\Invoice;
 use App\Models\InvoicePayment;
+use App\Models\PaymentMethod;
 
 /**
  * The day's cash ledger.
@@ -58,11 +59,24 @@ final class ShiftLedgerService
         ];
     }
 
-    /** Cash actually expected in the drawer for the shift (negative rows included). */
-    public function cashExpected(array $ledger): float
+    /**
+     * Cash actually expected in the drawer for the shift (negative rows included).
+     *
+     * Resolved from the tenant's `kind`, not from the literal string 'cash'. This
+     * figure goes on a shift-closing statement an operator signs, so a tenant that
+     * coded its drawer method `currency` or `notes` was getting 0.00 — the same
+     * class of error the SPA had with its change calculator.
+     */
+    public function cashExpected(array $ledger, int $businessId): float
     {
+        $cashCode = PaymentMethod::cashCodeFor($businessId);
+
+        if ($cashCode === null) {
+            return 0.0; // a legitimately cashless clinic
+        }
+
         foreach ($ledger['byMethod'] as $row) {
-            if (strtolower((string) $row['method']) === 'cash') {
+            if (strcasecmp((string) $row['method'], $cashCode) === 0) {
                 return round((float) $row['total'], 2);
             }
         }

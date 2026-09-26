@@ -51,11 +51,14 @@ interface NavbarProps {
   onLockTerminal?: () => void;
   /** Tenant white-label application name (server-resolved; cosmetic only). */
   brandName?: string | null;
+  /** Tenant currency symbol; inventory prices in search results are labelled with it. */
+  currency: string;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
   activeTab,
   setActiveTab,
+  currency,
   appointments,
   patients,
   invoices = [],
@@ -133,6 +136,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             invoices={invoices}
             inventoryItems={inventoryItems}
             setActiveTab={setActiveTab}
+            currency={currency}
             onSelectAppointment={onSelectAppointment}
             onOpenBookingModal={onOpenBookingModal}
             canOpenBooking={canOpenBooking}

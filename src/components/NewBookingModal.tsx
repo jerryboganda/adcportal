@@ -18,6 +18,7 @@ import {
   validateDiscount,
   validateSettlement,
 } from '../utils/bookingMoney';
+import { localDateString } from '../utils/tableUtils';
 
 interface NewBookingModalProps {
   patients: Patient[];
@@ -85,7 +86,7 @@ export const NewBookingModal: React.FC<NewBookingModalProps> = ({
   const [selectedServiceId, setSelectedServiceId] = useState<number | ''>(modalityServices[0]?.id ?? '');
   const [selectedReferrerId, setSelectedReferrerId] = useState<number | ''>('');
   const [priority, setPriority] = useState<Priority>('routine');
-  const [scheduledDate, setScheduledDate] = useState(() => new Date().toISOString().split('T')[0]);
+  const [scheduledDate, setScheduledDate] = useState(() => localDateString());
   const [scheduledTime, setScheduledTime] = useState('11:30');
   const [notes, setNotes] = useState('');
 
@@ -247,7 +248,7 @@ export const NewBookingModal: React.FC<NewBookingModalProps> = ({
   };
 
   const modalityLabel = (m: Modality) => (m.name.includes(m.code) ? m.name : `${m.name} (${m.code})`);
-  const today = new Date().toISOString().split('T')[0];
+  const today = localDateString();
   const selectedRoom = modalityRooms.find(r => r.id === selectedRoomId);
   const summaryPatient = isNewPatient ? (newName.trim() || 'New walk-in') : (patients.find(p => p.id === selectedPatientId)?.name ?? '—');
 

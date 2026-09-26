@@ -1,5 +1,5 @@
 # ============================================================
-# PolytronX RIS — full-stack production image
+# PolytronX RIS â€” full-stack production image
 #
 # Layer 1 (spa):   Node 20 compiles the React/Vite SPA (CI computes).
 # Layer 2 (app):   PHP 8.4 Apache serves the Laravel API + the built SPA
@@ -9,27 +9,33 @@
 #                  by the same engine as the operator's print dialog instead
 #                  of degrading to a second, differently-wrapping renderer.
 #
-# The VPS never builds anything — it pulls this image and runs only the
+# The VPS never builds anything â€” it pulls this image and runs only the
 # light release commands (migrate/config:cache inside the entrypoint).
 # ============================================================
 
 FROM node:20-alpine AS spa
 WORKDIR /app
 COPY package.json package-lock.json ./
-RUN npm ci --legacy-peer-deps || npm install --legacy-peer-deps
+# `npm ci` exists to fail when the lockfile and the manifest disagree. The `||`
+# fallback used to swallow exactly that signal, so the image could install a
+# dependency graph nobody had ever locked or audited.
+RUN npm ci --legacy-peer-deps
 COPY index.html vite.config.ts tsconfig.json ./
 COPY src ./src
 COPY public ./public
-RUN npm run build
+# `vite build` runs esbuild, which strips types WITHOUT checking them. Without
+# this the shipped bundle could contain a type error the `tsc` gate in CI
+# rejected â€” CI would go red on a commit whose image had already been built.
+RUN npm run lint && npm run build
 
 # ============================================================
-# Layer 3 (pdf): headless Chromium — the pixel-true PDF engine.
+# Layer 3 (pdf): headless Chromium â€” the pixel-true PDF engine.
 #
 # The document on screen and the document in the archive must be painted by the
 # SAME engine, otherwise an 80 mm receipt wraps differently in the PDF than it
 # did in the print dialog. This stage installs Playwright's Chromium and the
 # system libraries it needs; the runtime stage then copies in exactly three
-# things — the node binary, the two playwright packages and the browser bundle —
+# things â€” the node binary, the two playwright packages and the browser bundle â€”
 # so none of the rest of this toolchain reaches production.
 # ============================================================
 
@@ -42,7 +48,7 @@ COPY package.json package-lock.json ./
 # --ignore-scripts: the browsers are fetched explicitly below, into a known
 # path, so the image is built by one command rather than by a postinstall side
 # effect.
-RUN npm ci --legacy-peer-deps --ignore-scripts || npm install --legacy-peer-deps --ignore-scripts
+RUN npm ci --legacy-peer-deps --ignore-scripts
 
 RUN npx playwright install --with-deps chromium
 
@@ -76,7 +82,7 @@ RUN cp -a /usr/share/spa-dist/. public/ && rm -rf /usr/share/spa-dist \
 # Pixel-true PDF engine (headless Chromium)
 #
 # App\Services\Print\Pdf\ChromiumPdfDriver runs `node scripts/print-pdf.mjs`,
-# which imports playwright from /var/www/html/node_modules — so the browser, the
+# which imports playwright from /var/www/html/node_modules â€” so the browser, the
 # driver package and node itself all have to be present HERE, in the runtime
 # image, or every PDF silently falls back to DomPDF (which cannot match the
 # browser's line breaking).

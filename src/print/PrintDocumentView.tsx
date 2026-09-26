@@ -6,6 +6,7 @@ import {
   DocumentHeader,
   DocumentHero,
   DocumentItems,
+  DocumentLabel,
   DocumentMeta,
   DocumentNotices,
   DocumentObservations,
@@ -107,11 +108,12 @@ export const PrintDocumentView: React.FC<{ document: PrintDocumentModel }> = ({ 
           ) : null}
 
           {document.artifact === 'label' ? (
-            <>
-              {header}
-              <DocumentMeta rows={document.meta} />
-              <DocumentCodes codes={document.codes} show={showBarcode} />
-            </>
+            <DocumentLabel
+              branding={document.branding}
+              rows={document.meta}
+              codes={document.codes}
+              show={showBarcode}
+            />
           ) : null}
 
           {document.artifact === 'manifest' ? (

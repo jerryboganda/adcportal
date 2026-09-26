@@ -31,6 +31,7 @@ import {
   Printer
 } from 'lucide-react';
 import {
+  AccessRoleRecord,
   StaffUser,
   StaffRole,
   ClinicProfileSettings,
@@ -49,6 +50,8 @@ interface SettingsViewProps {
   /** Server-issued effective permission set — drives section visibility. */
   permissions: string[];
   staffUsers: StaffUser[];
+  /** Every role this clinic can assign, including custom ones. */
+  accessRoles?: AccessRoleRecord[];
   onAddStaffUser: (user: Omit<StaffUser, 'id'> & { password: string }) => void;
   onUpdateStaffUser: (user: StaffUser) => void;
   onDeleteStaffUser: (userId: string) => void;
@@ -169,6 +172,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   currentUser,
   permissions,
   staffUsers,
+  accessRoles = [],
   onAddStaffUser,
   onUpdateStaffUser,
   onDeleteStaffUser,
@@ -225,7 +229,9 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   // User form state
   const [userName, setUserName] = useState('');
   const [userEmail, setUserEmail] = useState('');
-  const [userRole, setUserRole] = useState<StaffRole>('receptionist');
+  // A system role name, or `role:<id>` for a custom one.
+  const [userRole, setUserRole] = useState<string>('receptionist');
+  const customRoles = accessRoles.filter(r => !r.system);
   const [userDepartment, setUserDepartment] = useState('');
   const [userPhone, setUserPhone] = useState('');
   const [userInitials, setUserInitials] = useState('');
@@ -250,7 +256,11 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
       setEditingUser(user);
       setUserName(user.name);
       setUserEmail(user.email);
-      setUserRole(user.role);
+      // A custom role is identified by id (`role:<id>`), never by its name, so
+      // opening an editor cannot silently show a different role than the one the
+      // user actually holds. `user.role` alone would match no option and the
+      // save would reassign them to whatever the select defaulted to.
+      setUserRole(user.roleId ? `role:${user.roleId}` : user.role);
       setUserDepartment(user.department);
       setUserPhone(user.phone);
       setUserInitials(user.initials);
@@ -291,12 +301,22 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
 
     const initials = userInitials.trim() || userName.split(' ').map(n => n[0]).join('').substring(0, 3).toUpperCase();
 
+    // `roleId` for a tenant-created role; otherwise the legacy `role` name. The
+    // server prefers `roleId` and ignores `role` when both are present, so the
+    // membership label and the permission set come from the same role.
+    const customRole = customRoles.find(r => `role:${r.id}` === userRole);
+    const roleSelection = customRole
+      ? { role: customRole.name, roleId: Number(customRole.id) }
+      : { role: userRole as StaffRole };
+
     if (editingUser) {
       onUpdateStaffUser({
         ...editingUser,
         name: userName,
         email: userEmail,
-        role: userRole,
+        // A custom role is carried as `roleId`; the server resolves it and
+        // ignores `role`. A system role keeps the legacy `role` string.
+        ...roleSelection,
         department: userDepartment,
         phone: userPhone,
         initials,
@@ -311,7 +331,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
       onAddStaffUser({
         name: userName,
         email: userEmail,
-        role: userRole,
+        ...roleSelection,
         department: userDepartment,
         phone: userPhone,
         initials,
@@ -1235,16 +1255,36 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block font-semibold text-slate-700 mb-1">Staff Role</label>
+                  {/*
+                    Every role this clinic can assign, not a hardcoded five. A
+                    tenant admin could create a custom role in Access Control, but
+                    this dropdown never offered it, so the role could not be given
+                    to anyone — the RBAC screen promised something the product
+                    could not deliver. `roleId` is what the server resolves a
+                    custom role from; the five system roles keep their legacy
+                    `role` string so existing callers are unaffected.
+                  */}
                   <select
                     value={userRole}
-                    onChange={e => setUserRole(e.target.value as StaffRole)}
+                    onChange={e => setUserRole(e.target.value)}
                     className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-slate-800 font-medium"
                   >
-                    <option value="admin">Administrator</option>
-                    <option value="radiologist">Radiologist</option>
-                    <option value="technologist">Technologist</option>
-                    <option value="receptionist">Receptionist</option>
-                    <option value="billing">Billing Officer</option>
+                    {customRoles.length > 0 && (
+                      <optgroup label="Custom roles">
+                        {customRoles.map(role => (
+                          <option key={role.id} value={`role:${role.id}`}>
+                            {role.displayName || role.name}
+                          </option>
+                        ))}
+                      </optgroup>
+                    )}
+                    <optgroup label="System roles">
+                      <option value="admin">Administrator</option>
+                      <option value="radiologist">Radiologist</option>
+                      <option value="technologist">Technologist</option>
+                      <option value="receptionist">Receptionist</option>
+                      <option value="billing">Billing Officer</option>
+                    </optgroup>
                   </select>
                 </div>
                 <div>

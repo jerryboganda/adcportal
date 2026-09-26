@@ -5,7 +5,7 @@ import { PrintDocumentView } from './PrintDocumentView';
 import { PrintPreviewShell } from './PrintPreviewShell';
 import { waitForPrintReady } from './readiness';
 import { useDocumentStyles } from './useDocumentStyles';
-import { printStore, useActivePrintDocument, PAPER_FALLBACK_MM } from './store';
+import { printStore, useActivePrintDocument, usePrintError, PAPER_FALLBACK_MM } from './store';
 
 /**
  * The document host — the only thing in the application that goes on paper.
@@ -26,6 +26,7 @@ import { printStore, useActivePrintDocument, PAPER_FALLBACK_MM } from './store';
  */
 export const PrintHost: React.FC = () => {
   const active = useActivePrintDocument();
+  const printError = usePrintError();
   const documentRef = useRef<HTMLDivElement | null>(null);
   const shellRef = useRef<HTMLDivElement | null>(null);
   const [scale, setScale] = useState(1);
@@ -34,6 +35,28 @@ export const PrintHost: React.FC = () => {
   const document = active?.document ?? null;
   const mode = active?.mode ?? 'print';
   const token = active?.token ?? 0;
+
+  // A failure is shown BEFORE the `!document` bail: the common case is a fetch
+  // that never produced a document at all (a 403 from the artifact registry, a
+  // 404, a dropped connection), so the panel has to be reachable with nothing
+  // active.
+  const errorPanel = printError
+    ? createPortal(
+      <div className="pd-print-host pd-print-host--error" data-print-mode="error" role="alert">
+        <div className="pd-shell-error">
+          <AlertTriangle className="w-5 h-5" />
+          <div>
+            <div className="pd-shell-error-title">Could not prepare this document</div>
+            <div className="pd-shell-error-body">{printError}</div>
+          </div>
+          <button type="button" className="pd-shell-btn" onClick={() => printStore.clear()}>
+            Close
+          </button>
+        </div>
+      </div>,
+      window.document.body,
+    )
+    : null;
 
   // The document's stylesheet travels inside the payload (rendered from the same
   // blade partial the PDF engines use), so the preview, the browser print and the
@@ -92,6 +115,10 @@ export const PrintHost: React.FC = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token]);
 
+  if (printError) {
+    return errorPanel;
+  }
+
   if (!document) {
     return null;
   }
@@ -109,21 +136,7 @@ export const PrintHost: React.FC = () => {
   };
 
   if (active?.error) {
-    return createPortal(
-      <div className="pd-print-host pd-print-host--error" data-print-mode="error" role="alert">
-        <div className="pd-shell-error">
-          <AlertTriangle className="w-5 h-5" />
-          <div>
-            <div className="pd-shell-error-title">Could not prepare this document</div>
-            <div className="pd-shell-error-body">{active.error}</div>
-          </div>
-          <button type="button" className="pd-shell-btn" onClick={() => printStore.clear()}>
-            Close
-          </button>
-        </div>
-      </div>,
-      window.document.body,
-    );
+    return errorPanel;
   }
 
   return createPortal(

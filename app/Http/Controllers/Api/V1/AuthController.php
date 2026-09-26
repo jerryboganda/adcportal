@@ -33,19 +33,31 @@ class AuthController extends BaseApiController
 
         $user = Auth::user();
 
-        // Terminated / offboarding tenants lose even interactive access —
-        // checked BEFORE the generic disabled flag so the operator sees why.
+        // A tenant that is not subscribable cannot obtain a session at all, and
+        // is told the same thing `EnsureTenantActive` would tell it at the API
+        // boundary. This used to cover only `terminated`/`offboarding` and rely
+        // on `TenantLifecycleService::revokeTenantLogins()` to disable every
+        // account for `suspended`/`expired` — a one-way door: nothing ever set
+        // `is_enable_login` back, so one suspend/reactivate round-trip locked
+        // the clinic out permanently and any deliberately-disabled account came
+        // back too. Refusing the login by STATUS is symmetric, restores itself,
+        // and cannot override a per-user HR decision.
         if (! $user->isPlatformAdmin()) {
             $businessId = (int) ($user->business_id ?: $user->active_business ?: 0);
             $business = $businessId ? Business::find($businessId) : null;
 
-            if ($business && in_array($business->subscription_status, ['terminated', 'offboarding'], true)) {
+            if ($business && ! $business->isSubscribable()) {
                 Auth::logout();
 
                 return response()->json([
-                    'message' => $business->subscription_status === 'terminated'
-                        ? 'This clinic account has been terminated.'
-                        : 'This clinic account is being offboarded. Access is no longer available.',
+                    'message' => match ($business->subscription_status) {
+                        'terminated' => 'This clinic account has been terminated.',
+                        'offboarding' => 'This clinic account is being offboarded. Access is no longer available.',
+                        'suspended' => 'This clinic account is suspended. Contact the platform administrator.',
+                        'expired' => 'This clinic subscription has expired. Renew to continue.',
+                        'provisioning' => 'This clinic is still being provisioned. Try again shortly.',
+                        default => 'This clinic trial has ended. Choose a plan to continue.',
+                    },
                     'subscriptionStatus' => $business->subscription_status,
                 ], 403);
             }
@@ -133,6 +145,8 @@ class AuthController extends BaseApiController
      */
     public function register(Request $request): JsonResponse
     {
+        $this->assertRegistrationIsOpen();
+
         $validated = $request->validate([
             'clinic_name' => ['required', 'string', 'max:255'],
             // Clinic and hospital tenants provision identically today; the
@@ -168,7 +182,15 @@ class AuthController extends BaseApiController
         $tenant = $result['business'];
 
         $orgNoun = ($validated['org_type'] ?? 'clinic') === 'hospital' ? 'hospital' : 'clinic';
-        $this->audit('tenant_registered', $tenant, ['summary' => "New {$orgNoun} registered: {$tenant->name}"]);
+        // Named explicitly: nobody is authenticated yet, so `getActiveBusiness()`
+        // would resolve to `Business::first()` and attribute this signup to the
+        // wrong clinic in the platform's registration history.
+        $this->auditForTenant(
+            (int) $tenant->id,
+            'tenant_registered',
+            $tenant,
+            ['summary' => "New {$orgNoun} registered: {$tenant->name}"]
+        );
 
         Auth::attempt($request->only('email', 'password'), remember: true);
 
@@ -181,5 +203,39 @@ class AuthController extends BaseApiController
             'data' => ['user' => ApiShape::currentUser(auth()->user())],
             'meta' => ['tenant_code' => $tenant->tenant_code],
         ], 201);
+    }
+
+    /**
+     * Is the public signup door open, and is there room for another tenant?
+     *
+     * Refused BEFORE any validation or write, so a flood costs a `count()` and
+     * nothing else. Throttling already bounds the rate; this bounds the total,
+     * which is the part that fills an operator's activation queue with tenants
+     * that can never pass `EnsureTenantActive`.
+     */
+    private function assertRegistrationIsOpen(): void
+    {
+        $registration = (array) config('ris.registration');
+
+        if (! ($registration['enabled'] ?? true)) {
+            abort(response()->json([
+                'message' => 'Online clinic registration is currently closed. Contact us to have your clinic provisioned.',
+                'error' => 'registration.closed',
+            ], 403));
+        }
+
+        $max = (int) ($registration['max_pending_tenants'] ?? 0);
+        $statuses = (array) ($registration['pending_statuses'] ?? ['provisioning', 'trialing']);
+
+        if ($max > 0) {
+            $pending = Business::query()->whereIn('subscription_status', $statuses)->count();
+
+            if ($pending >= $max) {
+                abort(response()->json([
+                    'message' => 'Registration is temporarily paused while we work through pending clinics. Please try again shortly.',
+                    'error' => 'registration.at_capacity',
+                ], 503));
+            }
+        }
     }
 }

@@ -99,6 +99,47 @@ class TenantLifecycleTest extends ApiTestCase
         $this->assertNotNull($service);
     }
 
+    /**
+     * The regression this guards: suspension used to flip `is_enable_login = 0`
+     * for every staff account, and nothing ever set it back. One suspend →
+     * reactivate round-trip therefore locked the clinic out permanently, with
+     * only a per-user platform toggle as a way back.
+     *
+     * `is_enable_login` is a per-user HR decision, so a reversible tenant state
+     * must leave it alone entirely — availability comes from the status gate.
+     */
+    public function test_suspension_is_reversible_and_never_disables_staff_accounts(): void
+    {
+        $super = $this->superAdmin();
+        $staff = $this->makeStaff($this->businessA, $this->adminA, 'receptionist');
+
+        $this->assertSame(1, (int) $staff->fresh()->is_enable_login);
+
+        $this->actingAs($super)
+            ->confirmStepUp()->postJson("/api/v1/platform/tenants/{$this->businessA->id}/suspend", ['reason' => 'Non-payment'])
+            ->assertOk();
+
+        // The account is untouched — the tenant is locked out by status, not by
+        // silently mutating every user row.
+        $this->assertSame(1, (int) $staff->fresh()->is_enable_login, 'Suspension must not disable staff logins.');
+        $this->assertSame(1, (int) $this->adminA->fresh()->is_enable_login);
+
+        // It really is locked out: no session, and the tenant plane is refused.
+        $this->postJson('/api/v1/login', ['email' => $this->adminA->email, 'password' => 'R1s!T3st#2026x'])
+            ->assertStatus(403)
+            ->assertJsonPath('subscriptionStatus', 'suspended');
+        $this->actingAs($this->adminA)->getJson('/api/v1/bootstrap')->assertStatus(402);
+
+        // …and reactivation puts the clinic straight back in, with no
+        // per-account repair required.
+        $this->actingAs($super)
+            ->confirmStepUp()->postJson("/api/v1/platform/tenants/{$this->businessA->id}/reactivate", ['reason' => 'Paid'])
+            ->assertOk();
+
+        $this->postJson('/api/v1/login', ['email' => $this->adminA->email, 'password' => 'R1s!T3st#2026x'])->assertOk();
+        $this->actingAs($this->adminA)->getJson('/api/v1/bootstrap')->assertOk();
+    }
+
     public function test_offboarding_revokes_logins_exports_data_and_starts_retention(): void
     {
         Storage::fake('local');

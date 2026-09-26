@@ -5,6 +5,11 @@ Hexagonal / DDD lens) on 2026-09-16. Every finding below was verified against
 the code and re-verified after the fixes with the full test suite
 (177 tests / 814 assertions, green) and a live strict-mode MySQL booking E2E.
 
+> Point-in-time record. The "MySQL" references below are accurate for 2026-09-16
+> but production has since migrated to **PostgreSQL 17** (2026-09-17 — see
+> `production-vps-topology.md`). The dialect bug they describe is real on both
+> engines; only the engine named here is historical.
+
 ## 1. Bounded contexts (as-built)
 
 | Context | Owner code | Notes |

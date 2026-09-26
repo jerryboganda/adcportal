@@ -32,28 +32,42 @@ class Totp
      */
     public static function verify(string $secret, ?string $code): bool
     {
+        return self::matchingCounter($secret, $code) !== null;
+    }
+
+    /**
+     * The time-step counter the code belongs to, or null if it does not match.
+     *
+     * Replay defence needs to know WHICH step matched, not merely that something
+     * did: a caller can then refuse any counter at or below the last one it
+     * accepted, so an observed code cannot be spent twice inside its window.
+     * Every candidate is compared with `hash_equals`; a match returns immediately
+     * whether it is the current, previous or next step.
+     */
+    public static function matchingCounter(string $secret, ?string $code): ?int
+    {
         $code = preg_replace('/\s+/', '', (string) $code);
 
         if (! $secret || ! preg_match('/^\d{6}$/', (string) $code)) {
-            return false;
+            return null;
         }
 
         $secretBinary = self::b32decode($secret);
         if ($secretBinary === '') {
-            return false;
+            return null;
         }
 
         $now = (int) floor(Carbon::now()->getTimestamp() / self::STEP);
 
         for ($i = -self::WINDOW; $i <= self::WINDOW; $i++) {
-            $expected = self::hotp($secretBinary, $now + $i);
+            $candidate = $now + $i;
 
-            if (hash_equals($expected, $code)) {
-                return true;
+            if (hash_equals(self::hotp($secretBinary, $candidate), (string) $code)) {
+                return $candidate;
             }
         }
 
-        return false;
+        return null;
     }
 
     /** Current code — tests and local tooling only. */

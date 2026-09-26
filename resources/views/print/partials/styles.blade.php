@@ -182,7 +182,27 @@
 /* ---- thermal tuning -------------------------------------------------- */
 @if($paper !== 'a4')
 .pd-rule-dashed { border-top: 0.25mm dashed #000000; margin: 1.6mm 0; }
+@endif
+
+/*
+ * Label tag: a fixed 25.4 mm height, so the layout is a two-column table rather
+ * than a vertical stack. The identity keeps 45% of the width and wraps; the
+ * symbol keeps 55% because a Code 128 whose module falls under ~0.19 mm will not
+ * scan, and a 63.5 mm tag cannot afford to be a readable label OR a scannable
+ * code — it has to be both.
+ */
+@if($paper === 'label')
+.pd-label { width: 100%; }
+.pd-label td { vertical-align: top; padding: 0; }
+.pd-label-clinic { font-size: 0.85em; font-weight: bold; text-transform: uppercase; letter-spacing: 0.02em;
+                   border-bottom: 0.25mm solid #000000; padding-bottom: 0.6mm; }
+.pd-label-id { width: 45%; font-size: 0.8em; padding-right: 1.5mm; }
+.pd-label-row { margin-bottom: 0.3mm; }
+.pd-label-key { color: #333333; }
 .pd-label-value { font-weight: bold; }
+.pd-label-symbol { width: 55%; }
+.pd-label-symbol .pd-codes { margin-top: 0.8mm; }
+.pd-label-symbol .pd-code-value { font-size: 0.72em; }
 @endif
 
 /*

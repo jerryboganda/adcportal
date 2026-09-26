@@ -163,7 +163,14 @@ export const TwoFactorSettingsCard: React.FC<TwoFactorSettingsCardProps> = ({ no
                 placeholder="Current authenticator code"
                 className="w-full rounded-lg border border-slate-300 bg-slate-50 px-3 py-2 font-mono text-sm tracking-[0.3em] outline-none focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/20"
               />
-              <button type="submit" disabled={busy || !password || code.trim().length !== 6} className="rounded-lg border border-rose-300 text-rose-700 hover:bg-rose-50 disabled:opacity-50 px-3 py-1.5 text-xs font-semibold inline-flex items-center gap-1.5">
+              <button
+                type="submit"
+                // Digits only, matching what the server accepts — counting the
+                // space made this button permanently disabled, i.e. there was no
+                // way to turn two-factor back off.
+                disabled={busy || !password || code.replace(/\D/g, '').length !== 6}
+                className="rounded-lg border border-rose-300 text-rose-700 hover:bg-rose-50 disabled:opacity-50 px-3 py-1.5 text-xs font-semibold inline-flex items-center gap-1.5"
+              >
                 {busy && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
                 Disable two-factor
               </button>

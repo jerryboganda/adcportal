@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { ShieldAlert } from 'lucide-react';
 import {
+  AccessRoleRecord,
   ActiveTab,
   AdverseReactionReport,
   AppNotification,
@@ -54,6 +55,8 @@ import * as api from './services/apiService';
 import { SessionUser } from './services/apiService';
 import { onUnauthorized, onPermissionDenied, onStepUpRequired, initCsrf } from './services/api';
 import { canAny } from './services/permissions';
+import { localDateString } from './utils/tableUtils';
+import { currencySymbol } from './utils/bookingMoney';
 
 /**
  * Module tabs are loaded on demand.
@@ -136,6 +139,10 @@ export const App: React.FC = () => {
   const [templates, setTemplates] = useState<ReportTemplate[]>([]);
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [staffUsers, setStaffUsers] = useState<StaffUser[]>([]);
+  // The roles a person can be GIVEN, including tenant-created custom roles. The
+  // staff editor used to offer only the five system roles, so a custom role
+  // created in Access Control could never be assigned to anyone.
+  const [accessRoles, setAccessRoles] = useState<AccessRoleRecord[]>([]);
   const [clinicSettings, setClinicSettings] = useState<ClinicProfileSettings | null>(null);
   const [entitlements, setEntitlements] = useState<Entitlements | null>(null);
   // White-label presentation for the active tenant (server-resolved from the
@@ -209,6 +216,7 @@ export const App: React.FC = () => {
       setForms(payload.screeningForms);
       setTemplates(payload.templates);
       setStaffUsers(payload.staff);
+      setAccessRoles(payload.roles ?? []);
       setClinicSettings(payload.clinicSettings);
       setEntitlements(payload.entitlements ?? null);
       setBranding(payload.branding ?? null);
@@ -254,6 +262,11 @@ export const App: React.FC = () => {
   const fail = useCallback((err: any, fallback: string) => {
     showFlash('error', err?.message ?? fallback);
   }, [showFlash]);
+
+  // The tenant's own currency. Every financial surface renders this rather than a
+  // hardcoded `Rs.`, which was wrong on the dashboard, reception balance badges,
+  // invoices, receipts and the shift statement for any clinic not billing in PKR.
+  const currency = currencySymbol(clinicSettings);
 
   useEffect(() => {
     onUnauthorized(() => {
@@ -427,7 +440,7 @@ export const App: React.FC = () => {
   }, [runTransition]);
 
   const handleMarkNoShow = useCallback((aptId: string) => {
-    return runTransition(aptId, 'no_show').catch(() => undefined);
+    void runTransition(aptId, 'no_show').catch(() => undefined);
   }, [runTransition]);
 
   const handleStartPreparing = useCallback((aptId: string) => {
@@ -458,7 +471,9 @@ export const App: React.FC = () => {
 
   /** Queue-board call: persisted server-side so every terminal sees the same "now serving". */
   const handleCallPatient = useCallback((aptId: string) => {
-    return runTransition(aptId, 'call').catch(() => undefined);
+    // `void`, not `return`: the board's handler is a fire-and-forget command and
+    // runTransition already surfaces its own failure flash.
+    void runTransition(aptId, 'call').catch(() => undefined);
   }, [runTransition]);
 
   const handleRejectToTech = useCallback(async (aptId: string, reason: string) => {
@@ -754,7 +769,7 @@ export const App: React.FC = () => {
     } catch (err: any) { fail(err, 'Could not delete the imaging suite.'); }
   }, [fail, showFlash]);
 
-  const handleAddPaymentMethod = useCallback(async (input: { code: string; name: string; isActive?: boolean; sortOrder?: number }) => {
+  const handleAddPaymentMethod = useCallback(async (input: { code: string; name: string; kind?: PaymentMethod['kind']; isActive?: boolean; sortOrder?: number }) => {
     try {
       const method = await api.createPaymentMethod(input);
       setPaymentMethods(prev => [...prev, method]);
@@ -762,7 +777,11 @@ export const App: React.FC = () => {
     } catch (err: any) { fail(err, 'Could not create the payment method.'); }
   }, [fail, showFlash]);
 
-  const handleUpdatePaymentMethod = useCallback(async (method: { id: number; name: string; isActive?: boolean; sortOrder?: number }) => {
+  // `id` is a NUMBER: `normalizePaymentMethod` runs `Number(m.id)` on the way in,
+  // while the `PaymentMethod` interface declared `string`. Nothing caught the
+  // contradiction because `strictNullChecks` was off. The interface now matches
+  // the normalizer, and the `kind` field is what the money arithmetic needs.
+  const handleUpdatePaymentMethod = useCallback(async (method: { id: number; name: string; kind?: PaymentMethod['kind']; isActive?: boolean; sortOrder?: number }) => {
     try {
       const updated = await api.updatePaymentMethod(method);
       setPaymentMethods(prev => prev.map(m => (m.id === updated.id ? updated : m)));
@@ -1085,7 +1104,7 @@ export const App: React.FC = () => {
       const url = URL.createObjectURL(blob);
       const anchor = document.createElement('a');
       anchor.href = url;
-      anchor.download = `PolytronX_Enterprise_PACS_RIS_Database_Backup_${new Date().toISOString().split('T')[0]}.json`;
+      anchor.download = `PolytronX_Enterprise_PACS_RIS_Database_Backup_${localDateString()}.json`;
       document.body.appendChild(anchor);
       anchor.click();
       anchor.remove();
@@ -1249,6 +1268,7 @@ export const App: React.FC = () => {
         role={role}
         entitlements={entitlements}
         brandName={branding?.appName ?? null}
+        currency={currency}
         onSelectAppointment={focusStudy}
         onOpenBookingModal={openBookingModal}
         canOpenBooking={canBook}
@@ -1272,6 +1292,7 @@ export const App: React.FC = () => {
             modalities={modalities}
             invoices={invoices}
             permissions={permissions}
+            currency={currency}
             setActiveTab={setActiveTab}
             onSelectAppointment={focusStudy}
             onOpenBookingModal={openBookingModal}
@@ -1290,6 +1311,7 @@ export const App: React.FC = () => {
             onOpenBookingModal={openBookingModal}
             canOpenBooking={canBook}
             paymentMethods={paymentMethods}
+            currency={currency}
             onOpenScreeningModal={(apt) => setScreeningModalApt(apt)}
             onRecordPayment={handleRecordPayment}
             onUpdateAppointment={handleUpdateAppointment}
@@ -1368,6 +1390,7 @@ export const App: React.FC = () => {
             onCreateAdverseReaction={handleCreateAdverseReaction}
             appointments={appointments}
             role={role}
+            currency={currency}
           />
         )}
 
@@ -1430,6 +1453,7 @@ export const App: React.FC = () => {
             currentUser={user}
             permissions={permissions}
             staffUsers={staffUsers}
+            accessRoles={accessRoles}
             onAddStaffUser={handleAddStaffUser}
             onUpdateStaffUser={handleUpdateStaffUser}
             onDeleteStaffUser={handleDeleteStaffUser}
@@ -1465,6 +1489,7 @@ export const App: React.FC = () => {
         <DoseCaptureModal
           appointment={doseModalApt}
           inventoryItems={inventoryItems}
+          currentUserName={user?.name}
           onCompleteAcquisition={handleCompleteAcquisition}
           onClose={() => setDoseModalApt(null)}
         />

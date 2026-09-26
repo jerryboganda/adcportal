@@ -43,6 +43,36 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Public clinic registration
+    |--------------------------------------------------------------------------
+    |
+    | POST /register is unauthenticated and provisions a FULL tenant: owner
+    | account, roles, masters, screening forms, report templates and a trialing
+    | subscription. Route throttling (6/min/IP) bounds the rate but not the total,
+    | so one source could still fill the operator's review queue with thousands of
+    | tenants that can never pass `EnsureTenantActive`.
+    |
+    | `enabled` is the kill switch an operator flips when a signup wave appears.
+    | `max_pending_tenants` bounds the damage while it stays on: signups are
+    | refused once this many tenants are awaiting activation. Set it to 0 to
+    | require an operator-created tenant.
+    |
+    | Email verification is deliberately NOT implemented. It needs a real mail
+    | transport — production runs MAIL_MAILER=log, so a verification message would
+    | be written to a logfile and never delivered, locking out every genuine
+    | clinic. Wiring it is a prerequisite for shipping it, not a config flag.
+    |
+    */
+
+    'registration' => [
+        'enabled' => env('RIS_REGISTRATION_ENABLED', true),
+        'max_pending_tenants' => env('RIS_REGISTRATION_MAX_PENDING', 50),
+        // Statuses that count as "awaiting an operator's attention".
+        'pending_statuses' => ['provisioning', 'trialing'],
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | Platform control plane
     |--------------------------------------------------------------------------
     |
@@ -284,13 +314,21 @@ return [
     | primitive is named "boolean" — TypeSafe's own docs call it "noul").
     | Read via config() — never env() directly — so config:cache keeps working.
     |
-    | Fail-open by contract: when the key is missing or the gateway is down,
-    | screening continues exactly as before with no triage payload.
-    |
-    */
+     | Fail-open by contract: when the key is missing or the gateway is down,
+     | screening continues exactly as before with no triage payload.
+     |
+     | OPT-IN, AND IT SENDS REAL CLINICAL TEXT OUT OF THE TENANT. Enabling this
+     | ships submitted screening answers, catalog question text and shift-review
+     | figures to a third-party model host. That was on by default and named in
+     | no security or data-classification document, which made it undisclosable
+     | rather than merely enabled — so the default is now OFF and a tenant opts
+     | in explicitly. The deterministic flagsRisk() gate is authoritative either
+     | way; nothing clinical depends on this answering.
+     |
+     */
 
     'typesafe' => [
-        'enabled' => env('TYPESAFE_ENABLED', true),
+        'enabled' => env('TYPESAFE_ENABLED', false),
         'api_key' => env('AI_GATEWAY_API_KEY'),
         'base_url' => env('AI_GATEWAY_BASE_URL', 'https://ai-gateway.vercel.sh'),
         // Optional absolute path to a PEM CA bundle. Leave empty for the

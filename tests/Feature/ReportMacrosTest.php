@@ -119,6 +119,37 @@ class ReportMacrosTest extends ApiTestCase
         );
     }
 
+    public function test_the_shared_snippet_library_is_not_editable_by_a_radiologist(): void
+    {
+        $radiologist = $this->makeStaff($this->businessA, $this->adminA, 'radiologist');
+        $shared = ReportMacro::where('business_id', $this->businessA->id)->firstOrFail();
+        $this->assertSame('tenant', $shared->scope, 'fixture must be a shared snippet');
+
+        // Personal snippets are the radiologist's own; the curated library is
+        // governed content and needs `report template edit` (the same authority
+        // storeMacro demands to publish there). This guard used to also accept a
+        // `report macro manage` grant that no role can hold, so the 403 below is
+        // the only thing holding.
+        $this->actingAs($radiologist)->putJson("/api/v1/reporting/macros/{$shared->id}", [
+            'name' => 'Rewritten by a radiologist',
+            'findings' => 'x',
+            'impression' => 'y',
+        ])->assertForbidden();
+
+        $this->actingAs($radiologist)
+            ->deleteJson("/api/v1/reporting/macros/{$shared->id}")
+            ->assertForbidden();
+
+        $this->assertFalse((bool) $shared->fresh()->is_archived);
+        $this->assertNotSame('Rewritten by a radiologist', $shared->fresh()->name);
+
+        // The clinic administrator holds the template grant and can retire it.
+        $this->actingAs($this->adminA)
+            ->deleteJson("/api/v1/reporting/macros/{$shared->id}")
+            ->assertOk();
+        $this->assertTrue((bool) $shared->fresh()->is_archived);
+    }
+
     public function test_a_clinics_macros_are_never_visible_to_another_clinic(): void
     {
         $radiologist = $this->makeStaff($this->businessA, $this->adminA, 'radiologist');

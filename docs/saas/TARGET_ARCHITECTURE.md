@@ -28,7 +28,7 @@ flowchart TB
     SPA --> API
     API --> TM
     API --> AUD
-    DB[(Shared MySQL: businesses + business_id-scoped domain tables)]
+    DB[(Shared PostgreSQL: businesses + business_id-scoped domain tables)]
     PA --> DB
     API --> DB
 ```

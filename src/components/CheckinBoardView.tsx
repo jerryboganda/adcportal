@@ -32,7 +32,7 @@ import {
   DollarSign
 } from 'lucide-react';
 import { Appointment, Invoice, ActiveTab, Priority, Patient, PaymentMethod, WorkflowState } from '../types';
-import { canAny } from '../services/permissions';
+import { canAny, canPrintArtifact } from '../services/permissions';
 import { WorklistFilterToolbar } from './WorklistFilterToolbar';
 import { SortableColumnHeader } from './SortableColumnHeader';
 import { openPrintPreview } from '../print/printDocument';
@@ -40,6 +40,7 @@ import {
   AdvancedFilterState,
   defaultAdvancedFilters,
   SortField,
+  localDateString,
   matchesAdvancedFilters,
   compareAppointmentsMultiSort,
 } from '../utils/tableUtils';
@@ -57,6 +58,8 @@ interface CheckinBoardViewProps {
   canOpenBooking?: boolean;
   /** Tenant-configured payment methods (replaces the fixed method list). */
   paymentMethods?: PaymentMethod[];
+  /** The tenant's currency symbol, resolved once in `App`. */
+  currency: string;
   onOpenScreeningModal: (apt: Appointment) => void;
   onRecordPayment: (
     invoiceId: string,
@@ -78,6 +81,7 @@ export const CheckinBoardView: React.FC<CheckinBoardViewProps> = ({
   onOpenBookingModal,
   canOpenBooking = false,
   paymentMethods = [],
+  currency,
   onOpenScreeningModal,
   onRecordPayment,
   onUpdateAppointment,
@@ -103,9 +107,15 @@ export const CheckinBoardView: React.FC<CheckinBoardViewProps> = ({
   const [cancelModalApt, setCancelModalApt] = useState<Appointment | null>(null);
 
   // Server-issued workflow permissions (API enforces the same checks).
-  const canCheckIn = canAny(permissions, ['study checkin']);
-  const canScreen = canAny(permissions, ['study screen']);
-  const canCancelStudy = canAny(permissions, ['study cancel']);
+const canCheckIn = canAny(permissions, ['study checkin']);
+const canScreen = canAny(permissions, ['study screen']);
+const canCancelStudy = canAny(permissions, ['study cancel']);
+// Taking money at the counter. `BillingView` already gates its equivalent button
+// on this permission; reception did not, so the two halves of the billing desk
+// disagreed about who can collect.
+const canCollectPayment = canAny(permissions, ['invoice payment']);
+// `label print` is its own revocable grant; the button ignored it.
+const canPrintLabel = canPrintArtifact(permissions, 'label');
   const [cancelReason, setCancelReason] = useState('');
   const [showManifestModal, setShowManifestModal] = useState(false);
 
@@ -371,7 +381,7 @@ export const CheckinBoardView: React.FC<CheckinBoardViewProps> = ({
         >
           <span className="text-slate-500 text-[11px] font-medium block">Outstanding Balance</span>
           <div className="flex items-baseline justify-between mt-1">
-            <span className="text-base font-bold text-teal-700">Rs. {totalDueForFiltered.toLocaleString()}</span>
+            <span className="text-base font-bold text-teal-700">{currency} {totalDueForFiltered.toLocaleString()}</span>
             <span className="text-[10px] text-teal-600 font-medium">Due</span>
           </div>
         </div>
@@ -563,7 +573,7 @@ export const CheckinBoardView: React.FC<CheckinBoardViewProps> = ({
                             {apt.modality.code}
                           </span>
                           <span className="text-slate-500 font-medium truncate max-w-[100px]">{apt.roomNumber}</span>
-                          <span className="text-slate-400 font-mono whitespace-nowrap">Rs. {apt.service.price.toLocaleString()}</span>
+                          <span className="text-slate-400 font-mono whitespace-nowrap">{currency} {apt.service.price.toLocaleString()}</span>
                         </div>
                       </td>
 
@@ -613,15 +623,17 @@ export const CheckinBoardView: React.FC<CheckinBoardViewProps> = ({
                         ) : (
                           <div className="flex items-center space-x-1">
                             <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-rose-50 text-rose-700 border border-rose-200">
-                              Rs. {balanceDue.toLocaleString()}
+                              {currency} {balanceDue.toLocaleString()}
                             </span>
-                            <button
-                              onClick={() => openPaymentCollector(apt)}
-                              className="px-1.5 py-0.5 rounded bg-teal-600 hover:bg-teal-500 text-white font-bold text-[10px] shadow-2xs transition-colors cursor-pointer"
-                              title="Collect Cash/Card at Reception"
-                            >
-                              Collect
-                            </button>
+                            {canCollectPayment && (
+                              <button
+                                onClick={() => openPaymentCollector(apt)}
+                                className="px-1.5 py-0.5 rounded bg-teal-600 hover:bg-teal-500 text-white font-bold text-[10px] shadow-2xs transition-colors cursor-pointer"
+                                title="Collect Cash/Card at Reception"
+                              >
+                                Collect
+                              </button>
+                            )}
                           </div>
                         )}
                       </td>
@@ -670,15 +682,17 @@ export const CheckinBoardView: React.FC<CheckinBoardViewProps> = ({
                             <Printer className="w-3.5 h-3.5" />
                           </button>
 
-                          <button
-                            onClick={() =>
-                              void openPrintPreview({ artifact: 'label', id: apt.id, paper: 'label' })
-                            }
-                            title="Open the patient wristband / specimen label"
-                            className="p-1 rounded bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-300 transition-colors cursor-pointer"
-                          >
-                            <Tag className="w-3.5 h-3.5" />
-                          </button>
+                          {canPrintLabel && (
+                            <button
+                              onClick={() =>
+                                void openPrintPreview({ artifact: 'label', id: apt.id, paper: 'label' })
+                              }
+                              title="Open the patient wristband / specimen label"
+                              className="p-1 rounded bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-300 transition-colors cursor-pointer"
+                            >
+                              <Tag className="w-3.5 h-3.5" />
+                            </button>
+                          )}
 
                           {/* Inspect Patient Card Drawer */}
                           <button
@@ -1130,7 +1144,7 @@ export const CheckinBoardView: React.FC<CheckinBoardViewProps> = ({
                   onClick={() => {
                     const day = filters.dateRangeMode !== 'all' && filters.startDate
                       ? filters.startDate
-                      : new Date().toISOString().slice(0, 10);
+                      : localDateString();
                     void openPrintPreview({ artifact: 'manifest', id: day, paper: 'a4' });
                     setShowManifestModal(false);
                   }}
