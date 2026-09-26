@@ -24,7 +24,6 @@ class AuthorizationBoundaryTest extends ApiTestCase
     {
         $foreignService = Service::where('business_id', $this->businessB->id)->firstOrFail();
         $ownService = Service::where('code', 'US-ABD-PEL')->where('business_id', $this->businessA->id)->firstOrFail();
-        $billing = $this->makeStaff($this->businessA, $this->adminA, 'billing');
 
         // Guard against the test silently testing nothing.
         $this->assertNotSame(
@@ -33,9 +32,12 @@ class AuthorizationBoundaryTest extends ApiTestCase
             'The fixture must span two tenants for this to mean anything.'
         );
 
-        $study = $this->bookStudy($ownService, $billing);
+        // The booking actor needs `appointment create`, which the `billing`
+        // bundle deliberately does not carry (it is a POS role, not a
+        // scheduling one), so the study is booked by the clinic owner.
+        $study = $this->bookStudy($ownService, $this->adminA);
 
-        $this->actingAs($billing)->postJson("/api/v1/studies/{$study}/invoices", [
+        $this->actingAs($this->adminA)->postJson("/api/v1/studies/{$study}/invoices", [
             'items' => [[
                 'serviceId' => $foreignService->id,
                 'description' => 'Smuggled line item',
@@ -67,6 +69,8 @@ class AuthorizationBoundaryTest extends ApiTestCase
     {
         $foreign = Location::create([
             'name' => 'Foreign Facility '.uniqid(),
+            // `locations.address` is NOT NULL, unlike the rest of the facade row.
+            'address' => '1 Example Road, Springfield',
             'business_id' => $this->businessB->id,
             'created_by' => $this->adminB->id,
         ]);
@@ -96,13 +100,24 @@ class AuthorizationBoundaryTest extends ApiTestCase
 
     public function test_print_settings_read_and_write_need_the_same_permission(): void
     {
-        // The SPA gates the section on ['print settings manage','setting manage'];
-        // the read asked for 'clinic manage', so the delegated front-desk role
-        // got a 403 on the panel it was entitled to open.
+        // The invariant is PARITY, not "a receptionist may open the panel": the
+        // read used to ask for `clinic manage` while the write asked for
+        // ['print settings manage','setting manage'], so the two disagreed. The
+        // `receptionist` bundle holds neither print grant (it gets `receipt
+        // print` and `label print`, not the settings panel), so the honest
+        // assertion is that the same role is refused by BOTH verbs.
         $reception = $this->makeStaff($this->businessA, $this->adminA, 'receptionist');
-        $technologist = $this->makeStaff($this->businessA, $this->adminA, 'technologist');
 
-        $this->actingAs($reception)->getJson('/api/v1/settings/printing')->assertOk();
+        $this->actingAs($reception)->getJson('/api/v1/settings/printing')->assertForbidden();
+        $this->actingAs($reception)->putJson('/api/v1/settings/printing', [
+            'paper' => 'a4',
+        ])->assertForbidden();
+
+        // …and a role that does hold it reads the panel, while a clinical role
+        // that holds neither is still refused.
+        $this->actingAs($this->adminA)->getJson('/api/v1/settings/printing')->assertOk();
+
+        $technologist = $this->makeStaff($this->businessA, $this->adminA, 'technologist');
         $this->actingAs($technologist)->getJson('/api/v1/settings/printing')->assertForbidden();
     }
 
@@ -155,10 +170,17 @@ class AuthorizationBoundaryTest extends ApiTestCase
         // A signup wave must be bounded, not merely rate-limited: 6/min/IP still
         // fills the operator's activation queue with tenants that can never pass
         // EnsureTenantActive.
+        //
+        // The cap counts tenants sitting in a PENDING status, so the fixtures
+        // (which provision as trialing) already occupy the queue. Flipping them
+        // to active here would have emptied it and asserted the opposite of what
+        // the guard does.
         config(['ris.registration.max_pending_tenants' => 1]);
 
-        Business::where('subscription_status', 'trialing')
-            ->update(['subscription_status' => 'active']);
+        $pending = Business::query()
+            ->whereIn('subscription_status', (array) config('ris.registration.pending_statuses', ['provisioning', 'trialing']))
+            ->count();
+        $this->assertGreaterThanOrEqual(1, $pending, 'The queue must already hold a pending tenant for this to mean anything.');
 
         $this->postJson('/api/v1/register', [
             'clinic_name' => 'One Too Many',

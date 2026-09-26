@@ -143,7 +143,13 @@ class CrossBoundaryLeakTest extends ApiTestCase
         $seenByAssigned = $this->actingAs($assigned)
             ->getJson('/api/v1/notifications')->assertOk()->json('data.notifications');
 
-        $this->assertSame([$mine->id], array_column($seenByAssigned, 'id'), 'A colleague must not see my assignment.');
+        // Ids cross the wire as strings (ApiShape::id), so both sides are
+        // compared as strings; the invariant is visibility, not set equality,
+        // because the tenant fixture may already carry rows of its own.
+        $seenIds = array_map('strval', array_column($seenByAssigned, 'id'));
+
+        $this->assertContains((string) $mine->id, $seenIds, 'The addressee must see their own assignment.');
+        $this->assertNotContains((string) $theirs->id, $seenIds, 'A colleague must not see my assignment.');
         $this->assertStringNotContainsString('Someone Else', json_encode($seenByAssigned));
     }
 
@@ -163,11 +169,11 @@ class CrossBoundaryLeakTest extends ApiTestCase
         ]);
 
         foreach ([$one, $two] as $staff) {
-            $ids = array_column(
+            $ids = array_map('strval', array_column(
                 $this->actingAs($staff)->getJson('/api/v1/notifications')->assertOk()->json('data.notifications'),
                 'id'
-            );
-            $this->assertContains($alert->id, $ids, 'A clinic-wide alert must reach every member of staff.');
+            ));
+            $this->assertContains((string) $alert->id, $ids, 'A clinic-wide alert must reach every member of staff.');
         }
     }
 
