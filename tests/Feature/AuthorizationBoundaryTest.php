@@ -177,10 +177,29 @@ class AuthorizationBoundaryTest extends ApiTestCase
         // the guard does.
         config(['ris.registration.max_pending_tenants' => 1]);
 
+        // The cap counts tenants in a PENDING status, and ApiTestCase provisions
+        // its fixtures as `active`, so the queue starts EMPTY. The test has to
+        // put one tenant in it - the earlier version flipped the pending ones to
+        // active, which is the opposite of filling the queue.
+        $awaitingActivation = Business::create([
+            'name' => 'Awaiting Activation '.uniqid(),
+            // Mirrors ApiTestCase's fixture shape: the SaaS columns the
+            // platform console reads must exist even on a pending tenant.
+            'form_type' => 'form-layout',
+            'layouts' => 'Formlayout11',
+            'subscription_status' => 'trialing',
+            'tenant_code' => 'PEND-'.random_int(1000, 9999),
+            'created_by' => $this->adminA->id,
+            'region' => array_key_first(config('ris.regions', ['default' => []])) ?: 'default',
+            'deployment_stamp' => array_key_first(config('ris.deployment_stamps', ['stamp-a' => []])) ?: 'stamp-a',
+            'isolation_profile' => 'pooled',
+            'database_cluster' => 'primary',
+        ]);
+
         $pending = Business::query()
             ->whereIn('subscription_status', (array) config('ris.registration.pending_statuses', ['provisioning', 'trialing']))
             ->count();
-        $this->assertGreaterThanOrEqual(1, $pending, 'The queue must already hold a pending tenant for this to mean anything.');
+        $this->assertGreaterThanOrEqual(1, $pending, 'The queue must hold a pending tenant for this to mean anything.');
 
         $this->postJson('/api/v1/register', [
             'clinic_name' => 'One Too Many',
